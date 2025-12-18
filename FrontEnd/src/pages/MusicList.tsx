@@ -1,16 +1,9 @@
 import { useEffect, useState } from "react";
 import { getMusicList } from "../services/musicApi";
-
-interface Music {
-  id: number;
-  title: string;
-  artist: string;
-  url: string;
-  cover: string;
-}
+import type { Song } from "../types/Song";
 
 export default function MusicList() {
-  const [list, setList] = useState<Music[]>([]);
+  const [list, setList] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,7 +21,7 @@ export default function MusicList() {
 
       {list.map((music) => (
         <div key={music.id} style={{ marginBottom: "20px" }}>
-          <img src={music.cover} width={100} />
+          <img src={music.cover_url} width={100} />
           <h3>{music.title}</h3>
           <p>{music.artist}</p>
 

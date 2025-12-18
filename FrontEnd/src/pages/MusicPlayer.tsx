@@ -1,16 +1,9 @@
 import { useEffect, useState } from "react";
 import { getMusicList } from "../services/musicApi";
-
-interface Music {
-  id: number;
-  title: string;
-  artist: string;
-  url: string;
-  cover: string;
-}
+import type { Song } from "../types/Song";
 
 export default function MusicPlayer() {
-  const [musicList, setMusicList] = useState<Music[]>([]);
+  const [musicList, setMusicList] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,7 +25,7 @@ export default function MusicPlayer() {
       <h2>Music List</h2>
       {musicList.map((music) => (
         <div key={music.id}>
-          <img src={music.cover} width={80} />
+          <img src={music.cover_url} width={80} />
           <p>{music.title}</p>
           <p>{music.artist}</p>
 
