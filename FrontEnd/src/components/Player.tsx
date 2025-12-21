@@ -399,7 +399,7 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
                   {/* Glow Effect */}
                   <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-20 bg-[var(--accent)] blur-xl transition-opacity duration-500"></div>
                   
-                  <style dangerouslySetInnerHTML={{ __html: `.group/btn:hover span { color: black !important; } .group/btn:hover svg { stroke: black !important; }` }} />
+                  <style dangerouslySetInnerHTML={{ __html: `.group\\/btn:hover span { color: black !important; } .group\\/btn:hover svg { stroke: black !important; }` }} />
                 </Link>
 
                 <a 

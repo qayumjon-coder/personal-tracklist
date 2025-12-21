@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import type { Song } from '../types/Song';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -10,16 +11,4 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Database types
-export interface Song {
-    id: number;
-    title: string;
-    artist: string;
-    category: string;
-    url: string;
-    cover_url: string;
-    duration: number;
-    liked?: boolean;
-    lyrics?: string;
-    created_at?: string;
-}
+export type { Song };

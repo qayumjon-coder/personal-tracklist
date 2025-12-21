@@ -1,8 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 :root {
   --bg-main: #000000;
@@ -160,5 +157,5 @@ html { font-size: 16px; }
 
 /* Remove all border radius across the app as requested */
 *, *::before, *::after {
-  /* border-radius: 0 !important; - Removed to allow specific rounding */
+  border-radius: 0;
 }
