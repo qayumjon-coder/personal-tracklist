@@ -894,7 +894,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]"></span>
                   </span>
-                  <span className="font-bold">Admin Curated</span>
+                  <span className="font-bold">Uploads Open</span>
                 </div>
 
                 <h2 className="text-3xl md:text-5xl font-bold tracking-tighter mb-6 text-white uppercase leading-tight">
@@ -902,7 +902,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 </h2>
 
                 <p className="text-[var(--text-secondary)] font-mono text-xs md:text-sm leading-relaxed uppercase tracking-[0.2em] max-w-2xl mx-auto lg:mx-0">
-                  Curated tracks, live on the mainframe. New frequencies added regularly by our admin unit.
+                  Join our neural network. Share your frequency with the world. Uploads are now open to all units.
                 </p>
               </div>
               
