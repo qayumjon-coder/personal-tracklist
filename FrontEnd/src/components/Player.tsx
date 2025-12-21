@@ -1,7 +1,7 @@
 import type { Song } from "../types/Song";
 
 import { useSettings } from "../contexts/SettingsContext";
-import { Heart, Mic2, X, Mail, Send, Upload, Search, Plus, Minus, Loader2, Check } from "lucide-react";
+import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send } from "lucide-react";
 import { Link } from "react-router-dom";
 import { updateSong, searchSongs } from "../services/musicApi";
 

@@ -27,6 +27,7 @@ export function usePlaylist() {
             }
         } catch (err) {
             console.error("Failed to load playlist", err);
+            setError("Failed to load playlist");
         } finally {
             setLoading(false);
         }
