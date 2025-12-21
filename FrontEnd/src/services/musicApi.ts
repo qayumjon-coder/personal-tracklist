@@ -3,6 +3,7 @@ import { supabase, type Song } from '../lib/supabase';
 /**
  * Fetch all songs from Supabase database
  */
+// Fetch all songs
 export async function getMusicList(): Promise<Song[]> {
   const { data, error } = await supabase
     .from('songs')
@@ -11,10 +12,53 @@ export async function getMusicList(): Promise<Song[]> {
 
   if (error) {
     console.error('Error fetching songs:', error);
-    throw new Error('Failed to fetch music list');
+    return [];
   }
 
-  return data || [];
+  // Map snake_case to camelCase for frontend consistency
+  return data.map((song: any) => ({
+    ...song,
+    coverUrl: song.cover_url // Ensure compatibility
+  }));
+}
+
+// Search songs
+export async function searchSongs(query: string): Promise<Song[]> {
+  const { data, error } = await supabase
+    .from('songs')
+    .select('*')
+    .or(`title.ilike.%${query}%,artist.ilike.%${query}%`)
+    .limit(20);
+
+  if (error) {
+    console.error('Error searching songs:', error);
+    return [];
+  }
+
+  return data.map((song: any) => ({
+    ...song,
+    coverUrl: song.cover_url
+  }));
+}
+
+// Fetch specific songs by IDs
+export async function getSongsByIds(ids: number[]): Promise<Song[]> {
+  if (ids.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('songs')
+    .select('*')
+    .in('id', ids);
+
+  if (error) {
+    console.error('Error fetching playlist songs:', error);
+    return [];
+  }
+
+  return data.map((song: any) => ({
+    ...song,
+    coverUrl: song.cover_url
+  }));
 }
 
 /**

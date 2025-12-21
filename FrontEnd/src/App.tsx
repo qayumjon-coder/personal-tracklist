@@ -5,15 +5,15 @@ import { Settings } from "./components/Settings";
 import { Admin } from "./pages/Admin";
 import { AdminLogin } from "./pages/AdminLogin";
 import MusicEditor from "./pages/MusicEditor";
-import { useFetchSongs } from "./hooks/useFetchSongs";
+import { usePlaylist } from "./hooks/usePlaylist";
 import { useAudioPlayer } from "./hooks/useAudioPlayer";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function MusicApp() {
-  const { songs, loading } = useFetchSongs();
-  const player = useAudioPlayer(songs);
+  const { playlist, loading, addToPlaylist, removeFromPlaylist } = usePlaylist();
+  const player = useAudioPlayer(playlist);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
@@ -23,7 +23,16 @@ function MusicApp() {
           <div className="scanline" />
           <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
           <Routes>
-            <Route path="/" element={<Player songs={songs} loading={loading} player={player} onOpenSettings={() => setIsSettingsOpen(true)} />} />
+            <Route path="/" element={
+              <Player 
+                songs={playlist} 
+                loading={loading} 
+                player={player} 
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onAddToPlaylist={addToPlaylist}
+                onRemoveFromPlaylist={removeFromPlaylist}
+              />
+            } />
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/editor" element={<ProtectedRoute><MusicEditor /></ProtectedRoute>} />

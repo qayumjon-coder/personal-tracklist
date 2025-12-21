@@ -1,9 +1,9 @@
 import type { Song } from "../types/Song";
 
 import { useSettings } from "../contexts/SettingsContext";
-import { Heart, Mic2, X, Mail, Send, Upload } from "lucide-react";
+import { Heart, Mic2, X, Mail, Send, Upload, Search, Plus, Minus, Loader2, Check } from "lucide-react";
 import { Link } from "react-router-dom";
-import { updateSong } from "../services/musicApi";
+import { updateSong, searchSongs } from "../services/musicApi";
 
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { Playlist } from "./Playlist";
@@ -22,9 +22,11 @@ interface PlayerProps {
   loading: boolean;
   player: ReturnType<typeof useAudioPlayer>;
   onOpenSettings: () => void;
+  onAddToPlaylist: (song: Song) => Promise<{ success: boolean; message: string }>;
+  onRemoveFromPlaylist: (id: number) => void;
 }
 
-export function Player({ songs, loading, player, onOpenSettings }: PlayerProps) {
+export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist }: PlayerProps) {
   const { playClick, playHover } = useSoundEffects();
   const { visualizerMode } = useSettings(); // Get visualizer mode
   const beatScale = useBeatScale(player.playing, player.analyser); // Get beat scale
@@ -61,6 +63,41 @@ export function Player({ songs, loading, player, onOpenSettings }: PlayerProps) 
         return reverted;
       });
     }
+  };
+
+  // Search Logic
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Song[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchMsg, setSearchMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    setSearchMsg(null);
+    try {
+        const results = await searchSongs(searchQuery);
+        setSearchResults(results);
+    } catch(err) {
+        console.error(err);
+    } finally {
+        setIsSearching(false);
+    }
+  };
+
+  const handleAddSong = async (song: Song) => {
+      // Check if already in playlist (locally)
+      if (songs.some(s => s.id === song.id)) {
+        setSearchMsg({ type: 'error', text: 'Song already in playlist' });
+        setTimeout(() => setSearchMsg(null), 2000);
+        return;
+      }
+      
+      const res = await onAddToPlaylist(song);
+      setSearchMsg({ type: res.success ? 'success' : 'error', text: res.message });
+      setTimeout(() => setSearchMsg(null), 2000);
   };
 
   const categories = ["All", ...Array.from(new Set(songs.map(s => s.category || "General")))];
@@ -126,6 +163,15 @@ export function Player({ songs, loading, player, onOpenSettings }: PlayerProps) 
                   <span className="opacity-60 group-hover:opacity-100">[</span>
                   <span className="mx-1">Config</span>
                   <span className="opacity-60 group-hover:opacity-100">]</span>
+                </button>
+
+                <button 
+                  onClick={() => { playClick(); setIsSearchOpen(true); }}
+                  onMouseEnter={playHover}
+                  className="text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] px-3 py-1 transition-all bg-black/50 uppercase group flex items-center gap-2"
+                >
+                  <Search size={10} />
+                  <span>Search</span>
                 </button>
             </div>
           </div>
@@ -298,6 +344,7 @@ export function Player({ songs, loading, player, onOpenSettings }: PlayerProps) 
                       const idx = songs.findIndex(s => s.id === song.id);
                       if (idx !== -1) player.selectSong(idx);
                   }}
+                  onRemove={onRemoveFromPlaylist}
                 />
               </div>
             </div>
@@ -386,6 +433,83 @@ export function Player({ songs, loading, player, onOpenSettings }: PlayerProps) 
         </div>
       </div>
     </div>
+
+    {/* Search Modal */}
+    {isSearchOpen && (
+      <div className="absolute inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[80vh] flex flex-col">
+          <button 
+            onClick={() => setIsSearchOpen(false)}
+            className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
+          >
+            <X size={20} />
+          </button>
+          
+          <h2 className="text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-6 uppercase">
+            Search Database
+          </h2>
+
+          {/* Search Form */}
+          <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="SEARCH ARTIST OR TITLE..."
+              className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-3 text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
+              autoFocus
+            />
+            <button 
+              type="submit" 
+              disabled={isSearching}
+              className="px-4 bg-[var(--accent)] text-black font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
+            >
+              {isSearching ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+            </button>
+          </form>
+
+          {/* Message Toast */}
+          {searchMsg && (
+            <div className={`mb-4 p-2 text-center text-xs font-mono border ${searchMsg.type === 'success' ? 'border-green-500 text-green-400' : 'border-red-500 text-red-400'}`}>
+              {searchMsg.text}
+            </div>
+          )}
+
+          {/* Results List */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
+             {searchResults.length === 0 && !isSearching && searchQuery && (
+               <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
+                 NO DATA FOUND IN SECTOR
+               </div>
+             )}
+             
+             {searchResults.map((song) => {
+               const inPlaylist = songs.some(s => s.id === song.id);
+               return (
+                 <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                       <img src={song.coverUrl} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
+                       <div className="min-w-0">
+                         <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
+                         <div className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider">{song.artist}</div>
+                       </div>
+                    </div>
+                    
+                    <button
+                      onClick={() => handleAddSong(song)}
+                      disabled={inPlaylist}
+                      className={`p-2 transition-all ${inPlaylist ? 'text-green-500 cursor-default' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] border border-transparent hover:border-[var(--accent)]'}`}
+                      title={inPlaylist ? "Already in playlist" : "Add to playlist"}
+                    >
+                      {inPlaylist ? <Check size={18} /> : <Plus size={18} />}
+                    </button>
+                 </div>
+               );
+             })}
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Lyrics Overlay */}
     {showLyrics && (

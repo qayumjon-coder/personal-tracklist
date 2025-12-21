@@ -1,13 +1,15 @@
 import type { Song } from "../types/Song";
 import { useSoundEffects } from "../hooks/useSoundEffects";
+import { Minus } from "lucide-react";
 
 interface PlaylistProps {
   songs: Song[];
   currentSong: Song;
   onSelectSong: (song: Song) => void;
+  onRemove?: (id: number) => void;
 }
 
-export function Playlist({ songs, currentSong, onSelectSong }: PlaylistProps) {
+export function Playlist({ songs, currentSong, onSelectSong, onRemove }: PlaylistProps) {
   const { playClick, playHover } = useSoundEffects();
 
   return (
@@ -15,11 +17,11 @@ export function Playlist({ songs, currentSong, onSelectSong }: PlaylistProps) {
       {songs.map((song, index) => {
         const isActive = song.id === currentSong?.id;
         return (
+          <div key={song.id} className="relative group">
           <button
-            key={song.id}
             onClick={() => { playClick(); onSelectSong(song); }}
             onMouseEnter={playHover}
-            className={`w-full flex items-center justify-between gap-4 py-3 px-4 transition-all duration-300 group relative border-l-2 ${
+            className={`w-full flex items-center justify-between gap-4 py-3 px-4 transition-all duration-300 relative border-l-2 ${
               isActive 
                 ? 'bg-[var(--accent)]/10 border-[var(--accent)] shadow-[inset_0_0_20px_rgba(0,255,255,0.1)]' 
                 : 'hover:bg-[var(--text-secondary)]/5 border-transparent hover:border-[var(--text-secondary)]/30'
@@ -59,10 +61,26 @@ export function Playlist({ songs, currentSong, onSelectSong }: PlaylistProps) {
               </div>
             </div>
 
-            <div className={`text-[10px] font-mono shrink-0 opacity-50 group-hover:opacity-100 transition-opacity ${isActive ? 'text-[var(--accent)] opacity-100' : ''}`}>
+            <div className={`text-[10px] font-mono shrink-0 opacity-50 group-hover:opacity-100 transition-opacity flex items-center gap-4 ${isActive ? 'text-[var(--accent)] opacity-100' : ''}`}>
                {formatDuration(song.duration)}
             </div>
           </button>
+          
+          {/* Remove Button */}
+          {onRemove && (
+            <button
+               onClick={(e) => {
+                 e.stopPropagation();
+                 playClick();
+                 onRemove(song.id);
+               }}
+               className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all z-10"
+               title="Remove from playlist"
+            >
+              <Minus size={14} />
+            </button>
+          )}
+          </div>
         );
       })}
     </div>
