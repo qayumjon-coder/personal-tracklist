@@ -1,6 +1,6 @@
 import type { Song } from "../types/Song";
 import { useSoundEffects } from "../hooks/useSoundEffects";
-import { Minus } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 interface PlaylistProps {
   songs: Song[];
@@ -74,10 +74,10 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove }: Playlis
                  playClick();
                  onRemove(song.id);
                }}
-               className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-[var(--text-secondary)] hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all z-10"
+               className="absolute right-4 top-1/2 -translate-y-1/2 p-2 text-red-500/40 hover:text-red-500 transition-all z-20 group/remove"
                title="Remove from playlist"
             >
-              <Minus size={14} />
+              <Trash2 size={18} className="drop-shadow-[0_0_8px_rgba(239,68,68,0.2)]" />
             </button>
           )}
           </div>
