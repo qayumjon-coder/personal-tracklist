@@ -12,7 +12,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 function MusicApp() {
-  const { playlist, loading, addToPlaylist, removeFromPlaylist } = usePlaylist();
+  const { playlist, loading, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist } = usePlaylist();
   const player = useAudioPlayer(playlist);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -31,6 +31,7 @@ function MusicApp() {
                 onOpenSettings={() => setIsSettingsOpen(true)}
                 onAddToPlaylist={addToPlaylist}
                 onRemoveFromPlaylist={removeFromPlaylist}
+                onBulkRemove={removeMultipleFromPlaylist}
               />
             } />
             <Route path="/admin/login" element={<AdminLogin />} />

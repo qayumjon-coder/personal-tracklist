@@ -24,9 +24,10 @@ interface PlayerProps {
   onOpenSettings: () => void;
   onAddToPlaylist: (song: Song) => Promise<{ success: boolean; message: string }>;
   onRemoveFromPlaylist: (id: number) => void;
+  onBulkRemove: (ids: number[]) => void;
 }
 
-export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist }: PlayerProps) {
+export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove }: PlayerProps) {
   const { playClick, playHover } = useSoundEffects();
   const { visualizerMode } = useSettings(); // Get visualizer mode
   const beatScale = useBeatScale(player.playing, player.analyser); // Get beat scale
@@ -447,6 +448,7 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
                       if (idx !== -1) player.selectSong(idx);
                   }}
                   onRemove={onRemoveFromPlaylist}
+                  onBulkRemove={onBulkRemove}
                 />
               </div>
             </div>

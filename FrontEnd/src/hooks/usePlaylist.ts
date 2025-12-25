@@ -54,10 +54,16 @@ export function usePlaylist() {
         saveToStorage(newPlaylist);
     };
 
+    const removeMultipleFromPlaylist = (songIds: number[]) => {
+        const newPlaylist = playlist.filter(s => !songIds.includes(s.id));
+        setPlaylist(newPlaylist);
+        saveToStorage(newPlaylist);
+    };
+
     const saveToStorage = (songs: Song[]) => {
         const ids = songs.map(s => s.id);
         localStorage.setItem(PLAYLIST_KEY, JSON.stringify(ids));
     };
 
-    return { playlist, loading, addToPlaylist, removeFromPlaylist, error };
+    return { playlist, loading, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, error };
 }
