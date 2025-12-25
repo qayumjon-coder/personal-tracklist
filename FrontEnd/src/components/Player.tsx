@@ -104,7 +104,31 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
   const filteredSongs = selectedCategory === "All" ? songs : songs.filter(s => (s.category || "General") === selectedCategory);
 
   if (loading) return <div className="text-[var(--text-primary)] text-center mt-20 text-lg animate-pulse font-mono">Loading library...</div>;
-  if (!songs.length) return <div className="text-[var(--text-secondary)] text-center mt-20 font-mono">No songs found in library</div>;
+  
+  if (!songs.length) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] w-full max-w-lg mx-auto p-8 border border-[var(--text-secondary)]/30 bg-[var(--bg-main)]/50 backdrop-blur-xl relative group">
+        <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)]"></div>
+        <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)]"></div>
+        
+        <div className="w-16 h-16 mb-6 border border-[var(--accent)] flex items-center justify-center animate-pulse">
+            <Search className="text-[var(--accent)]" size={32} />
+        </div>
+        
+        <h2 className="text-xl font-bold text-[var(--accent)] mb-4 tracking-widest font-mono uppercase text-glow">Playlist Empty</h2>
+        <p className="text-[var(--text-secondary)] text-center text-xs font-mono mb-8 uppercase tracking-[0.2em] leading-relaxed">
+            Your personal frequency stack is currently offline. <br/> Access the database to synchronize local tracks.
+        </p>
+        
+        <button 
+            onClick={() => { playClick(); setIsSearchOpen(true); }}
+            className="px-8 py-3 border border-[var(--accent)] text-[var(--accent)] font-bold font-mono text-xs uppercase tracking-[0.3em] hover:bg-[var(--accent)] hover:text-black transition-all duration-300 shadow-[0_0_20px_rgba(0,255,255,0.1)] hover:shadow-[0_0_30px_rgba(0,255,255,0.3)]"
+        >
+            Access Database
+        </button>
+      </div>
+    );
+  }
 
   const current: Song = songs[player.index];
 

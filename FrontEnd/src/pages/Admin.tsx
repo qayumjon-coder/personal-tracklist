@@ -98,7 +98,7 @@ export function Admin() {
     setStatus(null);
 
     try {
-      await uploadSong(
+      const newSong = await uploadSong(
         formData.title,
         formData.artist,
         formData.category,
@@ -107,7 +107,20 @@ export function Admin() {
         coverFile
       );
 
-      setStatus({ type: "success", message: "Song uploaded successfully!" });
+      // Automatically add to user's personalized playlist if there's room
+      const storedIdsStr = localStorage.getItem('my_playlist_ids') || "[]";
+      try {
+        const storedIds: number[] = JSON.parse(storedIdsStr);
+        if (storedIds.length < 7 && !storedIds.includes(newSong.id)) {
+          storedIds.push(newSong.id);
+          localStorage.setItem('my_playlist_ids', JSON.stringify(storedIds));
+        }
+      } catch (e) {
+        console.error("Failed to update local playlist", e);
+        localStorage.setItem('my_playlist_ids', JSON.stringify([newSong.id]));
+      }
+
+      setStatus({ type: "success", message: "Song uploaded successfully! Adding to your playlist..." });
       
       // Increment local count if not admin
       if (!isAuthenticated) {
@@ -116,7 +129,7 @@ export function Admin() {
         localStorage.setItem('user_upload_count', newCount.toString());
       }
 
-      setTimeout(() => navigate("/"), 2000);
+      setTimeout(() => navigate("/"), 1500);
     } catch (err) {
       console.error('Upload error:', err);
       setStatus({ type: "error", message: err instanceof Error ? err.message : "Failed to upload song." });
