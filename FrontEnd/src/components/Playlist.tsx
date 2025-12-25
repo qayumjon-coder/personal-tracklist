@@ -128,9 +128,11 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
 
                 <div className="flex items-center gap-4 flex-1 text-left overflow-hidden min-w-0">
                   {/* Track Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-xs font-bold truncate font-mono tracking-tight uppercase ${isActive ? 'text-[var(--accent)] text-glow' : 'text-[var(--text-secondary)] group-hover/item:text-[var(--text-primary)]'}`}>
-                      {song.title}
+                  <div className="flex-1 min-w-0 hover-marquee">
+                    <div className="overflow-hidden whitespace-nowrap">
+                      <div className={`marquee-inner text-xs font-bold font-mono tracking-tight uppercase inline-block ${isActive ? 'text-[var(--accent)] text-glow' : 'text-[var(--text-secondary)] group-hover/item:text-[var(--text-primary)]'}`}>
+                        {song.title} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {song.title} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+                      </div>
                     </div>
                     <div className="text-[9px] truncate font-mono uppercase tracking-[0.2em] opacity-40 mt-0.5">
                       {song.artist}

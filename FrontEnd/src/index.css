@@ -119,6 +119,15 @@ html { font-size: 16px; }
     animation: marquee 15s linear infinite;
 }
 
+@keyframes marquee-playlist {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+
+.hover-marquee:hover .marquee-inner {
+    animation: marquee-playlist 8s linear infinite;
+}
+
 /* Retro Grid Background */
 .retro-grid {
     background-size: 32px 32px;
