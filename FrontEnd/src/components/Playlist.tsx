@@ -16,6 +16,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -27,6 +28,16 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Auto-scroll to active song
+  useEffect(() => {
+    if (currentSong && scrollContainerRef.current) {
+      const activeEl = scrollContainerRef.current.querySelector('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [currentSong?.id]);
 
   const toggleSelect = (id: number) => {
     const newSelected = new Set(selectedIds);
@@ -105,14 +116,21 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
         </div>
       </div>
 
-      <div className="flex flex-col gap-0.5 overflow-y-auto custom-scrollbar flex-1 p-1">
+      <div 
+        ref={scrollContainerRef}
+        className="flex flex-col gap-0.5 overflow-y-auto custom-scrollbar flex-1 p-1"
+      >
         {songs.map((song, index) => {
           const isActive = song.id === currentSong?.id;
           const isSelected = selectedIds.has(song.id);
           const isMenuOpen = activeMenuId === song.id;
 
           return (
-            <div key={song.id} className={`relative group/item flex items-center transition-all duration-300 ${isActive ? 'playlist-active-bg' : ''} ${isSelected ? 'bg-[var(--accent)]/10' : ''}`}>
+            <div 
+                key={song.id} 
+                data-active={isActive}
+                className={`relative group/item flex items-center transition-all duration-300 ${isActive ? 'playlist-active-bg' : ''} ${isSelected ? 'bg-[var(--accent)]/10' : ''}`}
+            >
               {/* Selection Checkbox */}
               {(isSelectionMode || isSelected) && (
                 <button

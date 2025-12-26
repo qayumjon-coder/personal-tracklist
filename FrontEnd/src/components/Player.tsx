@@ -12,7 +12,7 @@ import { PlaybackControls } from "./PlaybackControls";
 import { VolumeControl } from "./VolumeControl";
 import { Visualizer, FadeVisualizer, useBeatScale, AmbientBackground } from "./Visualizer";
 import { formatTime } from "../utils/formatTime";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 
 import { useSoundEffects } from "../hooks/useSoundEffects";
@@ -35,11 +35,23 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [showLyrics, setShowLyrics] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<number>>(new Set());
+  const [showVolumeHUD, setShowVolumeHUD] = useState(false);
+  const volumeTimerRef = useRef<any>(null);
 
   // Sync liked status from songs prop
   useEffect(() => {
     setLikedIds(new Set(songs.filter(s => s.liked).map(s => s.id)));
   }, [songs]);
+
+  // Show volume HUD when volume changes
+  useEffect(() => {
+    setShowVolumeHUD(true);
+    if (volumeTimerRef.current) clearTimeout(volumeTimerRef.current);
+    volumeTimerRef.current = setTimeout(() => setShowVolumeHUD(false), 2000);
+    return () => {
+        if (volumeTimerRef.current) clearTimeout(volumeTimerRef.current);
+    };
+  }, [player.volume]);
 
   const toggleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -87,6 +99,67 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
         setIsSearching(false);
     }
   };
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger if user is typing in an input or textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      switch (e.code) {
+        case 'Space':
+          e.preventDefault();
+          player.playing ? player.pause() : player.play();
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          player.next();
+          break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          player.prev();
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          player.setVolume(Math.min(100, player.volume + 5));
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          player.setVolume(Math.max(0, player.volume - 5));
+          break;
+        case 'KeyM':
+          player.toggleMute();
+          break;
+        case 'KeyF':
+          if (!isSearchOpen) {
+            e.preventDefault();
+            setIsSearchOpen(true);
+          }
+          break;
+        case 'Escape':
+          if (isSearchOpen) setIsSearchOpen(false);
+          if (showLyrics) setShowLyrics(false);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [player, isSearchOpen, showLyrics]);
+
+  // Update Page Title with current song
+  useEffect(() => {
+    if (songs.length > 0 && songs[player.index]) {
+      const current = songs[player.index];
+      document.title = `${player.playing ? '▶' : '⏸'} ${current.title} - Fronto`;
+    } else {
+      document.title = 'Fronto - Cyber Music Player';
+    }
+    
+    return () => {
+      document.title = 'Fronto - Cyber Music Player';
+    };
+  }, [player.index, player.playing, songs]);
 
   const handleAddSong = async (song: Song) => {
       // Check if already in playlist (locally)
@@ -223,6 +296,23 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
       
       {/* Main Player Display */}
       <div className="flex-1 w-full">
+        {/* Volume HUD */}
+        {showVolumeHUD && (
+            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in zoom-in slide-in-from-top-4 duration-300">
+                <div className="bg-black/80 backdrop-blur-xl border border-[var(--accent)]/30 px-6 py-2 shadow-[0_0_30px_rgba(0,255,255,0.2)]">
+                    <div className="flex items-center gap-4">
+                        <span className="text-[10px] font-mono text-[var(--accent)] tracking-[0.3em] uppercase">VOLUME</span>
+                        <div className="w-32 h-1 bg-white/5 relative">
+                            <div 
+                                className="absolute inset-y-0 left-0 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)] transition-all duration-300"
+                                style={{ width: `${player.volume}%` }}
+                            />
+                        </div>
+                        <span className="text-[10px] font-mono text-[var(--accent)] w-6">{player.volume}%</span>
+                    </div>
+                </div>
+            </div>
+        )}
         <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[500px] md:min-h-[560px] lg:min-h-[600px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(0,255,255,0.1)] text-base md:text-lg">
           {/* Decorative Corners */}
           <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)] z-20"></div>

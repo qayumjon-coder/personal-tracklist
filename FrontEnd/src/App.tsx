@@ -11,10 +11,23 @@ import { SettingsProvider } from "./contexts/SettingsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
+import { LoadingScreen } from "./components/LoadingScreen";
+import { useEffect } from "react";
+
 function MusicApp() {
   const { playlist, loading, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist } = usePlaylist();
   const player = useAudioPlayer(playlist);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [showBoot, setShowBoot] = useState(true);
+
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => setShowBoot(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
+
+  if (showBoot) return <LoadingScreen />;
 
   return (
       <Router>
