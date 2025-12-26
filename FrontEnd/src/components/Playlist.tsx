@@ -117,7 +117,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
               {(isSelectionMode || isSelected) && (
                 <button
                   onClick={() => { playClick(); toggleSelect(song.id); }}
-                  className={`pl-4 pr-1 py-3 transition-colors ${isSelected ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/30 hover:text-[var(--accent)]'}`}
+                  className={`pl-2 pr-1 py-3 transition-colors ${isSelected ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/30 hover:text-[var(--accent)]'}`}
                 >
                   {isSelected ? <CheckSquare2 size={18} /> : <Square size={18} />}
                 </button>
@@ -132,7 +132,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                   }
                 }}
                 onMouseEnter={playHover}
-                className={`flex-1 flex items-center justify-between gap-4 py-4 px-4 transition-all duration-500 relative border-l-2 ${
+                className={`flex-1 flex items-center justify-between gap-2 py-3 px-3 transition-all duration-500 relative border-l-2 ${
                   isActive 
                     ? 'border-[var(--accent)]' 
                     : 'hover:bg-white/5 border-transparent hover:border-white/20'
@@ -148,26 +148,26 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                   <div className="absolute top-0 bottom-0 left-0 w-0.5 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]"></div>
                 )}
 
-                <div className="flex items-center gap-4 flex-1 text-left overflow-hidden min-w-0">
+                <div className="flex items-center gap-2 flex-1 text-left overflow-hidden min-w-0">
                   {/* Track Info */}
-                  <div className={`flex-1 min-w-0 ${song.title.length > 25 ? 'hover-marquee' : ''}`}>
+                  <div className={`flex-1 min-w-0 ${song.title.length > 20 ? 'hover-marquee' : ''}`}>
                     <div className="overflow-hidden whitespace-nowrap">
-                      <div className={`marquee-inner text-xs font-bold font-mono tracking-tight uppercase inline-block transition-colors duration-300 ${isActive ? 'text-[var(--accent)] text-glow' : 'text-[var(--text-secondary)] group-hover/item:text-[var(--text-primary)]'}`}>
+                      <div className={`marquee-inner text-[10px] md:text-xs font-bold font-mono tracking-tight uppercase inline-block transition-colors duration-300 ${isActive ? 'text-[var(--accent)] text-glow' : 'text-[var(--text-secondary)] group-hover/item:text-[var(--text-primary)]'}`}>
                         {song.title}
-                        {song.title.length > 25 && (
+                        {song.title.length > 20 && (
                           <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">
                              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {song.title} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className={`text-[9px] truncate font-mono uppercase tracking-[0.2em] mt-0.5 transition-opacity duration-300 ${isActive ? 'opacity-80' : 'opacity-30 group-hover/item:opacity-60'}`}>
+                    <div className={`text-[8px] md:text-[9px] truncate font-mono uppercase tracking-[0.15em] mt-0.5 transition-opacity duration-300 ${isActive ? 'opacity-80' : 'opacity-30 group-hover/item:opacity-60'}`}>
                       {song.artist}
                     </div>
                   </div>
                 </div>
 
-                <div className={`text-[9px] font-mono shrink-0 opacity-40 group-hover/item:opacity-100 transition-opacity flex items-center gap-4 ${isActive ? 'text-[var(--accent)] opacity-100' : ''}`}>
+                <div className={`text-[8px] md:text-[9px] font-mono shrink-0 opacity-40 group-hover/item:opacity-80 transition-opacity flex items-center ${isActive ? 'text-[var(--accent)] opacity-100' : ''}`}>
                    {formatDuration(song.duration)}
                 </div>
               </button>
@@ -180,7 +180,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                     playClick();
                     setActiveMenuId(isMenuOpen ? null : song.id);
                   }}
-                  className={`p-3 text-[var(--text-secondary)]/40 hover:text-[var(--accent)] transition-colors ${isMenuOpen ? 'text-[var(--accent)]' : ''}`}
+                  className={`p-2 text-[var(--text-secondary)]/40 hover:text-[var(--accent)] transition-colors ${isMenuOpen ? 'text-[var(--accent)]' : ''}`}
                 >
                   <MoreVertical size={16} />
                 </button>
