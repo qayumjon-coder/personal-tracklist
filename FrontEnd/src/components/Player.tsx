@@ -282,8 +282,8 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col md:flex-row mt-6 md:mt-10 min-h-0">
             
-            {/* LEFT COLUMN: Player (40%) */}
-            <div className="flex-[7] relative flex flex-col p-3 md:p-5 lg:p-6 border-b md:border-b-0 md:border-r border-[var(--text-secondary)]/30 overflow-hidden">
+            {/* LEFT COLUMN: Player (80%) */}
+            <div className="flex-[8] relative flex flex-col p-3 md:p-5 lg:p-6 border-b md:border-b-0 md:border-r border-[var(--text-secondary)]/30 overflow-hidden">
               
                 {/* Fade Visualizer Overlay (Player Box Only) */}
                 {visualizerMode === 'fade' && (
