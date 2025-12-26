@@ -282,7 +282,7 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
           {/* Main Content Area */}
           <div className="flex-1 flex flex-col md:flex-row mt-6 md:mt-10 min-h-0">
             
-            {/* LEFT COLUMN: Player (70%) */}
+            {/* LEFT COLUMN: Player (40%) */}
             <div className="flex-[7] relative flex flex-col p-3 md:p-5 lg:p-6 border-b md:border-b-0 md:border-r border-[var(--text-secondary)]/30 overflow-hidden">
               
                 {/* Fade Visualizer Overlay (Player Box Only) */}
@@ -402,8 +402,8 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
               </div>
             </div>
 
-            {/* RIGHT COLUMN: Playlist (30%) */}
-            <div className="flex-[3] flex flex-col bg-[var(--bg-main)]/50 border-t md:border-t-0 border-[var(--text-secondary)]/30 backdrop-blur-sm relative min-h-[280px] md:min-h-0">
+            {/* RIGHT COLUMN: Playlist (20%) */}
+            <div className="flex-[2] flex flex-col bg-[var(--bg-main)]/50 border-t md:border-t-0 border-[var(--text-secondary)]/30 backdrop-blur-sm relative min-h-[280px] md:min-h-0">
               {/* Playlist Header */}
               <div className="p-3 md:p-4 border-b border-[var(--text-secondary)]/30 bg-[var(--text-secondary)]/5 flex justify-between items-center">
                 <div>
