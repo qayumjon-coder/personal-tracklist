@@ -166,46 +166,48 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                   <div className="absolute top-0 bottom-0 left-0 w-0.5 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]"></div>
                 )}
 
-                <div className="flex items-center gap-2 flex-1 text-left overflow-hidden min-w-0">
+                <div className="flex flex-col flex-1 text-left overflow-hidden min-w-0 py-0.5">
                   {/* Track Info */}
-                  <div className={`flex-1 min-w-0 ${song.title.length > 20 ? 'hover-marquee' : ''}`}>
+                  <div className={`w-full min-w-0 ${song.title.length > 18 ? 'hover-marquee' : ''}`}>
                     <div className="overflow-hidden whitespace-nowrap">
-                      <div className={`marquee-inner text-[10px] md:text-xs font-bold font-mono tracking-tight uppercase inline-block transition-colors duration-300 ${isActive ? 'text-[var(--accent)] text-glow' : 'text-[var(--text-secondary)] group-hover/item:text-[var(--text-primary)]'}`}>
+                      <div className={`marquee-inner text-[10px] md:text-[11px] font-bold font-mono tracking-tight uppercase inline-block transition-colors duration-300 ${isActive ? 'text-[var(--accent)] text-glow' : 'text-[var(--text-secondary)] group-hover/item:text-[var(--text-primary)]'}`}>
                         {song.title}
-                        {song.title.length > 20 && (
+                        {song.title.length > 18 && (
                           <span className="opacity-0 group-hover/item:opacity-100 transition-opacity">
                              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; {song.title} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                           </span>
                         )}
                       </div>
                     </div>
-                    <div className={`text-[8px] md:text-[9px] truncate font-mono uppercase tracking-[0.15em] mt-0.5 transition-opacity duration-300 ${isActive ? 'opacity-80' : 'opacity-30 group-hover/item:opacity-60'}`}>
+                  </div>
+                  
+                  <div className="flex items-baseline justify-between gap-2 mt-0.5">
+                    <div className={`text-[8px] truncate font-mono uppercase tracking-[0.1em] transition-opacity duration-300 flex-1 ${isActive ? 'opacity-80' : 'opacity-30 group-hover/item:opacity-60'}`}>
                       {song.artist}
                     </div>
+                    <div className={`text-[8px] font-mono shrink-0 opacity-40 group-hover/item:opacity-80 transition-opacity ${isActive ? 'text-[var(--accent)] opacity-80' : ''}`}>
+                       {formatDuration(song.duration)}
+                    </div>
                   </div>
-                </div>
-
-                <div className={`text-[8px] md:text-[9px] font-mono shrink-0 opacity-40 group-hover/item:opacity-80 transition-opacity flex items-center ${isActive ? 'text-[var(--accent)] opacity-100' : ''}`}>
-                   {formatDuration(song.duration)}
                 </div>
               </button>
               
               {/* More Actions Toggle */}
-              <div className="relative" ref={isMenuOpen ? menuRef : null}>
+              <div className="relative shrink-0" ref={isMenuOpen ? menuRef : null}>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     playClick();
                     setActiveMenuId(isMenuOpen ? null : song.id);
                   }}
-                  className={`p-2 text-[var(--text-secondary)]/40 hover:text-[var(--accent)] transition-colors ${isMenuOpen ? 'text-[var(--accent)]' : ''}`}
+                  className={`p-1.5 text-[var(--text-secondary)]/40 hover:text-[var(--accent)] transition-colors ${isMenuOpen ? 'text-[var(--accent)]' : ''}`}
                 >
-                  <MoreVertical size={16} />
+                  <MoreVertical size={14} />
                 </button>
 
                 {/* Dropdown Menu */}
                 {isMenuOpen && (
-                  <div className="absolute right-2 top-full -mt-2 w-32 bg-[var(--bg-main)] border border-[var(--text-secondary)]/30 z-50 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+                  <div className="absolute right-0 top-full mt-1 w-32 bg-[var(--bg-main)] border border-[var(--text-secondary)]/30 z-50 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
                     <button
                       onClick={(e) => { e.stopPropagation(); toggleSelect(song.id); }}
                       className="w-full flex items-center gap-3 px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors border-b border-[var(--text-secondary)]/10"
