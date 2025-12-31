@@ -248,9 +248,41 @@ export default function Admin() {
         )}
 
         {loading ? (
-           <div className="flex items-center justify-center p-20 border border-[var(--text-secondary)] border-dashed">
-            <div className="animate-spin w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full" />
-            <span className="ml-4 tracking-widest animate-pulse">ACCESSING MAINFRAME...</span>
+           <div className="flex flex-col items-center justify-center p-32 border border-[var(--text-secondary)]/30 bg-black/40 backdrop-blur-sm relative overflow-hidden group">
+             {/* Scanning Line Background */}
+             <div className="absolute inset-0 bg-[linear-gradient(transparent_0%,var(--accent)_50%,transparent_100%)] opacity-5 w-full h-[200%] -translate-y-1/2 animate-[scan_4s_linear_infinite]" style={{ backgroundSize: '100% 3px' }}></div>
+             
+             {/* Main Loader */}
+             <div className="relative w-24 h-24 mb-8">
+               {/* Outer Ring */}
+               <div className="absolute inset-0 border-2 border-[var(--accent)]/30 rounded-full animate-[spin_3s_linear_infinite]" style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }} />
+               <div className="absolute inset-0 border-2 border-[var(--accent)]/30 rounded-full animate-[spin_3s_linear_infinite_reverse]" style={{ borderBottomColor: 'transparent', borderRightColor: 'transparent' }} />
+               
+               {/* Inner Hexagon/Square */}
+               <div className="absolute inset-4 border border-[var(--accent)] rounded-sm rotate-45 animate-pulse flex items-center justify-center bg-[var(--accent)]/5">
+                  <div className="w-2 h-2 bg-[var(--accent)] rounded-full shadow-[0_0_10px_var(--accent)] animate-ping" />
+               </div>
+               
+               {/* Orbiting Particle */}
+               <div className="absolute inset-0 animate-[spin_1.5s_linear_infinite]">
+                 <div className="h-2 w-2 bg-[var(--accent)] rounded-full absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 shadow-[0_0_10px_var(--accent)]" />
+               </div>
+             </div>
+             
+             {/* Text Animation */}
+             <div className="flex flex-col items-center gap-2 relative z-10">
+               <span className="text-[var(--accent)] font-black text-lg tracking-[0.3em] font-mono animate-pulse text-glow">
+                 INITIALIZING
+               </span>
+               <div className="flex gap-1">
+                 <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce [animation-delay:-0.3s]"></span>
+                 <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce [animation-delay:-0.15s]"></span>
+                 <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce"></span>
+               </div>
+               <span className="text-[var(--text-secondary)] text-[10px] tracking-[0.5em] uppercase opacity-70 mt-2">
+                 Retrieving Neural Data...
+               </span>
+             </div>
            </div>
         ) : error ? (
           <div className="p-8 border border-red-500 bg-red-900/10 text-red-400 text-center">
