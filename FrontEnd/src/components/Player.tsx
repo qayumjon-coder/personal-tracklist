@@ -377,7 +377,7 @@ export function Player({ songs, loading, player, onOpenSettings, onAddToPlaylist
               <span className="text-[9px] font-mono text-[var(--accent)] tracking-[0.2em] font-bold uppercase">SYS.LINK_ACTIVE</span>
               <div className="hidden sm:block h-3 w-px bg-[var(--text-secondary)]/20 mx-1"></div>
               <span className="hidden sm:inline text-[9px] font-mono text-[var(--text-secondary)]/50 tracking-widest uppercase">STP_FLTR: ON</span>
-              <span className="hidden sm:inline text-[10px] font-mono text-[var(--accent)] tracking-widest">Personal Tracklist</span>
+              <span className="hidden sm:inline left-[50px] text-[12px] font-mono font-bold text-[var(--accent)] tracking-widest uppercase">Personal Tracklist</span>
             </div>
             
             {/* Tech Labels */}
