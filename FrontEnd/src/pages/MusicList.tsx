@@ -24,10 +24,12 @@ export default function MusicList() {
           <img src={music.cover_url} width={100} />
           <h3>{music.title}</h3>
           <p>{music.artist}</p>
-
+          {/* audio source from api */}
           <audio controls src={music.url}></audio>
         </div>
       ))}
+
+      {/* That's all */}
     </div>
   );
 }

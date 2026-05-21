@@ -358,16 +358,6 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
       };
 
       // Initialize 40 ambient floating particles (Aurora dust)
-      const numParticles = 45;
-      const particles = Array.from({ length: numParticles }, () => ({
-        x: Math.random() * 100, // percentage of canvas width
-        y: Math.random() * 100, // percentage of canvas height
-        size: 1.2 + Math.random() * 2.0,
-        speedY: 0.15 + Math.random() * 0.35,
-        amplitudeX: 0.3 + Math.random() * 1.2,
-        phase: Math.random() * Math.PI * 2,
-        speedPhase: 0.01 + Math.random() * 0.02
-      }));
 
       const animateAurora = () => {
         if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
