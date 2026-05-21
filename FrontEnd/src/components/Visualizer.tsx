@@ -7,7 +7,13 @@ interface VisualizerProps {
 }
 
 export function Visualizer({ playing, analyser }: VisualizerProps) {
-  const { visualizerMode } = useSettings();
+  const { visualizerMode, theme } = useSettings();
+  const accentColorRef = useRef('#00E5FF');
+
+  useEffect(() => {
+    const rootStyles = getComputedStyle(document.documentElement);
+    accentColorRef.current = rootStyles.getPropertyValue('--accent').trim() || '#00E5FF';
+  }, [theme, visualizerMode]);
 
   // Refs for Bars
   const [barCount, setBarCount] = useState(32);
@@ -323,6 +329,501 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
       animateBars();
     }
 
+    // CYBER ORBIT MODE (Canvas Particles)
+    else if (visualizerMode === 'orbit') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const numParticles = 60; // Reduced to 60 for massive rendering speedup
+      const particles: {
+        angle: number;
+        distance: number;
+        speed: number;
+        size: number;
+        history: { x: number; y: number }[];
+        seed: number;
+      }[] = [];
+
+      for (let i = 0; i < numParticles; i++) {
+        particles.push({
+          angle: Math.random() * Math.PI * 2,
+          distance: 40 + Math.random() * 200,
+          speed: (0.005 + Math.random() * 0.01) * (Math.random() < 0.5 ? 1 : -1),
+          size: 1 + Math.random() * 2.5,
+          history: [],
+          seed: Math.random()
+        });
+      }
+
+      const animateOrbit = () => {
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+        }
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const cx = width / 2;
+        const cy = height / 2;
+
+        ctx.clearRect(0, 0, width, height);
+
+        let bassIntensity = 0;
+        let midIntensity = 0;
+
+        if (playing && analyser) {
+          analyser.getByteFrequencyData(dataArray);
+
+          // Bass is lower frequencies
+          let bassSum = 0;
+          const bassBins = 8;
+          for (let i = 0; i < bassBins; i++) {
+            bassSum += dataArray[i];
+          }
+          bassIntensity = bassSum / bassBins / 255;
+
+          // Mid frequencies
+          let midSum = 0;
+          const midStart = 10;
+          const midBins = 20;
+          for (let i = midStart; i < midStart + midBins; i++) {
+            midSum += dataArray[i];
+          }
+          midIntensity = midSum / midBins / 255;
+        }
+
+        // Get dynamic cached theme accent color (instantaneous read)
+        const accentColor = accentColorRef.current;
+
+        ctx.globalCompositeOperation = 'screen';
+
+        particles.forEach((p) => {
+          // Speed up orbit on bass beats
+          const currentSpeed = p.speed * (1 + bassIntensity * 4);
+          p.angle += currentSpeed;
+
+          // Expand orbits on mid beats with custom organic noise per particle
+          const currentDist = p.distance + Math.sin(p.angle * 2 + p.seed * 10) * p.distance * 0.1 + (bassIntensity * 60 * p.seed);
+
+          const x = cx + Math.cos(p.angle) * currentDist;
+          const y = cy + Math.sin(p.angle) * currentDist;
+
+          // Add to trail history
+          p.history.push({ x, y });
+          if (p.history.length > 6) {
+            p.history.shift();
+          }
+
+          // Draw trail lines
+          if (p.history.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(p.history[0].x, p.history[0].y);
+            for (let h = 1; h < p.history.length; h++) {
+              ctx.lineTo(p.history[h].x, p.history[h].y);
+            }
+            ctx.strokeStyle = accentColor;
+            ctx.lineWidth = p.size * 0.4;
+            ctx.globalAlpha = 0.15 + bassIntensity * 0.3;
+            ctx.stroke();
+          }
+
+          // Draw core glowing particle
+          ctx.beginPath();
+          ctx.arc(x, y, p.size * (1 + bassIntensity * 1.3), 0, Math.PI * 2);
+          ctx.fillStyle = accentColor;
+          ctx.shadowBlur = 6 + bassIntensity * 10;
+          ctx.shadowColor = accentColor;
+          ctx.globalAlpha = 0.5 + midIntensity * 0.4;
+          ctx.fill();
+        });
+
+        // Clean up shadow settings
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1.0;
+
+        if (playing) {
+          animationRef.current = requestAnimationFrame(animateOrbit);
+        }
+      };
+
+      animateOrbit();
+    }
+
+    // 3D RETRO GRID MODE (Terrain Perspective Grid)
+    else if (visualizerMode === 'grid') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      let speedOffset = 0;
+
+      const animateGrid = () => {
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+        }
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const horizon = height * 0.35; // Top-middle horizon line
+        
+        ctx.clearRect(0, 0, width, height);
+
+        let energy = 0.05;
+        if (playing && analyser) {
+          analyser.getByteFrequencyData(dataArray);
+
+          // Get overall audio energy to control flight speed
+          let sum = 0;
+          for (let i = 0; i < 16; i++) {
+            sum += dataArray[i];
+          }
+          energy = sum / 16 / 255;
+        }
+
+        // Increment speed offset (flightspeed is boosted by volume energy)
+        speedOffset += 0.015 + energy * 0.07;
+        if (speedOffset > 1) speedOffset -= 1;
+
+        // Get dynamic cached theme accent color (instantaneous read)
+        const accentColor = accentColorRef.current;
+
+        ctx.strokeStyle = accentColor;
+        ctx.shadowColor = accentColor;
+
+        // Draw horizontal grid lines in perspective
+        const numHorizontalLines = 15;
+        for (let i = 0; i < numHorizontalLines; i++) {
+          // Perspective spacing ratio
+          const lineRatio = (i + speedOffset) / numHorizontalLines;
+          const y = horizon + (height - horizon) * Math.pow(lineRatio, 2.5);
+
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+          ctx.globalAlpha = Math.pow(lineRatio, 1.8) * 0.7;
+          ctx.lineWidth = 1 + lineRatio * 1.5;
+          ctx.stroke();
+        }
+
+        // Draw perspective vertical lines
+        const numVerticalLines = 24;
+        const midX = width / 2;
+
+        for (let i = 0; i <= numVerticalLines; i++) {
+          const ratio = i / numVerticalLines;
+          const startX = (ratio - 0.5) * width * 2.5 + midX; 
+
+          // Map each vertical perspective line to a frequency bin
+          const dataIdx = Math.floor(Math.abs(ratio - 0.5) * 2 * (bufferLength * 0.15));
+          const freqVal = dataArray[dataIdx] || 0;
+          const displacement = (freqVal / 255) * 25 * (1 - Math.abs(ratio - 0.5));
+
+          ctx.beginPath();
+          ctx.lineWidth = 1.2;
+
+          // Segmented perspective lines waving with music
+          const segments = 10;
+          ctx.moveTo(midX + (startX - midX) * 0.01, horizon);
+          for (let s = 1; s <= segments; s++) {
+            const segRatio = s / segments;
+            const y = horizon + (height - horizon) * Math.pow(segRatio, 2);
+            
+            const waveX = Math.sin(segRatio * Math.PI * 2 - speedOffset * 4) * displacement * Math.pow(segRatio, 1.5);
+            const x = midX + (startX - midX) * segRatio + waveX;
+            
+            ctx.lineTo(x, y);
+          }
+
+          ctx.globalAlpha = 0.45;
+          ctx.stroke();
+        }
+
+        ctx.globalAlpha = 1.0;
+
+        if (playing) {
+          animationRef.current = requestAnimationFrame(animateGrid);
+        }
+      };
+
+      animateGrid();
+    }
+
+    // GLITCH MATRIX CODERAIN MODE (Binary/Hex drops)
+    else if (visualizerMode === 'matrix') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      let columns: {
+        x: number;
+        y: number;
+        speed: number;
+        chars: string[];
+        active: boolean;
+      }[] = [];
+
+      const setupColumns = () => {
+        const width = canvas.width || canvas.clientWidth;
+        // Increased grid cell width to 22px (reducing total columns by 35%)
+        const numCols = Math.floor(width / 22);
+        columns = [];
+        for (let i = 0; i < numCols; i++) {
+          const charList = [];
+          for (let c = 0; c < 10; c++) { // Reduced length to 10 for drawing speed
+            charList.push(Math.random() < 0.5 ? '0' : '1');
+          }
+          columns.push({
+            x: i * 22 + 11,
+            y: Math.random() * -300,
+            speed: 1.2 + Math.random() * 2.5,
+            chars: charList,
+            active: Math.random() < 0.45 // Only ~45% of columns active at start for aesthetics and speed
+          });
+        }
+      };
+
+      setupColumns();
+
+      const animateMatrix = () => {
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+          setupColumns();
+        }
+
+        const width = canvas.width;
+        const height = canvas.height;
+
+        ctx.clearRect(0, 0, width, height);
+
+        let bass = 0;
+        let highs = 0;
+
+        if (playing && analyser) {
+          analyser.getByteFrequencyData(dataArray);
+
+          // Get bass
+          let bassSum = 0;
+          for (let i = 0; i < 6; i++) bassSum += dataArray[i];
+          bass = bassSum / 6 / 255;
+
+          // Get highs
+          let highsSum = 0;
+          const highStart = 40;
+          for (let i = highStart; i < highStart + 15; i++) highsSum += dataArray[i];
+          highs = highsSum / 15 / 255;
+        }
+
+        // Get dynamic cached theme accent color (instantaneous read)
+        const accentColor = accentColorRef.current;
+
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+
+        columns.forEach((col) => {
+          if (!col.active) {
+            // Gradually wake up inactive columns randomly
+            if (Math.random() < 0.005) {
+              col.active = true;
+              col.y = -100;
+            }
+            return;
+          }
+
+          // Speed up streams based on general music bass volume
+          const currentSpeed = col.speed * (1 + bass * 3);
+          col.y += currentSpeed;
+
+          // Reset column if it goes off bottom
+          if (col.y > height + 150) {
+            col.y = -100 - Math.random() * 150;
+            col.speed = 1.2 + Math.random() * 2.5;
+            col.active = Math.random() < 0.45; // Dynamically cycle streams
+          }
+
+          // Render character stream
+          const streamLen = col.chars.length;
+          col.chars.forEach((char, charIdx) => {
+            const charY = col.y - charIdx * 15;
+            if (charY < -15 || charY > height) return;
+
+            const baseOpacity = 1 - charIdx / streamLen;
+            let opacity = baseOpacity * 0.45;
+
+            if (charIdx === 0) {
+              opacity = 0.95; // Leading character is bright
+            }
+
+            ctx.globalAlpha = opacity;
+
+            // Glitch: Randomly switch characters in stream
+            if (Math.random() < 0.02 + highs * 0.1) {
+              col.chars[charIdx] = Math.random() < 0.6 
+                ? (Math.random() < 0.5 ? '0' : '1') 
+                : Math.floor(Math.random() * 16).toString(16).toUpperCase();
+            }
+
+            // Set color: main lead character is glowing accent, others are trailing secondary
+            if (charIdx === 0) {
+              ctx.fillStyle = '#FFFFFF';
+              ctx.shadowBlur = 8 + bass * 12;
+              ctx.shadowColor = accentColor;
+            } else {
+              ctx.fillStyle = accentColor;
+              ctx.shadowBlur = 0;
+            }
+
+            ctx.fillText(char, col.x, charY);
+          });
+        });
+
+        // Reset canvas context states
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1.0;
+
+        if (playing) {
+          animationRef.current = requestAnimationFrame(animateMatrix);
+        }
+      };
+
+      animateMatrix();
+    }
+
+    // AURORA NEON BEATS MODE (Vertical Aurora/Neon bars with high performance)
+    else if (visualizerMode === 'aurora') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const numBeams = 100; // Increased to 100 for exact high-density neon line replication
+      const prevHeights = new Array(numBeams).fill(0);
+
+      const animateAurora = () => {
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+        }
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const cy = height / 2;
+
+        ctx.clearRect(0, 0, width, height);
+
+        if (playing && analyser) {
+          analyser.getByteFrequencyData(dataArray);
+        }
+
+        const beamSpacing = width / numBeams;
+        const midIndex = numBeams / 2;
+
+        for (let i = 0; i < numBeams; i++) {
+          // Calculate normalized horizontal distance from center (0 at center, 1 at edges)
+          const normDist = Math.abs(i - midIndex) / midIndex;
+
+          // Smooth envelope that slopes at the edges but keeps the outer lines visible (matching the image)
+          const envelope = 0.25 + 0.75 * Math.cos(normDist * Math.PI / 2);
+
+          // Map index to audio frequencies (focus on lower to middle spectrum)
+          const freqIdx = Math.floor((i / numBeams) * (bufferLength * 0.45));
+          const freqVal = playing && analyser ? dataArray[freqIdx] : 0;
+
+          // Target height modulated by envelope and a natural harmonic wave motion
+          const waveMotion = Math.sin(performance.now() / 200 + i * 0.25) * 15 * envelope;
+          const target = (freqVal / 255) * (height * 0.85) * envelope + 10 + waveMotion;
+
+          // Smooth height transition
+          prevHeights[i] += (target - prevHeights[i]) * 0.22;
+          const h = Math.max(8, prevHeights[i]);
+
+          const x = i * beamSpacing + beamSpacing / 2;
+
+          // PIXEL-PERFECT GRADIENT SYSTEM (Tom ma'noda rasmdagining xuddi o'zi!)
+          // 1. Horizontal gradient interpolation: center is Cyan/White, edges are Purple/Pink
+          const cyanIntensity = Math.max(0, 1 - normDist * 1.5);
+          const pinkIntensity = 0.5 + normDist * 0.5;
+          const purpleIntensity = 0.8;
+
+          // 2. Vertical Gradient mapping per beam:
+          // Top & Bottom are Pink/Purple, fading to transparent. The center is Cyan/White.
+          const grad = ctx.createLinearGradient(x, cy - h / 2, x, cy + h / 2);
+          grad.addColorStop(0, 'rgba(236, 72, 153, 0)'); // Top fade
+          
+          // Outer top fade in (pink)
+          grad.addColorStop(0.18, `rgba(236, 72, 153, ${pinkIntensity * 0.75})`);
+          
+          // Inner top (purple/indigo)
+          grad.addColorStop(0.35, `rgba(139, 92, 246, ${purpleIntensity * 0.85})`);
+          
+          // Center Core (Cyan/White in the center of the visualizer, Purple/Pink at the edges)
+          const centerColor = cyanIntensity > 0.1 
+            ? `rgba(0, 255, 255, ${cyanIntensity})` 
+            : `rgba(139, 92, 246, 0.85)`;
+          grad.addColorStop(0.5, centerColor);
+          
+          // Inner bottom (purple/indigo)
+          grad.addColorStop(0.65, `rgba(139, 92, 246, ${purpleIntensity * 0.85})`);
+          
+          // Outer bottom fade in (pink)
+          grad.addColorStop(0.82, `rgba(236, 72, 153, ${pinkIntensity * 0.75})`);
+          
+          grad.addColorStop(1, 'rgba(236, 72, 153, 0)'); // Bottom fade
+
+          // Core line color: pure white for central neon lines, hot pink/violet for edges
+          const coreColor = cyanIntensity > 0.35 
+            ? '#FFFFFF' 
+            : `rgba(244, 114, 182, 0.95)`;
+
+          // HIGH-PERFORMANCE MULTI-PASS NEON GLOW (No lag, 60 FPS guaranteed)
+          // Layer 1: Wide background aura
+          ctx.beginPath();
+          ctx.moveTo(x, cy - h / 2);
+          ctx.lineTo(x, cy + h / 2);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 10;
+          ctx.globalAlpha = 0.14;
+          ctx.stroke();
+
+          // Layer 2: Medium neon glow
+          ctx.beginPath();
+          ctx.moveTo(x, cy - h / 2);
+          ctx.lineTo(x, cy + h / 2);
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 4.5;
+          ctx.globalAlpha = 0.38;
+          ctx.stroke();
+
+          // Layer 3: Sharp glowing core line
+          ctx.beginPath();
+          ctx.moveTo(x, cy - h / 2);
+          ctx.lineTo(x, cy + h / 2);
+          ctx.strokeStyle = coreColor;
+          ctx.lineWidth = 1.6;
+          ctx.globalAlpha = 0.95;
+          ctx.stroke();
+        }
+
+        // Reset global alpha and states for safety
+        ctx.globalAlpha = 1.0;
+
+        if (playing) {
+          animationRef.current = requestAnimationFrame(animateAurora);
+        }
+      };
+
+      animateAurora();
+    }
+
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
@@ -330,7 +831,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
   if (visualizerMode === 'off' || visualizerMode === 'fade' || visualizerMode === 'scale') return null;
 
-  if (visualizerMode === 'wave' || visualizerMode === 'multiwave') {
+  if (visualizerMode === 'wave' || visualizerMode === 'multiwave' || visualizerMode === 'orbit' || visualizerMode === 'grid' || visualizerMode === 'matrix' || visualizerMode === 'aurora') {
     return <canvas ref={canvasRef} className="w-full h-full" />;
   }
 

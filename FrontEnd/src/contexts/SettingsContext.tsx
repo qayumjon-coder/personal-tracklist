@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 type Theme = "aqua" | "green" | "amber" | "pink" | "red" | "neon" | "toxic" | "sunset" | "matrix";
 type Language = "en" | "uz";
-type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "off";
+type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "orbit" | "grid" | "matrix" | "aurora" | "off";
 
 interface SettingsContextType {
   theme: Theme;
@@ -47,7 +47,11 @@ const translations = {
     lyrics: "LYRICS",
     fade: "FADE",
     scale: "SCALE",
-    multiwave: "MULTIWAVE"
+    multiwave: "MULTIWAVE",
+    orbit: "ORBIT",
+    grid: "3D GRID",
+    matrix: "MATRIX",
+    aurora: "AURORA"
   },
   uz: {
     system_config: "TIZIM_SOZLAMALARI",
@@ -68,7 +72,11 @@ const translations = {
     lyrics: "QO'SHIQ MATNI",
     fade: "FADE",
     scale: "KATTALASHTIRISH",
-    multiwave: "MULTIWAVE"
+    multiwave: "MULTIWAVE",
+    orbit: "ORBITA",
+    grid: "3D SETKA",
+    matrix: "MATRITSA",
+    aurora: "AVRORA"
   }
 };
 

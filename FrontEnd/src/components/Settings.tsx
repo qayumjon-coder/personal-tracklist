@@ -153,14 +153,14 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
                 <div className="pt-2">
                   <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-3 block">VISUAL_ENGINE:</span>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 border border-[var(--text-secondary)]/20 divide-x divide-y sm:divide-y-0 divide-[var(--text-secondary)]/20">
-                    {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale']).map((mode) => (
+                  <div className="grid grid-cols-5 sm:grid-cols-10 border border-[var(--text-secondary)]/20 divide-x divide-y sm:divide-y-0 divide-[var(--text-secondary)]/20">
+                    {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale', 'orbit', 'grid', 'matrix', 'aurora']).map((mode) => (
                       <button
                         key={mode}
                         onClick={() => setVisualizerMode(mode as any)}
-                        className={`px-1 py-2 text-[9px] font-bold tracking-tighter uppercase transition-colors ${visualizerMode === mode ? 'bg-[var(--text-primary)] text-black' : 'text-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/5'}`}
+                        className={`px-1 py-2 text-[8px] sm:text-[9px] font-bold tracking-tighter uppercase transition-colors ${visualizerMode === mode ? 'bg-[var(--text-primary)] text-black' : 'text-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/5'}`}
                       >
-                        {mode}
+                        {t(mode)}
                       </button>
                     ))}
                   </div>

@@ -638,7 +638,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               {/* Background Visuals */}
               <div className="absolute inset-0 pointer-events-none overflow-hidden">
                   {/* Dynamic Visualizer Background */}
-                  <div className="absolute bottom-0 left-0 right-0 h-32 opacity-20 pointer-events-none mix-blend-screen">
+                  <div className={`absolute left-0 right-0 pointer-events-none mix-blend-screen transition-all duration-500 ${
+                    ['orbit', 'grid', 'matrix'].includes(visualizerMode)
+                      ? 'inset-0 opacity-35'
+                      : 'bottom-0 h-32 opacity-20'
+                  }`}>
                     <Visualizer playing={player.playing} analyser={player.analyser} />
                   </div>
               </div>
