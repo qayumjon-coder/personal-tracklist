@@ -33,9 +33,17 @@ interface PlayerProps {
   loadingMore?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  localFilesInfo?: {
+    requestAccess: () => void;
+    restoreAccess: () => void;
+    removeLocalFiles: () => void;
+    hasStoredHandle: boolean;
+    isScanning: boolean;
+    error: string | null;
+  };
 }
 
-export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, loadingMore, hasMore, onLoadMore }: PlayerProps) {
+export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, loadingMore, hasMore, onLoadMore, localFilesInfo }: PlayerProps) {
   const { playClick, playHover } = useSoundEffects();
   const { visualizerMode } = useSettings(); // Get visualizer mode
   // Removed beatScale from state to avoid 60fps re-renders of the entire Player component
@@ -847,6 +855,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   }}
                   onRemove={onRemoveFromPlaylist}
                   onBulkRemove={onBulkRemove}
+                  localFilesInfo={localFilesInfo}
                 />
                 {/* Load More */}
                 {hasMore && onLoadMore && (

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import type { Song } from "../types/Song";
 import { useSoundEffects } from "../hooks/useSoundEffects";
-import { Trash2, MoreVertical, Check, Square, CheckSquare2, X, LayoutGrid, List } from "lucide-react";
+import { Trash2, MoreVertical, Check, Square, CheckSquare2, X, LayoutGrid, List, FolderPlus, Disc } from "lucide-react";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { updateSong } from "../services/musicApi";
 
@@ -11,9 +11,16 @@ interface PlaylistProps {
   onSelectSong: (song: Song) => void;
   onRemove?: (id: number) => void;
   onBulkRemove?: (ids: number[]) => void;
+  localFilesInfo?: {
+    requestAccess: () => void;
+    restoreAccess: () => void;
+    removeLocalFiles: () => void;
+    hasStoredHandle: boolean;
+    isScanning: boolean;
+  }
 }
 
-export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRemove }: PlaylistProps) {
+export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRemove, localFilesInfo }: PlaylistProps) {
   const { playClick, playHover } = useSoundEffects();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
@@ -151,6 +158,33 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                       <button onClick={() => { playClick(); setViewMode('list'); }} className={`p-1 rounded-sm transition-colors ${viewMode === 'list' ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="List View"><List size={12} /></button>
                       <button onClick={() => { playClick(); setViewMode('grid'); }} className={`p-1 rounded-sm transition-colors ${viewMode === 'grid' ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="Grid View"><LayoutGrid size={12} /></button>
                     </div>
+
+                    {localFilesInfo && (
+                        <div className="flex items-center gap-1 ml-2 pl-2 border-l border-[var(--text-secondary)]/20">
+                            {localFilesInfo.isScanning ? (
+                                <span className="text-[9px] text-[var(--accent)] font-bold animate-pulse uppercase">Scanning...</span>
+                            ) : (
+                                <>
+                                    {localFilesInfo.hasStoredHandle && songs.filter(s => s.category === 'Local').length === 0 && (
+                                        <button onClick={() => { playClick(); localFilesInfo.restoreAccess(); }} className="p-1 px-2 border border-[var(--accent)]/50 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black uppercase text-[8px] font-bold tracking-widest transition-colors flex items-center gap-1" title="Restore Local Library">
+                                            Restore Local
+                                        </button>
+                                    )}
+                                    {!localFilesInfo.hasStoredHandle && (
+                                        <button onClick={() => { playClick(); localFilesInfo.requestAccess(); }} className="p-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors flex items-center gap-1" title="Add Local Folder">
+                                            <FolderPlus size={14} />
+                                            <span className="text-[8px] uppercase font-bold tracking-widest hidden sm:inline">Add Local</span>
+                                        </button>
+                                    )}
+                                    {localFilesInfo.hasStoredHandle && (
+                                        <button onClick={() => { playClick(); localFilesInfo.removeLocalFiles(); }} className="p-1 px-2 text-[var(--text-secondary)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 text-[8px] uppercase tracking-widest font-bold transition-all flex items-center gap-1 border border-transparent hover:border-[var(--danger)]/50" title="Disconnect Local Folder">
+                                            <Disc size={12} /> Eject
+                                        </button>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
         </div>

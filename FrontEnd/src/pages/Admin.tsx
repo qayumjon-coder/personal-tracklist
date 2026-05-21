@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { getMusicList, updateSong, deleteSong } from "../services/musicApi";
-import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, Minimize2 } from "lucide-react";
+import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, PlayCircle, Users, Clock, FileText, TrendingUp } from "lucide-react";
 import { useDebounce } from "../hooks/useDebounce";
 import { useScrollLock } from "../hooks/useScrollLock";
 
@@ -12,11 +12,13 @@ interface Music {
   artist: string;
   url?: string;
   cover?: string;
-  coverUrl?: string; // Handle potential naming discrepancy
+  coverUrl?: string;
   duration?: number;
   category?: string;
   liked?: boolean;
   lyrics?: string;
+  play_count?: number;
+  created_at?: string;
 }
 
 export default function Admin() {
@@ -52,6 +54,8 @@ export default function Admin() {
     const withDuration = list.filter(m => m.duration);
     const shortest = withDuration.length ? withDuration.reduce((prev, curr) => (prev.duration! < curr.duration!) ? prev : curr) : null;
     const longest = withDuration.length ? withDuration.reduce((prev, curr) => (prev.duration! > curr.duration!) ? prev : curr) : null;
+    const totalDuration = list.reduce((acc, m) => acc + (m.duration || 0), 0);
+    const avgDuration = list.length ? totalDuration / list.length : 0;
     
     // Categories
     const cats: Record<string, number> = {};
@@ -61,7 +65,18 @@ export default function Admin() {
     });
     const topCat = Object.entries(cats).sort((a,b) => b[1] - a[1])[0];
 
-    return { shortest, longest, topCat };
+    // Artists
+    const uniqueArtists = new Set(list.map(m => m.artist)).size;
+
+    // Plays
+    const totalPlays = list.reduce((acc, m) => acc + (m.play_count || 0), 0);
+    const mostPlayed = list.length ? list.reduce((prev, curr) => ((prev.play_count || 0) > (curr.play_count || 0)) ? prev : curr) : null;
+
+    // Lyrics
+    const withLyrics = list.filter(m => m.lyrics && m.lyrics.trim().length > 0).length;
+    const lyricsProgress = (withLyrics / list.length) * 100;
+
+    return { shortest, longest, topCat, totalDuration, avgDuration, uniqueArtists, totalPlays, mostPlayed, lyricsProgress };
   }, [list]);
 
   // Cleanup audio on unmount
@@ -263,13 +278,33 @@ export default function Admin() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {/* Total */}
             <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
               <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
                  <MusicIcon size={12} /> Total Tracks
               </div>
               <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">{list.length}</div>
+            </div>
+
+            {/* Total Plays */}
+            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                 <PlayCircle size={12} /> Total Plays
+              </div>
+              <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                {stats?.totalPlays.toLocaleString() || 0}
+              </div>
+            </div>
+
+            {/* Artists */}
+            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                 <Users size={12} /> Unique Artists
+              </div>
+              <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                {stats?.uniqueArtists || 0}
+              </div>
             </div>
 
             {/* Top Cat */}
@@ -283,6 +318,49 @@ export default function Admin() {
               </div>
             </div>
 
+            {/* Most Played */}
+            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                 <TrendingUp size={12} /> Most Played
+              </div>
+              <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                 {stats?.mostPlayed?.title || 'N/A'}
+              </div>
+              <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                 {stats?.mostPlayed?.play_count || 0} views
+              </div>
+            </div>
+
+            {/* Total Duration */}
+            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                 <Clock size={12} /> Total Time
+              </div>
+              <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                 {Math.floor((stats?.totalDuration || 0) / 3600)}h {Math.floor(((stats?.totalDuration || 0) % 3600) / 60)}m
+              </div>
+              <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                 Avg: {formatDuration(stats?.avgDuration)}
+              </div>
+            </div>
+
+            {/* Lyrics Coverage */}
+            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                 <FileText size={12} /> Lyrics Progress
+              </div>
+              <div className="text-lg font-bold group-hover:text-[var(--accent)] transition-colors">
+                 {Math.round(stats?.lyricsProgress || 0)}%
+              </div>
+              {/* Progress bar */}
+              <div className="w-full h-1 bg-[var(--text-secondary)]/20 mt-2 overflow-hidden">
+                <div 
+                  className="h-full bg-[var(--accent)] transition-all duration-1000" 
+                  style={{ width: `${stats?.lyricsProgress || 0}%` }}
+                />
+              </div>
+            </div>
+
             {/* Longest */}
             <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
               <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
@@ -293,19 +371,6 @@ export default function Admin() {
               </div>
               <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
                  {formatDuration(stats?.longest?.duration)}
-              </div>
-            </div>
-
-            {/* Shortest */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <Minimize2 size={12} /> Shortest
-              </div>
-               <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
-                 {stats?.shortest?.title || 'N/A'}
-              </div>
-              <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
-                 {formatDuration(stats?.shortest?.duration)}
               </div>
             </div>
         </div>
