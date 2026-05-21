@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 type Theme = "aqua" | "green" | "amber" | "pink" | "red" | "neon" | "toxic" | "sunset" | "matrix";
 type Language = "en" | "uz";
-type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "orbit" | "grid" | "matrix" | "aurora" | "off";
+type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "aurora" | "off";
 
 interface SettingsContextType {
   theme: Theme;
@@ -48,9 +48,6 @@ const translations = {
     fade: "FADE",
     scale: "SCALE",
     multiwave: "MULTIWAVE",
-    orbit: "ORBIT",
-    grid: "3D GRID",
-    matrix: "MATRIX",
     aurora: "AURORA"
   },
   uz: {
@@ -73,9 +70,6 @@ const translations = {
     fade: "FADE",
     scale: "KATTALASHTIRISH",
     multiwave: "MULTIWAVE",
-    orbit: "ORBITA",
-    grid: "3D SETKA",
-    matrix: "MATRITSA",
     aurora: "AVRORA"
   }
 };

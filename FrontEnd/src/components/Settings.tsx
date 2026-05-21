@@ -153,8 +153,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
 
                 <div className="pt-2">
                   <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-3 block">VISUAL_ENGINE:</span>
-                  <div className="grid grid-cols-5 sm:grid-cols-10 border border-[var(--text-secondary)]/20 divide-x divide-y sm:divide-y-0 divide-[var(--text-secondary)]/20">
-                    {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale', 'orbit', 'grid', 'matrix', 'aurora']).map((mode) => (
+                  <div className="grid grid-cols-4 sm:grid-cols-7 border border-[var(--text-secondary)]/20 divide-x divide-y sm:divide-y-0 divide-[var(--text-secondary)]/20">
+                    {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale', 'aurora']).map((mode) => (
                       <button
                         key={mode}
                         onClick={() => setVisualizerMode(mode as any)}
