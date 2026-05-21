@@ -337,8 +337,37 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
+      
       const numBeams = 100; // Increased to 100 for exact high-density neon line replication
       const prevHeights = new Array(numBeams).fill(0);
+
+      // Define atmospheric colors dynamically linked to the website's themes
+      const themePalettes: Record<string, {
+        primary: string;
+        secondary: string;
+      }> = {
+        aqua: { primary: '0, 255, 255', secondary: '0, 136, 136' },
+        green: { primary: '0, 255, 0', secondary: '0, 136, 0' },
+        amber: { primary: '255, 176, 0', secondary: '136, 85, 0' },
+        pink: { primary: '255, 0, 255', secondary: '136, 0, 136' },
+        red: { primary: '255, 0, 0', secondary: '136, 0, 0' },
+        neon: { primary: '0, 255, 255', secondary: '255, 0, 255' },
+        toxic: { primary: '0, 255, 0', secondary: '157, 0, 255' },
+        sunset: { primary: '255, 204, 0', secondary: '255, 0, 102' },
+        matrix: { primary: '0, 255, 0', secondary: '0, 51, 0' }
+      };
+
+      // Initialize 40 ambient floating particles (Aurora dust)
+      const numParticles = 45;
+      const particles = Array.from({ length: numParticles }, () => ({
+        x: Math.random() * 100, // percentage of canvas width
+        y: Math.random() * 100, // percentage of canvas height
+        size: 1.2 + Math.random() * 2.0,
+        speedY: 0.15 + Math.random() * 0.35,
+        amplitudeX: 0.3 + Math.random() * 1.2,
+        phase: Math.random() * Math.PI * 2,
+        speedPhase: 0.01 + Math.random() * 0.02
+      }));
 
       const animateAurora = () => {
         if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
@@ -352,96 +381,121 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
         ctx.clearRect(0, 0, width, height);
 
+        let bassIntensity = 0;
+        let rms = 0;
+
         if (playing && analyser) {
           analyser.getByteFrequencyData(dataArray);
+
+          // Calculate bass energy (first 15 frequency bands)
+          let bassSum = 0;
+          const bassBins = 15;
+          for (let b = 0; b < bassBins; b++) {
+            bassSum += dataArray[b] || 0;
+          }
+          bassIntensity = bassSum / (bassBins * 255);
+
+          // Calculate overall RMS/volume energy
+          let totalSum = 0;
+          const totalBins = Math.min(bufferLength, 128);
+          for (let b = 0; b < totalBins; b++) {
+            totalSum += dataArray[b] || 0;
+          }
+          rms = totalSum / (totalBins * 255);
         }
 
-        const beamSpacing = width / numBeams;
-        const midIndex = numBeams / 2;
+        const palette = themePalettes[theme] || themePalettes.aqua;
 
-        for (let i = 0; i < numBeams; i++) {
+        // 1. Draw deep ambient radial backdrop glow pulsing with bass
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const bgGlowRad = Math.max(100, Math.min(width, height) * (0.35 + bassIntensity * 0.25));
+        const bgGradient = ctx.createRadialGradient(width / 2, cy, 0, width / 2, cy, bgGlowRad);
+        bgGradient.addColorStop(0, `rgba(${palette.primary}, ${0.12 + bassIntensity * 0.18})`);
+        bgGradient.addColorStop(0.5, `rgba(${palette.secondary}, ${0.04 + bassIntensity * 0.06})`);
+        bgGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = bgGradient;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+
+        // 2. Render & Update Floating Particles (Aurora Dust)
+        // Disabled to perfectly match the strict diamond neon equalizer image provided by the user.
+
+        // 3. Draw Vertical Equalizer Beams (Pixel-Perfect Diamond Shape)
+        // The image has roughly 65-75 distinct glowing bars with clear gaps
+        const activeBeams = 75; 
+        const beamSpacing = width / activeBeams;
+        const midIndex = activeBeams / 2;
+
+        for (let i = 0; i < activeBeams; i++) {
           // Calculate normalized horizontal distance from center (0 at center, 1 at edges)
           const normDist = Math.abs(i - midIndex) / midIndex;
 
-          // Smooth envelope that slopes at the edges but keeps the outer lines visible (matching the image)
-          const envelope = 0.25 + 0.75 * Math.cos(normDist * Math.PI / 2);
+          // Strict diamond/triangle envelope to taper edges sharply (matches image)
+          const envelope = Math.pow(Math.max(0, 1 - normDist), 1.4);
 
-          // Map index to audio frequencies (focus on lower to middle spectrum)
-          const freqIdx = Math.floor((i / numBeams) * (bufferLength * 0.45));
+          // Symmetrical frequency mapping (Center = Bass/0, Edges = Treble)
+          // We use only the lower half of frequencies for better visuals
+          const freqIdx = Math.floor(normDist * (bufferLength * 0.45));
           const freqVal = playing && analyser ? dataArray[freqIdx] : 0;
 
-          // Target height modulated by envelope and a natural harmonic wave motion
-          const waveMotion = Math.sin(performance.now() / 200 + i * 0.25) * 15 * envelope;
-          const target = (freqVal / 255) * (height * 0.85) * envelope + 10 + waveMotion;
+          // Pure frequency target (NO sway, NO wave motion) - just raw audio equalizer
+          const target = (freqVal / 255) * (height * 0.85) * envelope + (envelope * 12);
 
-          // Smooth height transition
-          prevHeights[i] += (target - prevHeights[i]) * 0.22;
-          const h = Math.max(8, prevHeights[i]);
+          // Smooth height transition (fast reaction for sharp visualizer look)
+          prevHeights[i] += (target - prevHeights[i]) * 0.35;
+          const h = Math.max(4, prevHeights[i]);
 
           const x = i * beamSpacing + beamSpacing / 2;
 
-          // PIXEL-PERFECT GRADIENT SYSTEM (Tom ma'noda rasmdagining xuddi o'zi!)
-          // 1. Horizontal gradient interpolation: center is Cyan/White, edges are Purple/Pink
-          const cyanIntensity = Math.max(0, 1 - normDist * 1.5);
-          const pinkIntensity = 0.5 + normDist * 0.5;
-          const purpleIntensity = 0.8;
+          // Two-tone gradient to match the image (Secondary outer glow, Primary inner glow)
+          const gradOuter = ctx.createLinearGradient(x, cy - h / 2, x, cy + h / 2);
+          gradOuter.addColorStop(0, `rgba(${palette.secondary}, 0)`);
+          gradOuter.addColorStop(0.2, `rgba(${palette.secondary}, 0.5)`);
+          gradOuter.addColorStop(0.5, `rgba(${palette.secondary}, 0.9)`);
+          gradOuter.addColorStop(0.8, `rgba(${palette.secondary}, 0.5)`);
+          gradOuter.addColorStop(1, `rgba(${palette.secondary}, 0)`);
 
-          // 2. Vertical Gradient mapping per beam:
-          // Top & Bottom are Pink/Purple, fading to transparent. The center is Cyan/White.
-          const grad = ctx.createLinearGradient(x, cy - h / 2, x, cy + h / 2);
-          grad.addColorStop(0, 'rgba(236, 72, 153, 0)'); // Top fade
-          
-          // Outer top fade in (pink)
-          grad.addColorStop(0.18, `rgba(236, 72, 153, ${pinkIntensity * 0.75})`);
-          
-          // Inner top (purple/indigo)
-          grad.addColorStop(0.35, `rgba(139, 92, 246, ${purpleIntensity * 0.85})`);
-          
-          // Center Core (Cyan/White in the center of the visualizer, Purple/Pink at the edges)
-          const centerColor = cyanIntensity > 0.1 
-            ? `rgba(0, 255, 255, ${cyanIntensity})` 
-            : `rgba(139, 92, 246, 0.85)`;
-          grad.addColorStop(0.5, centerColor);
-          
-          // Inner bottom (purple/indigo)
-          grad.addColorStop(0.65, `rgba(139, 92, 246, ${purpleIntensity * 0.85})`);
-          
-          // Outer bottom fade in (pink)
-          grad.addColorStop(0.82, `rgba(236, 72, 153, ${pinkIntensity * 0.75})`);
-          
-          grad.addColorStop(1, 'rgba(236, 72, 153, 0)'); // Bottom fade
+          const gradInner = ctx.createLinearGradient(x, cy - h / 2, x, cy + h / 2);
+          gradInner.addColorStop(0, `rgba(${palette.primary}, 0)`);
+          gradInner.addColorStop(0.3, `rgba(${palette.primary}, 0.6)`);
+          gradInner.addColorStop(0.5, `rgba(${palette.primary}, 1)`);
+          gradInner.addColorStop(0.7, `rgba(${palette.primary}, 0.6)`);
+          gradInner.addColorStop(1, `rgba(${palette.primary}, 0)`);
 
-          // Core line color: pure white for central neon lines, hot pink/violet for edges
-          const coreColor = cyanIntensity > 0.35 
-            ? '#FFFFFF' 
-            : `rgba(244, 114, 182, 0.95)`;
+          // Core line color: High contrast pure white center
+          const coreColor = `rgba(255, 255, 255, 0.95)`;
 
-          // HIGH-PERFORMANCE MULTI-PASS NEON GLOW (No lag, 60 FPS guaranteed)
-          // Layer 1: Wide background aura
+          ctx.lineCap = 'round'; // Keeps the line ends clean
+          
+          // Gaps between lines: Ensure glow width is strictly less than beamSpacing
+          const maxGlowWidth = Math.min(12, beamSpacing * 0.75);
+
+          // Layer 1: Wide background aura (Secondary color)
           ctx.beginPath();
           ctx.moveTo(x, cy - h / 2);
           ctx.lineTo(x, cy + h / 2);
-          ctx.strokeStyle = grad;
-          ctx.lineWidth = 10;
-          ctx.globalAlpha = 0.14;
+          ctx.strokeStyle = gradOuter;
+          ctx.lineWidth = maxGlowWidth;
+          ctx.globalAlpha = 0.5;
           ctx.stroke();
 
-          // Layer 2: Medium neon glow
+          // Layer 2: Medium neon glow (Primary color)
           ctx.beginPath();
           ctx.moveTo(x, cy - h / 2);
           ctx.lineTo(x, cy + h / 2);
-          ctx.strokeStyle = grad;
-          ctx.lineWidth = 4.5;
-          ctx.globalAlpha = 0.38;
+          ctx.strokeStyle = gradInner;
+          ctx.lineWidth = maxGlowWidth * 0.45;
+          ctx.globalAlpha = 0.9;
           ctx.stroke();
 
-          // Layer 3: Sharp glowing core line
+          // Layer 3: Soft glowing core line (White)
           ctx.beginPath();
           ctx.moveTo(x, cy - h / 2);
           ctx.lineTo(x, cy + h / 2);
           ctx.strokeStyle = coreColor;
-          ctx.lineWidth = 1.6;
-          ctx.globalAlpha = 0.95;
+          ctx.lineWidth = Math.min(2.5, beamSpacing * 0.15);
+          ctx.globalAlpha = 1.0;
           ctx.stroke();
         }
 
@@ -459,7 +513,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [playing, analyser, visualizerMode]);
+  }, [playing, analyser, visualizerMode, theme]);
 
   if (visualizerMode === 'off' || visualizerMode === 'fade' || visualizerMode === 'scale') return null;
 
