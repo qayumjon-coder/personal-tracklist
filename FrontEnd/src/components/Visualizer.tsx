@@ -372,7 +372,6 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
         ctx.clearRect(0, 0, width, height);
 
         let bassIntensity = 0;
-        let rms = 0;
 
         if (playing && analyser) {
           analyser.getByteFrequencyData(dataArray);
@@ -384,14 +383,6 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
             bassSum += dataArray[b] || 0;
           }
           bassIntensity = bassSum / (bassBins * 255);
-
-          // Calculate overall RMS/volume energy
-          let totalSum = 0;
-          const totalBins = Math.min(bufferLength, 128);
-          for (let b = 0; b < totalBins; b++) {
-            totalSum += dataArray[b] || 0;
-          }
-          rms = totalSum / (totalBins * 255);
         }
 
         const palette = themePalettes[theme] || themePalettes.aqua;
