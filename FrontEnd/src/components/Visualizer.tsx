@@ -802,7 +802,7 @@ export function AmbientBackground({ playing, analyser }: VisualizerProps) {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [playing, analyser]);
+  }, [playing, analyser, theme]);
 
   return (
     <canvas
@@ -813,6 +813,7 @@ export function AmbientBackground({ playing, analyser }: VisualizerProps) {
 }
 
 export function ConcentricWavesVisualizer({ playing, analyser }: VisualizerProps) {
+  const { theme } = useSettings();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
 
@@ -836,7 +837,7 @@ export function ConcentricWavesVisualizer({ playing, analyser }: VisualizerProps
       });
     }
 
-    let currentAccent = '#00E5FF';
+    const currentAccent = (THEME_COLORS[theme] || THEME_COLORS.aqua).primary;
 
     const animate = () => {
       if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
@@ -934,7 +935,7 @@ export function ConcentricWavesVisualizer({ playing, analyser }: VisualizerProps
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
-  }, [playing, analyser]);
+  }, [playing, analyser, theme]);
 
   return (
     <canvas
