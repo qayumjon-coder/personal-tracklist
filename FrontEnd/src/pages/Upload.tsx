@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useFetchSongs } from "../hooks/useFetchSongs";
-import { ArrowLeft, Music, Image as ImageIcon, CheckCircle, AlertCircle, LogOut, Sparkles, Link2, Loader2, X } from "lucide-react";
+import { ArrowLeft, Music, Image as ImageIcon, AlertCircle, LogOut, Sparkles, Link2, Loader2, X } from "lucide-react";
 import { uploadSong } from "../services/musicApi";
 import { useAuth } from "../contexts/AuthContext";
 import { parseBlob } from "music-metadata";
+import { toast } from "sonner";
 
 // ─── oEmbed helpers ───────────────────────────────────────────────────────────
 
@@ -107,7 +108,7 @@ export function Upload() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   // ── Import State ────────────────────────────────────────────────────────────
   const [importUrl, setImportUrl] = useState("");
@@ -175,8 +176,7 @@ export function Upload() {
 
       const genreMsg = genre ? ` Janr: ${genre}.` : "";
       setImportUrl("");
-      setStatus({ type: "success", message: `✨ Ma'lumotlar import qilindi!${genreMsg}` });
-      setTimeout(() => setStatus(null), 4000);
+      toast.success(`✨ Ma'lumotlar import qilindi!${genreMsg}`);
 
     } catch (err) {
       setImportError(err instanceof Error ? err.message : "Import muvaffaqiyatsiz bo'ldi.");
@@ -193,12 +193,12 @@ export function Upload() {
 
       if (type === "audio") {
         if (fileSizeMB > 20) {
-          setStatus({ type: "error", message: `Audio file is too big! (${fileSizeMB.toFixed(2)} MB). Max limit is 20MB.` });
+          toast.error(`Audio file is too big! (${fileSizeMB.toFixed(2)} MB). Max limit is 20MB.`);
           return;
         }
         setAudioFile(file);
         
-        setStatus({ type: "success", message: "✨ AI is analyzing song details..." });
+        toast.info("✨ AI is analyzing song details...", { id: 'ai-analyze' });
         
         try {
           const metadataPromise = parseBlob(file);
@@ -241,8 +241,7 @@ export function Upload() {
             duration: duration || prev.duration
           }));
 
-          setStatus({ type: "success", message: "✨ AI successfully auto-filled details!" });
-          setTimeout(() => setStatus(null), 3000);
+          toast.success("✨ AI successfully auto-filled details!", { id: 'ai-analyze' });
 
         } catch (error) {
           console.error("Metadata parsing failed:", error);
@@ -280,24 +279,17 @@ export function Upload() {
               };
           });
           
-          setStatus({ 
-            type: "error", 
-            message: `AI Analysis Skipped: ${error instanceof Error ? error.message : "Unavailable"}. Using filename.` 
-          });
-          
-          setTimeout(() => setStatus(null), 3000);
+          toast.error(`AI Analysis Skipped: ${error instanceof Error ? error.message : "Unavailable"}. Using filename.`, { id: 'ai-analyze' });
         }
 
       } else {
         if (fileSizeMB > 5) {
-          setStatus({ type: "error", message: `Cover image is too big! (${fileSizeMB.toFixed(2)} MB). Max limit is 5MB.` });
+          toast.error(`Cover image is too big! (${fileSizeMB.toFixed(2)} MB). Max limit is 5MB.`);
           return;
         }
         setCoverFile(file);
         setPreviewUrl(URL.createObjectURL(file));
       }
-      
-      if (status?.message.includes("too big")) setStatus(null);
     }
   };
 
@@ -305,12 +297,20 @@ export function Upload() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!audioFile || !coverFile || !formData.title || !formData.artist) {
-      setStatus({ type: "error", message: "All fields are required!" });
+      toast.error("All fields are required!");
       return;
     }
 
     setLoading(true);
-    setStatus(null);
+    setUploadProgress(0);
+
+    // Simulate progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress(prev => {
+        if (prev >= 90) return prev;
+        return prev + Math.random() * 10;
+      });
+    }, 300);
 
     let finalDuration = formData.duration;
     if (!finalDuration && audioFile) {
@@ -332,11 +332,15 @@ export function Upload() {
         formData.lyrics
       );
 
-      setStatus({ type: "success", message: "Track uploaded successfully!" });
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      toast.success("Track uploaded successfully!");
       setTimeout(() => navigate("/"), 1500);
     } catch (err) {
+      clearInterval(progressInterval);
+      setUploadProgress(0);
       console.error('Upload error:', err);
-      setStatus({ type: "error", message: err instanceof Error ? err.message : "Failed to upload song." });
+      toast.error(err instanceof Error ? err.message : "Failed to upload song.");
     } finally {
       setLoading(false);
     }
@@ -368,7 +372,7 @@ export function Upload() {
                        border border-[var(--accent)] text-[var(--accent)]
                        hover:bg-[var(--accent)] hover:text-black
                        transition-all duration-300
-                       shadow-[0_0_10px_rgba(0,255,255,0.2)] hover:shadow-[0_0_20px_rgba(0,255,255,0.6)]
+                       shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.6)]
                        overflow-hidden"
             >
               <span className="relative z-10">Manage DB</span>
@@ -449,7 +453,7 @@ export function Upload() {
                        border-[var(--accent)] text-[var(--accent)]
                        hover:bg-[var(--accent)] hover:text-black
                        disabled:opacity-40 disabled:cursor-not-allowed
-                       shadow-[0_0_8px_rgba(0,255,255,0.1)] hover:shadow-[0_0_15px_rgba(0,255,255,0.4)]
+                       shadow-[0_0_8px_rgba(var(--accent-rgb),0.1)] hover:shadow-[0_0_15px_rgba(var(--accent-rgb),0.4)]
                        flex items-center gap-2 whitespace-nowrap"
           >
             {importing ? (
@@ -481,7 +485,7 @@ export function Upload() {
       </div>
 
       {/* ── Upload Form ─────────────────────────────────────────────────────── */}
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-black/40 p-8 border border-[var(--text-secondary)] shadow-[0_0_30px_rgba(0,255,255,0.05)] backdrop-blur-sm">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-black/40 p-8 border border-[var(--text-secondary)] shadow-[0_0_30px_rgba(var(--accent-rgb),0.05)] backdrop-blur-sm">
         
         {/* Left Column: Text Inputs */}
         <div className="space-y-6">
@@ -580,24 +584,31 @@ export function Upload() {
           </div>
 
           <div className="pt-4">
-             {status && (
-              <div className={`p-4 border flex items-center gap-3 ${status.type === 'success' ? 'border-green-500 text-green-400 bg-green-900/20' : 'border-red-500 text-red-400 bg-red-900/20'}`}>
-                {status.message.includes("AI") || status.message.includes("import") ? <Sparkles className="animate-pulse text-[var(--accent)]" /> : (status.type === 'success' ? <CheckCircle /> : <AlertCircle />)}
-                {status.message}
-              </div>
-            )}
             
             <button
               type="submit"
               disabled={loading}
-              className={`w-full mt-4 py-4 font-bold text-xl uppercase tracking-widest border transition-all duration-300
+              className={`w-full relative overflow-hidden mt-4 py-4 font-bold text-xl uppercase tracking-widest border transition-all duration-300
                 ${loading 
-                  ? 'border-gray-600 text-gray-600 cursor-not-allowed' 
+                  ? 'border-[var(--accent)] text-[var(--accent)] bg-black cursor-not-allowed' 
                   : 'border-[var(--accent)] text-[var(--bg-main)] bg-[var(--accent)] hover:bg-transparent hover:text-[var(--accent)] hover:shadow-[0_0_20px_var(--accent)]'
                 }
               `}
             >
-              {loading ? "UPLOADING..." : "UPLOAD TRACK"}
+              {loading && (
+                <div 
+                  className="absolute left-0 top-0 bottom-0 bg-[var(--accent)]/30 transition-all duration-300 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              )}
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <Loader2 size={20} className="animate-spin" />
+                    UPLOADING {Math.round(uploadProgress)}%
+                  </>
+                ) : "UPLOAD TRACK"}
+              </span>
             </button>
           </div>
         </div>

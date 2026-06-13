@@ -3,8 +3,10 @@ import SEO from "./SEO";
 
 import { useSettings } from "../contexts/SettingsContext";
 import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, ChevronDown, Share2, Moon, Clock } from "lucide-react";
+import { Pagination } from "./Pagination";
 import { Link } from "react-router-dom";
 import { searchSongs, getTrendingSongs, incrementPlayCount } from "../services/musicApi";
+import { toast } from "sonner";
 
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { Playlist } from "./Playlist";
@@ -30,6 +32,7 @@ interface PlayerProps {
   onAddToPlaylist: (song: Song) => Promise<{ success: boolean; message: string }>;
   onRemoveFromPlaylist: (id: number) => void;
   onBulkRemove: (ids: number[]) => void;
+  onReorderPlaylist: (startIndex: number, endIndex: number) => void;
   loadingMore?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
@@ -43,7 +46,7 @@ interface PlayerProps {
   };
 }
 
-export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, loadingMore, hasMore, onLoadMore, localFilesInfo }: PlayerProps) {
+export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, onReorderPlaylist, loadingMore, hasMore, onLoadMore, localFilesInfo }: PlayerProps) {
   const { playClick, playHover } = useSoundEffects();
   const { visualizerMode } = useSettings(); // Get visualizer mode
   // Removed beatScale from state to avoid 60fps re-renders of the entire Player component
@@ -91,17 +94,17 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
-  
+
   const onTouchMove = (e: React.TouchEvent) => {
     setTouchEnd(e.targetTouches[0].clientX);
   };
-  
+
   const onTouchEndEvent = () => {
     if (!touchStart || !touchEnd) return;
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
-    
+
     if (isLeftSwipe) {
       player.next(); // swipe left -> next
     } else if (isRightSwipe) {
@@ -115,7 +118,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     if (volumeTimerRef.current) clearTimeout(volumeTimerRef.current);
     volumeTimerRef.current = setTimeout(() => setShowVolumeHUD(false), 2000);
     return () => {
-        if (volumeTimerRef.current) clearTimeout(volumeTimerRef.current);
+      if (volumeTimerRef.current) clearTimeout(volumeTimerRef.current);
     };
   }, [player.volume]);
 
@@ -144,8 +147,10 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 400);
   const [searchResults, setSearchResults] = useState<Song[]>([]);
+  const [searchPage, setSearchPage] = useState(1);
+  const itemsPerSearchPage = 10;
+
   const [isSearching, setIsSearching] = useState(false);
-  const [searchMsg, setSearchMsg] = useState<{type: 'success'|'error', text: string} | null>(null);
   const [lastSearchQuery, setLastSearchQuery] = useState<string>("");
 
   // Lock body scroll when modals are open
@@ -169,22 +174,22 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   // Only search when the debounced query changes
   useEffect(() => {
     const runSearch = async () => {
-        if (!debouncedSearchQuery.trim()) {
-            setSearchResults([]);
-            return;
-        }
-        setIsSearching(true);
-        setSearchMsg(null);
-        try {
-            const results = await searchSongs(debouncedSearchQuery);
-            setSearchResults(results);
-            localStorage.setItem('lastSearchQuery', debouncedSearchQuery);
-            setLastSearchQuery(debouncedSearchQuery);
-        } catch(err) {
-            console.error('Search error:', err);
-        } finally {
-            setIsSearching(false);
-        }
+      if (!debouncedSearchQuery.trim()) {
+        setSearchResults([]);
+        return;
+      }
+      setIsSearching(true);
+      try {
+        const results = await searchSongs(debouncedSearchQuery);
+        setSearchResults(results);
+        setSearchPage(1); // Reset page on new search
+        localStorage.setItem('lastSearchQuery', debouncedSearchQuery);
+        setLastSearchQuery(debouncedSearchQuery);
+      } catch (err) {
+        console.error('Search error:', err);
+      } finally {
+        setIsSearching(false);
+      }
     };
     runSearch();
   }, [debouncedSearchQuery]);
@@ -199,10 +204,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       setIsSearching(true);
       searchSongs('').then(results => {
         setSearchResults(results);
+        setSearchPage(1);
       }).catch(err => {
-          console.error("Failed to load suggestions", err);
+        console.error("Failed to load suggestions", err);
       }).finally(() => {
-          setIsSearching(false);
+        setIsSearching(false);
       });
     }
   }, [isSearchOpen, searchQuery]);
@@ -210,13 +216,19 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input or textarea
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      // Don't trigger if user is typing in an input, textarea or select
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement
+      ) return;
 
       switch (e.code) {
         case 'Space':
-          e.preventDefault();
-          player.playing ? player.pause() : player.play();
+          if (!isSearchOpen && !isKaraokeOpen) {
+            e.preventDefault();
+            player.playing ? player.pause() : player.play();
+          }
           break;
         case 'ArrowRight':
           e.preventDefault();
@@ -257,28 +269,27 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
 
   const handleAddSong = async (song: Song) => {
-      // Check if already in playlist (locally)
-      if (songs.some(s => s.id === song.id)) {
-        setSearchMsg({ type: 'error', text: 'Song already in playlist' });
-        setTimeout(() => setSearchMsg(null), 2000);
-        return;
-      }
-      
-      const res = await onAddToPlaylist(song);
-      setSearchMsg({ type: res.success ? 'success' : 'error', text: res.message });
-      setTimeout(() => setSearchMsg(null), 2000);
-  };
+    // Check if already in playlist (locally)
+    if (songs.some(s => s.id === song.id)) {
+      toast.error('Song already in playlist');
+      return;
+    }
 
-  const [shareToast, setShareToast] = useState(false);
+    const res = await onAddToPlaylist(song);
+    if (res.success) {
+      toast.success(res.message);
+    } else {
+      toast.error(res.message);
+    }
+  };
 
   const copyShareLink = () => {
     if (!current) return;
     const url = new URL(window.location.href);
     url.searchParams.set('track', current.id.toString());
     navigator.clipboard.writeText(url.toString());
-    
-    setShareToast(true);
-    setTimeout(() => setShareToast(false), 2000);
+
+    toast.success("Link copied to clipboard!");
   };
 
   const categoriesList = Array.from(new Set(songs.map(s => s.category || "General"))).filter(c => c !== "Trending");
@@ -291,17 +302,17 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   ];
 
   const filteredSongs =
-    selectedCategory === "All"      ? songs :
-    selectedCategory === "Trending" ? trendingSongs :
-    selectedCategory === "Liked ♥" ? songs.filter(s => likedIds.has(s.id)) :
-    songs.filter(s => (s.category || "General") === selectedCategory);
+    selectedCategory === "All" ? songs :
+      selectedCategory === "Trending" ? trendingSongs :
+        selectedCategory === "Liked ♥" ? songs.filter(s => likedIds.has(s.id)) :
+          songs.filter(s => (s.category || "General") === selectedCategory);
 
   if (loading) {
     return (
       <>
         <AmbientBackground playing={false} analyser={null} />
         <div className="w-full max-w-6xl mx-auto px-3 md:px-6 py-3 md:py-8">
-          <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[500px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(0,255,255,0.05)]">
+          <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[500px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(var(--accent-rgb),0.05)]">
             {/* Left: big cover shimmer */}
             <div className="flex-1 flex flex-col items-center justify-center p-8 gap-6 border-r border-[var(--text-secondary)]/20">
               <div className="w-56 h-56 md:w-60 md:h-60 bg-[var(--text-secondary)]/8 animate-pulse" />
@@ -310,7 +321,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 <div className="h-2.5 bg-[var(--text-secondary)]/6 animate-pulse rounded-sm w-3/5 mx-auto" />
                 <div className="h-1 bg-[var(--text-secondary)]/8 animate-pulse rounded-sm w-full mt-4" />
                 <div className="flex justify-center gap-4 pt-2">
-                  {[1,2,3,4,5].map(i => <div key={i} className="w-8 h-8 rounded-full bg-[var(--text-secondary)]/8 animate-pulse" />)}
+                  {[1, 2, 3, 4, 5].map(i => <div key={i} className="w-8 h-8 rounded-full bg-[var(--text-secondary)]/8 animate-pulse" />)}
                 </div>
               </div>
             </div>
@@ -323,7 +334,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       </>
     );
   }
-  
+
   if (error) {
     return (
       <>
@@ -339,7 +350,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
             <div className="px-6 py-3 border border-red-500/30 bg-red-900/20 font-mono text-sm tracking-wider text-red-300">
               {error}
             </div>
-            <button 
+            <button
               onClick={() => window.location.reload()}
               className="mt-8 px-8 py-3 bg-red-500/10 border border-red-500 text-red-500 hover:bg-red-500 hover:text-black font-bold font-mono tracking-widest text-xs uppercase transition-all shadow-[0_0_15px_rgba(255,0,0,0.2)] hover:shadow-[0_0_25px_rgba(255,0,0,0.4)]"
             >
@@ -350,7 +361,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       </>
     );
   }
-  
+
   if (!songs.length) {
     return (
       <>
@@ -359,21 +370,21 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           <div className="flex flex-col items-center justify-center w-full max-w-lg p-8 border border-[var(--text-secondary)]/30 bg-[var(--bg-main)]/50 backdrop-blur-xl relative group">
             <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)]"></div>
             <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)]"></div>
-            
+
             <div className="w-16 h-16 mb-6 border border-[var(--accent)] flex items-center justify-center animate-pulse">
-                <Search className="text-[var(--accent)]" size={32} />
+              <Search className="text-[var(--accent)]" size={32} />
             </div>
-            
+
             <h2 className="text-2xl font-bold text-white mb-4 tracking-widest font-mono uppercase text-glow drop-shadow-[0_0_15px_rgba(255,255,255,0.8)]">Playlist Empty</h2>
             <p className="text-white font-bold text-sm font-mono mb-8 uppercase tracking-[0.2em] leading-relaxed drop-shadow-md">
-                Your personal frequency stack is currently offline. <br/> Access the database to synchronize local tracks.
+              Your personal frequency stack is currently offline. <br /> Access the database to synchronize local tracks.
             </p>
-            
-            <button 
-                onClick={() => { playClick(); setIsSearchOpen(true); }}
-                className="px-8 py-3 border border-[var(--accent)] text-[var(--accent)] font-bold font-mono text-xs uppercase tracking-[0.3em] hover:bg-[var(--accent)] hover:text-black transition-all duration-300 shadow-[0_0_20px_rgba(0,255,255,0.1)] hover:shadow-[0_0_30px_rgba(0,255,255,0.3)]"
+
+            <button
+              onClick={() => { playClick(); setIsSearchOpen(true); }}
+              className="px-8 py-3 border border-[var(--accent)] text-[var(--accent)] font-bold font-mono text-xs uppercase tracking-[0.3em] hover:bg-[var(--accent)] hover:text-black transition-all duration-300 shadow-[0_0_20px_rgba(var(--accent-rgb),0.1)] hover:shadow-[0_0_30px_rgba(var(--accent-rgb),0.3)]"
             >
-                Access Database
+              Access Database
             </button>
           </div>
         </div>
@@ -382,13 +393,13 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         {isSearchOpen && (
           <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
             <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[80vh] flex flex-col">
-              <button 
+              <button
                 onClick={() => setIsSearchOpen(false)}
                 className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
               >
                 <X size={20} />
               </button>
-              
+
               <h2 className="text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-6 uppercase">
                 Search Database
               </h2>
@@ -418,8 +429,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-3 text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
                   autoFocus
                 />
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   disabled={isSearching}
                   className="px-4 bg-[var(--accent)] text-black font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
                 >
@@ -427,41 +438,35 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 </button>
               </form>
 
-              {searchMsg && (
-                <div className={`mb-4 p-2 text-center text-xs font-mono border ${searchMsg.type === 'success' ? 'border-green-500 text-green-400' : 'border-red-500 text-red-400'}`}>
-                  {searchMsg.text}
-                </div>
-              )}
-
               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
-                 {searchResults.length === 0 && !isSearching && searchQuery && (
-                   <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
-                     NO DATA FOUND IN SECTOR
-                   </div>
-                 )}
-                 
-                 {searchResults.map((song) => {
-                   const inPlaylist = songs.some(s => s.id === song.id);
-                   return (
-                     <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                           <img src={song.coverUrl} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
-                           <div className="min-w-0">
-                             <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
-                             <div className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider">{song.artist}</div>
-                           </div>
+                {searchResults.length === 0 && !isSearching && searchQuery && (
+                  <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
+                    NO DATA FOUND IN SECTOR
+                  </div>
+                )}
+
+                {searchResults.map((song) => {
+                  const inPlaylist = songs.some(s => s.id === song.id);
+                  return (
+                    <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <img src={song.coverUrl} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
+                          <div className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider">{song.artist}</div>
                         </div>
-                        
-                        <button
-                          onClick={() => handleAddSong(song)}
-                          disabled={inPlaylist}
-                          className={`p-2 transition-all ${inPlaylist ? 'text-green-500 cursor-default' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] border border-transparent hover:border-[var(--accent)]'}`}
-                        >
-                          {inPlaylist ? <Check size={18} /> : <Plus size={18} />}
-                        </button>
-                     </div>
-                   );
-                 })}
+                      </div>
+
+                      <button
+                        onClick={() => handleAddSong(song)}
+                        disabled={inPlaylist}
+                        className={`p-2 transition-all ${inPlaylist ? 'text-green-500 cursor-default' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] border border-transparent hover:border-[var(--accent)]'}`}
+                      >
+                        {inPlaylist ? <Check size={18} /> : <Plus size={18} />}
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -470,8 +475,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     );
   }
 
-  const seoTitle = current 
-    ? `${player.playing ? '▶' : '⏸'} ${current.title} - ${current.artist}` 
+  const seoTitle = current
+    ? `${player.playing ? '▶' : '⏸'} ${current.title} - ${current.artist}`
     : 'Music Player - Fronto';
   const seoDesc = current
     ? `Listen to ${current.title} by ${current.artist} on Fronto.`
@@ -479,71 +484,65 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
   return (
     <div className="w-full flex-1 flex flex-col relative">
-    <SEO 
-      title={seoTitle}
-      description={seoDesc}
-      image={current?.coverUrl}
-    />
-    {/* Global Atmospheric Background */}
-    <AmbientBackground playing={player.playing} analyser={player.analyser} />
+      <SEO
+        title={seoTitle}
+        description={seoDesc}
+        image={current?.coverUrl}
+      />
+      {/* Global Atmospheric Background */}
+      <AmbientBackground playing={player.playing} analyser={player.analyser} />
 
-    {shareToast && (
-      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-green-900/40 border border-green-500 text-green-400 px-6 py-2 text-xs font-mono uppercase animate-in fade-in slide-in-from-top-4">
-        Link copied to clipboard
-      </div>
-    )}
+      {player.audioError && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-red-900/40 border border-red-500 text-red-400 px-6 py-2 text-xs font-mono uppercase animate-in fade-in slide-in-from-top-4 flex items-center gap-2">
+          <AlertTriangle size={14} />
+          {player.audioError}
+        </div>
+      )}
 
-    {player.audioError && (
-      <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-red-900/40 border border-red-500 text-red-400 px-6 py-2 text-xs font-mono uppercase animate-in fade-in slide-in-from-top-4 flex items-center gap-2">
-        <AlertTriangle size={14} />
-        {player.audioError}
-      </div>
-    )}
+      {/* Settings component moved to App.tsx */}
 
-    {/* Settings component moved to App.tsx */}
-    
-    {/* Responsive Page Wrapper */}
-    <div className="w-full max-w-6xl mx-auto px-3 md:px-6 py-3 md:py-8 flex flex-col gap-8 md:gap-12 items-center">
-      
-      {/* Main Player Display */}
-      <div className="flex-1 w-full">
-        {/* Volume HUD */}
-        {showVolumeHUD && (
+      {/* Responsive Page Wrapper */}
+      <div className="w-full max-w-6xl mx-auto px-3 md:px-6 py-3 md:py-8 flex flex-col gap-8 md:gap-12 items-center">
+
+        {/* Main Player Display */}
+        <div className="flex-1 w-full">
+          {/* Volume HUD */}
+          {showVolumeHUD && (
             <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in zoom-in slide-in-from-top-4 duration-300">
-                <div className="bg-black/80 backdrop-blur-xl border border-[var(--accent)]/30 px-6 py-2 shadow-[0_0_30px_rgba(0,255,255,0.2)]">
-                    <div className="flex items-center gap-4">
-                        <span className="text-[10px] font-mono text-[var(--accent)] tracking-[0.3em] uppercase">VOLUME</span>
-                        <div className="w-32 h-1 bg-white/5 relative">
-                            <div 
-                                className="absolute inset-y-0 left-0 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)] transition-all duration-300"
-                                style={{ width: `${player.volume}%` }}
-                            />
-                        </div>
-                        <span className="text-[10px] font-mono text-[var(--accent)] w-6">{player.volume}%</span>
-                    </div>
+              <div className="bg-black/80 backdrop-blur-xl border border-[var(--accent)]/30 px-6 py-2 shadow-[0_0_30px_rgba(var(--accent-rgb),0.2)]">
+                <div className="flex items-center gap-4">
+                  <span className="text-[10px] font-mono text-[var(--accent)] tracking-[0.3em] uppercase">VOLUME</span>
+                  <div className="w-32 h-1 bg-white/5 relative">
+                    <div
+                      className="absolute inset-y-0 left-0 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)] transition-all duration-300"
+                      style={{ width: `${player.volume}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono text-[var(--accent)] w-6">{player.volume}%</span>
                 </div>
+              </div>
             </div>
-        )}
-        <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[500px] md:h-[600px] lg:h-[650px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(0,255,255,0.1)] text-base md:text-lg">
-          {/* Decorative Corners */}
-          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)] z-20"></div>
-          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--accent)] z-20"></div>
-          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[var(--accent)] z-20"></div>
-          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)] z-20"></div>
+          )}
+          <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[500px] md:h-[600px] lg:h-[650px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(var(--accent-rgb),0.1)] text-base md:text-lg">
+            {/* Decorative Corners */}
+            <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)] z-20"></div>
+            <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--accent)] z-20"></div>
+            <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-[var(--accent)] z-20"></div>
+            <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)] z-20"></div>
 
-          {/* Top Toolbar - Global */}
-          <div className="absolute top-0 left-0 right-0 h-10 border-b border-[var(--text-secondary)]/30 flex items-center justify-between px-4 bg-[var(--bg-main)]/80 backdrop-blur-md z-30">
-            {/* Status Status */}
-            <div className="flex items-center gap-3">
-              <div className={`w-1.5 h-1.5 rounded-full ${player.playing ? 'bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]' : 'bg-[var(--text-secondary)]/30'}`}></div>
-              <span className="text-[9px] font-mono text-[var(--accent)] tracking-[0.2em] font-bold uppercase">SYS.LINK_ACTIVE</span>
-              <div className="hidden sm:block h-3 w-px bg-[var(--text-secondary)]/20 mx-1"></div>
-              <span className="hidden sm:inline text-[9px] font-mono text-[var(--text-secondary)]/50 tracking-widest uppercase">STP_FLTR: ON</span>
-              <span className="hidden sm:inline left-[50px] text-[12px] font-mono font-bold text-[var(--accent)] tracking-widest uppercase">Personal Tracklist</span>
-            </div>
-            
-            {/* Tech Labels */}
-            <div className="hidden lg:flex gap-6 text-[9px] text-[var(--text-secondary)]/40 font-mono tracking-[0.3em] uppercase">
+            {/* Top Toolbar - Global */}
+            <div className="absolute top-0 left-0 right-0 h-10 border-b border-[var(--text-secondary)]/30 flex items-center justify-between px-4 bg-[var(--bg-main)]/80 backdrop-blur-md z-30">
+              {/* Status Status */}
+              <div className="flex items-center gap-3">
+                <div className={`w-1.5 h-1.5 rounded-full ${player.playing ? 'bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]' : 'bg-[var(--text-secondary)]/30'}`}></div>
+                <span className="text-[9px] font-mono text-[var(--accent)] tracking-[0.2em] font-bold uppercase">SYS.LINK_ACTIVE</span>
+                <div className="hidden sm:block h-3 w-px bg-[var(--text-secondary)]/20 mx-1"></div>
+                <span className="hidden sm:inline text-[9px] font-mono text-[var(--text-secondary)]/50 tracking-widest uppercase">STP_FLTR: ON</span>
+                <span className="hidden sm:inline left-[50px] text-[12px] font-mono font-bold text-[var(--accent)] tracking-widest uppercase">Personal Tracklist</span>
+              </div>
+
+              {/* Tech Labels */}
+              <div className="hidden lg:flex gap-6 text-[9px] text-[var(--text-secondary)]/40 font-mono tracking-[0.3em] uppercase">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[var(--accent)]/30">BUFR:</span>
                   <span>100%</span>
@@ -556,22 +555,22 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   <span className="text-[var(--accent)]/30">BITD:</span>
                   <span>24-BIT</span>
                 </div>
-            </div>
+              </div>
 
-            {/* Controls */}
-            <div className="flex items-center gap-2">
+              {/* Controls */}
+              <div className="flex items-center gap-2">
                 {/* Sleep Timer */}
                 <div className="relative">
-                  <button 
+                  <button
                     onClick={() => { playClick(); setIsSleepTimerMenuOpen(!isSleepTimerMenuOpen); }}
                     onMouseEnter={playHover}
-                    className={`text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border ${player.sleepTimer ? 'border-[var(--accent)] text-[var(--accent)] shadow-[0_0_10px_rgba(0,255,255,0.2)]' : 'border-[var(--text-secondary)]/30'} px-3 py-1 transition-all bg-black/50 uppercase flex items-center gap-2 group`}
+                    className={`text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border ${player.sleepTimer ? 'border-[var(--accent)] text-[var(--accent)] shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]' : 'border-[var(--text-secondary)]/30'} px-3 py-1 transition-all bg-black/50 uppercase flex items-center gap-2 group`}
                     title="Sleep Timer"
                   >
                     <Moon size={10} fill={player.sleepTimer ? "currentColor" : "none"} />
                     <span className="mx-1">{player.sleepTimer ? `${player.sleepTimer}M` : 'Sleep'}</span>
                   </button>
-                  
+
                   {isSleepTimerMenuOpen && (
                     <div className="absolute top-full mt-1 right-0 w-36 bg-black/95 backdrop-blur-xl border border-[var(--accent)]/30 z-50 shadow-2xl animate-in fade-in zoom-in duration-200">
                       <div className="px-3 py-1.5 border-b border-white/5 text-[7px] font-mono text-[var(--accent)] uppercase tracking-[0.2em] opacity-60">Set Timer</div>
@@ -597,7 +596,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   )}
                 </div>
 
-                <button 
+                <button
                   onClick={() => { playClick(); onOpenSettings(); }}
                   onMouseEnter={playHover}
                   className="text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] px-3 py-1 transition-all bg-black/50 uppercase group"
@@ -607,7 +606,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   <span className="opacity-60 group-hover:opacity-100">]</span>
                 </button>
 
-                <button 
+                <button
                   onClick={() => { playClick(); setIsSearchOpen(true); }}
                   onMouseEnter={playHover}
                   className="text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] px-3 py-1 transition-all bg-black/50 uppercase group flex items-center gap-2"
@@ -615,85 +614,84 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   <Search size={10} />
                   <span>Search</span>
                 </button>
+              </div>
             </div>
-          </div>
-            
-          {/* Main Content Area */}
-          <div className="flex-1 flex flex-col md:flex-row mt-6 md:mt-10 min-h-0 relative">
 
-            {/* Atmospheric Mobile Background - Appears behind the player only on mobile */}
-            <div className="md:hidden absolute inset-0 pointer-events-none overflow-hidden opacity-40 mix-blend-screen z-0">
-               <img src={current?.coverUrl} className="w-full h-full object-cover blur-3xl scale-125 saturate-200" alt="" />
-               <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-main)]/50 via-black/50 to-black/90" />
-            </div>
-            
-            {/* LEFT COLUMN: Player (Flexible) */}
-            <div className="flex-1 relative flex flex-col p-3 md:p-5 lg:p-6 border-b md:border-b-0 md:border-r border-transparent md:border-[var(--text-secondary)]/30 overflow-hidden z-10">
-              
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col md:flex-row mt-6 md:mt-10 min-h-0 relative">
+
+              {/* Atmospheric Mobile Background - Appears behind the player only on mobile */}
+              <div className="md:hidden absolute inset-0 pointer-events-none overflow-hidden opacity-40 mix-blend-screen z-0">
+                <img src={current?.coverUrl} className="w-full h-full object-cover blur-3xl scale-125 saturate-200" alt="" />
+                <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-main)]/50 via-black/50 to-black/90" />
+              </div>
+
+              {/* LEFT COLUMN: Player (Flexible) */}
+              <div className="flex-1 relative flex flex-col p-3 md:p-5 lg:p-6 border-b md:border-b-0 md:border-r border-transparent md:border-[var(--text-secondary)]/30 overflow-hidden z-10">
+
                 {/* Fade Visualizer Overlay (Player Box Only) */}
                 {visualizerMode === 'fade' && (
                   <FadeVisualizer playing={player.playing} analyser={player.analyser} />
                 )}
 
-              {/* Background Visuals */}
-              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {/* Background Visuals */}
+                <div className="absolute inset-0 pointer-events-none overflow-hidden">
                   {/* Dynamic Visualizer Background */}
-                  <div className={`absolute left-0 right-0 pointer-events-none mix-blend-screen transition-all duration-500 ${
-                    ['orbit', 'grid', 'matrix'].includes(visualizerMode)
+                  <div className={`absolute left-0 right-0 pointer-events-none mix-blend-screen transition-all duration-500 ${['orbit', 'grid', 'matrix'].includes(visualizerMode)
                       ? 'inset-0 opacity-35'
                       : 'bottom-0 h-32 opacity-20'
-                  }`}>
+                    }`}>
                     <Visualizer playing={player.playing} analyser={player.analyser} />
                   </div>
-              </div>
+                </div>
 
-              {/* Cover Art Section - Flexible height */}
-              <div className="flex-1 flex flex-col items-center justify-center relative z-10 py-2 md:py-4 min-h-0">
+                {/* Cover Art Section - Flexible height */}
+                <div className="flex-1 flex flex-col items-center justify-center relative z-10 py-2 md:py-4 min-h-0">
                   {/* Glow */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-[var(--accent)] opacity-10 blur-[80px] rounded-full pointer-events-none" />
-                  
-              {/* Cover */}
-              <div 
-                className="relative group/cover cursor-grab active:cursor-grabbing"
-                onTouchStart={onTouchStart}
-                onTouchMove={onTouchMove}
-                onTouchEnd={onTouchEndEvent}
-              >
-                {/* Rotating Inner Glow */}
-                <div className="absolute -inset-4 bg-[var(--accent)]/10 rounded-full blur-2xl animate-pulse opacity-0 group-hover/cover:opacity-100 transition-opacity duration-700"></div>
-                
-                {/* 
+
+                  {/* Cover */}
+                  <div
+                    className="relative group/cover cursor-grab active:cursor-grabbing"
+                    onTouchStart={onTouchStart}
+                    onTouchMove={onTouchMove}
+                    onTouchEnd={onTouchEndEvent}
+                  >
+                    {/* Rotating Inner Glow */}
+                    <div className="absolute -inset-4 bg-[var(--accent)]/10 rounded-full blur-2xl animate-pulse opacity-0 group-hover/cover:opacity-100 transition-opacity duration-700"></div>
+
+                    {/* 
                   CONCENTRIC RINGS FOR SCALE VISUALIZER 
                   Placed absolutely behind the actual cover image layer, size 300% to prevent clipping
                 */}
-                {visualizerMode === 'scale' && (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[300%] h-[300%] opacity-60 pointer-events-none -z-10">
-                    <ConcentricWavesVisualizer playing={player.playing} analyser={player.analyser} />
-                  </div>
-                )}
-                
-                <div className="relative w-56 h-56 md:w-60 md:h-60 lg:w-64 lg:h-64 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm animate-in zoom-in-95 duration-500 shrink-0">
-                  {/* Decorative corner accents for cover */}
-                  <div className="absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--accent)]"></div>
-                  <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--accent)]"></div>
-                  
-                  <img 
-                    ref={coverImgRef}
-                    src={current.coverUrl} 
-                    alt={current.title} 
-                    className="w-full h-full object-cover transition-transform duration-75"
-                  />
-                </div>
-              </div>
-              </div>
+                    {visualizerMode === 'scale' && (
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex items-center justify-center w-[300%] h-[300%] opacity-60 pointer-events-none -z-10">
+                        <ConcentricWavesVisualizer playing={player.playing} analyser={player.analyser} />
+                      </div>
+                    )}
 
-              {/* Track Info & Controls Section - Compact */}
-              <div className="w-full max-w-lg mx-auto space-y-4 md:space-y-5 relative z-10 pt-3 md:pt-4 pb-2">
+                    <div className="relative w-56 h-56 md:w-60 md:h-60 lg:w-64 lg:h-64 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm animate-in zoom-in-95 duration-500 shrink-0">
+                      {/* Decorative corner accents for cover */}
+                      <div className="absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--accent)]"></div>
+                      <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--accent)]"></div>
+
+                      <img
+                        ref={coverImgRef}
+                        src={current.coverUrl}
+                        alt={current.title}
+                        className="w-full h-full object-cover transition-transform duration-75"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Track Info & Controls Section - Compact */}
+                <div className="w-full max-w-lg mx-auto space-y-4 md:space-y-5 relative z-10 pt-3 md:pt-4 pb-2">
                   {/* Title & Artist & Actions Combined */}
                   <div className="text-center space-y-0.5 md:space-y-1">
                     <div className="flex items-start justify-center gap-2 md:gap-3">
                       {/* Like Button - Always visible */}
-                      <button 
+                      <button
                         onClick={toggleLike}
                         className={`p-3 md:p-4 rounded-full transition-all duration-300 transform hover:scale-110 active:scale-95 shrink-0 mt-1 ${isLiked(current.id) ? 'text-[var(--accent)] drop-shadow-[0_0_10px_var(--accent)] bg-[var(--accent)]/10' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-secondary)]/10'}`}
                       >
@@ -702,12 +700,12 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
                       {/* Song Title & Artist - Always visible */}
                       <div className="flex flex-col items-center flex-1 min-w-0 px-1">
-                          <h2 className="text-base md:text-xl lg:text-2xl font-black text-[var(--accent)] text-glow tracking-tight drop-shadow-lg truncate font-mono uppercase w-full">
-                            {current.title}
-                          </h2>
-                          <p className="text-[9px] md:text-[10px] lg:text-xs text-[var(--text-secondary)] font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase mt-0.5 md:mt-1 opacity-80 truncate w-full">
-                            {current.artist}
-                          </p>
+                        <h2 className="text-base md:text-xl lg:text-2xl font-black text-[var(--accent)] text-glow tracking-tight drop-shadow-lg truncate font-mono uppercase w-full">
+                          {current.title}
+                        </h2>
+                        <p className="text-[9px] md:text-[10px] lg:text-xs text-[var(--text-secondary)] font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase mt-0.5 md:mt-1 opacity-80 truncate w-full">
+                          {current.artist}
+                        </p>
                       </div>
 
                       {/* Lyrics Button - Visible only if lyrics exist */}
@@ -734,10 +732,10 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
                   {/* Progress Bar & Times */}
                   <div className="space-y-0.5 md:space-y-1">
-                    <ProgressBar 
-                      progress={player.progress} 
-                      onSeek={player.seek} 
-                      duration={player.duration} 
+                    <ProgressBar
+                      progress={player.progress}
+                      onSeek={player.seek}
+                      duration={player.duration}
                     />
                     <div className="flex justify-between text-[10px] font-mono text-[var(--text-secondary)] tracking-wider">
                       <span>{formatTime(player.currentTime)}</span>
@@ -758,7 +756,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       onToggleShuffle={player.toggleShuffle}
                       onToggleRepeat={player.toggleRepeat}
                     />
-                    
+
                     <div className="w-3/4 md:w-2/3">
                       <VolumeControl
                         volume={player.volume}
@@ -768,30 +766,30 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       />
                     </div>
                   </div>
+                </div>
               </div>
-            </div>
 
-            {/* Mobile Open Playlist Button (Only visible on mobile when playlist is closed) */}
-            <div className="md:hidden flex items-center justify-center px-4 pb-4 bg-transparent z-10 w-full">
-              <button
-                onClick={() => setIsMobilePlaylistOpen(true)}
-                className="flex items-center gap-2 justify-center w-full py-3 border border-[var(--text-secondary)]/30 bg-black/50 backdrop-blur-md text-[10px] uppercase font-mono tracking-[0.2em] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
-                title="Open Playlist"
-              >
-                <ListMusic size={14} /> View Tracklist
-              </button>
-            </div>
+              {/* Mobile Open Playlist Button (Only visible on mobile when playlist is closed) */}
+              <div className="md:hidden flex items-center justify-center px-4 pb-4 bg-transparent z-10 w-full">
+                <button
+                  onClick={() => setIsMobilePlaylistOpen(true)}
+                  className="flex items-center gap-2 justify-center w-full py-3 border border-[var(--text-secondary)]/30 bg-black/50 backdrop-blur-md text-[10px] uppercase font-mono tracking-[0.2em] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
+                  title="Open Playlist"
+                >
+                  <ListMusic size={14} /> View Tracklist
+                </button>
+              </div>
 
-            {/* RIGHT COLUMN: Playlist (Fixed-width on Desktop, BottomSheet on Mobile) */}
-            {/* Mobile Cover Overlay (Darkens background when drawer open) */}
-            {isMobilePlaylistOpen && (
-               <div 
-                 className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] md:hidden transition-opacity duration-300"
-                 onClick={() => setIsMobilePlaylistOpen(false)}
-               />
-            )}
-            
-            <div className={`
+              {/* RIGHT COLUMN: Playlist (Fixed-width on Desktop, BottomSheet on Mobile) */}
+              {/* Mobile Cover Overlay (Darkens background when drawer open) */}
+              {isMobilePlaylistOpen && (
+                <div
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] md:hidden transition-opacity duration-300"
+                  onClick={() => setIsMobilePlaylistOpen(false)}
+                />
+              )}
+
+              <div className={`
               fixed inset-x-0 bottom-0 z-[50] md:relative md:z-10
               w-full md:w-64 lg:w-80 flex flex-col 
               bg-[var(--bg-main)]/95 md:bg-[var(--bg-main)]/50 
@@ -802,38 +800,38 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               h-[80vh] md:h-full min-h-0 overflow-hidden
               shadow-[0_-10px_40px_rgba(0,0,0,0.8)] md:shadow-none
             `}>
-              
-              {/* Mobile Swipe Handle to Close */}
-              <div 
-                className="w-full flex justify-center py-3 md:hidden cursor-pointer active:bg-white/5 border-b border-[var(--text-secondary)]/10"
-                onClick={() => setIsMobilePlaylistOpen(false)}
-              >
-                <div className="flex items-center justify-center w-full">
-                  <div className="w-12 h-1 bg-[var(--text-secondary)]/40 rounded-full" />
-                   {/* Fallback chevron */}
-                  <ChevronDown className="absolute right-4 text-[var(--text-secondary)]/50" size={16} />
+
+                {/* Mobile Swipe Handle to Close */}
+                <div
+                  className="w-full flex justify-center py-3 md:hidden cursor-pointer active:bg-white/5 border-b border-[var(--text-secondary)]/10"
+                  onClick={() => setIsMobilePlaylistOpen(false)}
+                >
+                  <div className="flex items-center justify-center w-full">
+                    <div className="w-12 h-1 bg-[var(--text-secondary)]/40 rounded-full" />
+                    {/* Fallback chevron */}
+                    <ChevronDown className="absolute right-4 text-[var(--text-secondary)]/50" size={16} />
+                  </div>
                 </div>
-              </div>
-              {/* Playlist Header */}
-              <div className="p-3 md:p-4 border-b border-[var(--text-secondary)]/30 bg-[var(--text-secondary)]/5 flex justify-between items-center">
-                <div>
+                {/* Playlist Header */}
+                <div className="p-3 md:p-4 border-b border-[var(--text-secondary)]/30 bg-[var(--text-secondary)]/5 flex justify-between items-center">
+                  <div>
                     <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-widest font-mono uppercase">Tracklist</h3>
                     <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-mono">{filteredSongs.length} SONGS_LOADED</p>
-                </div>
-                
-                {/* Category Dropdown (Mini) */}
-                <div className="relative">
-                  <button
-                    onClick={() => { playClick(); setIsConfigMenuOpen(!isConfigMenuOpen); }}
-                    onMouseEnter={playHover}
-                    className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-[10px] border border-[var(--text-secondary)]/30 px-2 py-1 bg-black/50 flex items-center gap-2 w-32 justify-between"
-                  >
-                    <span className="truncate">{selectedCategory.toUpperCase()}</span>
-                    <span>{isConfigMenuOpen ? '▴' : '▾'}</span>
-                  </button>
-                  
-                  {isConfigMenuOpen && (
-                    <div className="absolute right-0 top-full mt-1 w-32 bg-[var(--bg-main)] border border-[var(--text-secondary)] z-50 shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                  </div>
+
+                  {/* Category Dropdown (Mini) */}
+                  <div className="relative">
+                    <button
+                      onClick={() => { playClick(); setIsConfigMenuOpen(!isConfigMenuOpen); }}
+                      onMouseEnter={playHover}
+                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-[10px] border border-[var(--text-secondary)]/30 px-2 py-1 bg-black/50 flex items-center gap-2 w-32 justify-between"
+                    >
+                      <span className="truncate">{selectedCategory.toUpperCase()}</span>
+                      <span>{isConfigMenuOpen ? '▴' : '▾'}</span>
+                    </button>
+
+                    {isConfigMenuOpen && (
+                      <div className="absolute right-0 top-full mt-1 w-32 bg-[var(--bg-main)] border border-[var(--text-secondary)] z-50 shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
                         {categories.map(cat => (
                           <button
                             key={cat}
@@ -843,186 +841,180 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                             {cat}
                           </button>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {/* List */}
+                <div className="flex-1 overflow-hidden p-0 flex flex-col">
+                  <Playlist
+                    songs={filteredSongs}
+                    currentSong={songs[player.index]}
+                    onSelectSong={(song) => {
+                      const idx = songs.findIndex(s => s.id === song.id);
+                      if (idx !== -1) player.selectSong(idx);
+                      setIsMobilePlaylistOpen(false);
+                    }}
+                    onRemove={onRemoveFromPlaylist}
+                    onBulkRemove={onBulkRemove}
+                    onReorder={onReorderPlaylist}
+                    localFilesInfo={localFilesInfo}
+                  />
+                  {/* Load More */}
+                  {hasMore && onLoadMore && (
+                    <div className="p-3 flex justify-center">
+                      <button
+                        onClick={onLoadMore}
+                        disabled={loadingMore}
+                        className="text-[9px] font-mono uppercase tracking-widest border border-[var(--text-secondary)]/30 px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/50 transition-all disabled:opacity-40 flex items-center gap-2"
+                      >
+                        {loadingMore ? <Loader2 size={10} className="animate-spin" /> : null}
+                        {loadingMore ? 'Loading...' : 'Load More'}
+                      </button>
                     </div>
                   )}
                 </div>
               </div>
-              
-              {/* List */}
-              <div className="flex-1 overflow-y-auto p-0 custom-scrollbar">
-                <Playlist
-                  songs={filteredSongs}
-                  currentSong={songs[player.index]}
-                  onSelectSong={(song) => {
-                      const idx = songs.findIndex(s => s.id === song.id);
-                      if (idx !== -1) player.selectSong(idx);
-                  }}
-                  onRemove={onRemoveFromPlaylist}
-                  onBulkRemove={onBulkRemove}
-                  localFilesInfo={localFilesInfo}
-                />
-                {/* Load More */}
-                {hasMore && onLoadMore && (
-                  <div className="p-3 flex justify-center">
-                    <button
-                      onClick={onLoadMore}
-                      disabled={loadingMore}
-                      className="text-[9px] font-mono uppercase tracking-widest border border-[var(--text-secondary)]/30 px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/50 transition-all disabled:opacity-40 flex items-center gap-2"
-                    >
-                      {loadingMore ? <Loader2 size={10} className="animate-spin" /> : null}
-                      {loadingMore ? 'Loading...' : 'Load More'}
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Suggestion/Contact CTA Section */}
-      <div className="w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 mt-16 mb-24">
-        <div className="relative group">
-          {/* Glow behind */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-[var(--accent)]/50 via-[var(--text-secondary)]/50 to-[var(--accent)]/50 blur-2xl opacity-10 group-hover:opacity-30 transition-opacity duration-700"></div>
-          
-          <div className="relative bg-black/60 border border-[var(--text-secondary)]/20 backdrop-blur-2xl p-8 md:p-12 overflow-hidden">
-            {/* Decorative Elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/5 rounded-full -mr-32 -mt-32 blur-[100px]"></div>
-            <div className="absolute bottom-0 left-0 w-32 h-32 border-b border-l border-[var(--accent)]/10"></div>
-            
-            <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
-              <div className="flex-1 text-center lg:text-left">
-                <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-[var(--accent)]/5 border border-[var(--accent)]/40 text-[var(--accent)] text-[10px] font-mono tracking-[0.25em] uppercase mb-6 shadow-[0_0_20px_rgba(0,255,255,0.15)] hover:shadow-[0_0_30px_rgba(0,255,255,0.25)] transition-all duration-300">
-                  <span className="relative flex h-2.5 w-2.5">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]"></span>
-                  </span>
-                  <span className="font-bold">Uploads Open</span>
+        {/* Suggestion/Contact CTA Section */}
+        <div className="w-full animate-in fade-in slide-in-from-bottom-8 duration-1000 mt-16 mb-24">
+          <div className="relative group">
+            {/* Glow behind */}
+            <div className="absolute -inset-1 bg-gradient-to-r from-[var(--accent)]/50 via-[var(--text-secondary)]/50 to-[var(--accent)]/50 blur-2xl opacity-10 group-hover:opacity-30 transition-opacity duration-700"></div>
+
+            <div className="relative bg-black/60 border border-[var(--text-secondary)]/20 backdrop-blur-2xl p-8 md:p-12 overflow-hidden">
+              {/* Decorative Elements */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/5 rounded-full -mr-32 -mt-32 blur-[100px]"></div>
+              <div className="absolute bottom-0 left-0 w-32 h-32 border-b border-l border-[var(--accent)]/10"></div>
+
+              <div className="relative z-10 flex flex-col lg:flex-row items-center justify-between gap-12">
+                <div className="flex-1 text-center lg:text-left">
+                  <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-[var(--accent)]/5 border border-[var(--accent)]/40 text-[var(--accent)] text-[10px] font-mono tracking-[0.25em] uppercase mb-6 shadow-[0_0_20px_rgba(var(--accent-rgb),0.15)] hover:shadow-[0_0_30px_rgba(var(--accent-rgb),0.25)] transition-all duration-300">
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--accent)] opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]"></span>
+                    </span>
+                    <span className="font-bold">Uploads Open</span>
+                  </div>
+
+                  <h2 className="text-3xl md:text-5xl font-bold tracking-tighter mb-6 text-white uppercase leading-tight">
+                    Upload <span className="text-[var(--accent)]">your music</span> <br className="hidden md:block" /> directly to the mainframe
+                  </h2>
+
+                  <p className="text-[var(--text-secondary)] font-mono text-xs md:text-sm leading-relaxed uppercase tracking-[0.2em] max-w-2xl mx-auto lg:mx-0">
+                    Join our neural network. Share your frequency with the world. Uploads are now open to all units.
+                  </p>
                 </div>
 
-                <h2 className="text-3xl md:text-5xl font-bold tracking-tighter mb-6 text-white uppercase leading-tight">
-                  Upload <span className="text-[var(--accent)]">your music</span> <br className="hidden md:block" /> directly to the mainframe
-                </h2>
+                <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto shrink-0">
+                  <Link
+                    to="/upload"
+                    className="group/btn relative px-10 py-5 bg-black/40 border-2 border-[var(--accent)] text-[var(--accent)] font-black tracking-[0.2em] uppercase text-xs overflow-hidden transition-all duration-500 hover:shadow-[0_0_50px_var(--accent)] text-center min-w-[220px] backdrop-blur-sm flex items-center justify-center"
+                  >
+                    {/* Content */}
+                    <div className="relative z-10 flex items-center justify-center gap-3 group-hover/btn:scale-105 transition-transform duration-300">
+                      <Upload size={18} strokeWidth={2.5} className="group-hover/btn:-translate-y-1 transition-transform duration-300" />
+                      <span className="font-black group-hover/btn:text-black">Upload Track</span>
+                    </div>
 
-                <p className="text-[var(--text-secondary)] font-mono text-xs md:text-sm leading-relaxed uppercase tracking-[0.2em] max-w-2xl mx-auto lg:mx-0">
-                  Join our neural network. Share your frequency with the world. Uploads are now open to all units.
-                </p>
-              </div>
-              
-              <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto shrink-0">
-                <Link 
-                  to="/upload"
-                  className="group/btn relative px-10 py-5 bg-black/40 border-2 border-[var(--accent)] text-[var(--accent)] font-black tracking-[0.2em] uppercase text-xs overflow-hidden transition-all duration-500 hover:shadow-[0_0_50px_var(--accent)] text-center min-w-[220px] backdrop-blur-sm flex items-center justify-center"
-                >
-                  {/* Content */}
-                  <div className="relative z-10 flex items-center justify-center gap-3 group-hover/btn:scale-105 transition-transform duration-300">
-                    <Upload size={18} strokeWidth={2.5} className="group-hover/btn:-translate-y-1 transition-transform duration-300" />
-                    <span className="font-black group-hover/btn:text-black">Upload Track</span>
-                  </div>
-                  
-                  {/* Animated Background */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)] via-[var(--accent)] to-[var(--accent)] translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500"></div>
-                  
-                  {/* Glow Effect */}
-                  <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-20 bg-[var(--accent)] blur-xl transition-opacity duration-500"></div>
-                  
-                  <style dangerouslySetInnerHTML={{ __html: `.group\\/btn:hover span { color: black !important; } .group\\/btn:hover svg { stroke: black !important; }` }} />
-                </Link>
+                    {/* Animated Background */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)] via-[var(--accent)] to-[var(--accent)] translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500"></div>
 
-                <a 
-                  href="https://t.me/NomsizMe"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-10 py-5 bg-[var(--accent)] border border-[var(--accent)] text-black font-bold tracking-[0.3em] uppercase text-xs hover:bg-transparent hover:text-[var(--accent)] transition-all duration-500 hover:shadow-[0_0_30px_var(--accent)] flex items-center justify-center gap-3 min-w-[200px]"
-                >
-                  <Send size={18} />
-                  <span>Telegram</span>
-                </a>
-              </div>
-            </div>
+                    {/* Glow Effect */}
+                    <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-20 bg-[var(--accent)] blur-xl transition-opacity duration-500"></div>
 
-            {/* Banner Metadata Footer */}
-            <div className="mt-12 pt-8 border-t border-[var(--text-secondary)]/10 flex flex-wrap justify-center lg:justify-start gap-8 text-[10px] font-mono text-[var(--text-secondary)]/30 tracking-[0.4em] uppercase">
-              <div className="flex items-center gap-2">
-                <span className="w-1 h-1 bg-[var(--accent)] rounded-full"></span>
-                <span>STATUS: LINKED</span>
+                    <style dangerouslySetInnerHTML={{ __html: `.group\\/btn:hover span { color: black !important; } .group\\/btn:hover svg { stroke: black !important; }` }} />
+                  </Link>
+
+                  <a
+                    href="https://t.me/NomsizMe"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-10 py-5 bg-[var(--accent)] border border-[var(--accent)] text-black font-bold tracking-[0.3em] uppercase text-xs hover:bg-transparent hover:text-[var(--accent)] transition-all duration-500 hover:shadow-[0_0_30px_var(--accent)] flex items-center justify-center gap-3 min-w-[200px]"
+                  >
+                    <Send size={18} />
+                    <span>Telegram</span>
+                  </a>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="w-1 h-1 bg-[var(--accent)] rounded-full"></span>
-                <span>UPLOADER.EXE // ACTIVE</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-1 h-1 bg-[var(--accent)] rounded-full"></span>
-                <span>REF_CODE: 77-SYNC</span>
+
+              {/* Banner Metadata Footer */}
+              <div className="mt-12 pt-8 border-t border-[var(--text-secondary)]/10 flex flex-wrap justify-center lg:justify-start gap-8 text-[10px] font-mono text-[var(--text-secondary)]/30 tracking-[0.4em] uppercase">
+                <div className="flex items-center gap-2">
+                  <span className="w-1 h-1 bg-[var(--accent)] rounded-full"></span>
+                  <span>STATUS: LINKED</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-1 h-1 bg-[var(--accent)] rounded-full"></span>
+                  <span>UPLOADER.EXE // ACTIVE</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-1 h-1 bg-[var(--accent)] rounded-full"></span>
+                  <span>REF_CODE: 77-SYNC</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {/* Search Modal */}
-    {isSearchOpen && (
-      <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
-        <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[80vh] flex flex-col">
-          <button 
-            onClick={() => setIsSearchOpen(false)}
-            className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
-          >
-            <X size={20} />
-          </button>
-          
-          <h2 className="text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-6 uppercase">
-            Search Database
-          </h2>
-
-          {/* Search Form */}
-          <form onSubmit={handleSearch} className="flex gap-2 mb-6">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="SEARCH ARTIST OR TITLE..."
-              className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-3 text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
-              autoFocus
-            />
-            <button 
-              type="submit" 
-              disabled={isSearching}
-              className="px-4 bg-[var(--accent)] text-black font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
+      {/* Search Modal */}
+      {isSearchOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[80vh] flex flex-col">
+            <button
+              onClick={() => setIsSearchOpen(false)}
+              className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
             >
-              {isSearching ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+              <X size={20} />
             </button>
-          </form>
 
-          {/* Message Toast */}
-          {searchMsg && (
-            <div className={`mb-4 p-2 text-center text-xs font-mono border ${searchMsg.type === 'success' ? 'border-green-500 text-green-400' : 'border-red-500 text-red-400'}`}>
-              {searchMsg.text}
-            </div>
-          )}
+            <h2 className="text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-6 uppercase">
+              Search Database
+            </h2>
 
-          {/* Results List */}
-          <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
-             {searchResults.length === 0 && !isSearching && searchQuery && (
-               <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
-                 NO DATA FOUND IN SECTOR
-               </div>
-             )}
-             
-             {searchResults.map((song) => {
-               const inPlaylist = songs.some(s => s.id === song.id);
-               return (
-                 <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
+            {/* Search Form */}
+            <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="SEARCH ARTIST OR TITLE..."
+                className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-3 text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={isSearching}
+                className="px-4 bg-[var(--accent)] text-black font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
+              >
+                {isSearching ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
+              </button>
+            </form>
+
+            {/* Search Form */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
+              {searchResults.length === 0 && !isSearching && searchQuery && (
+                <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
+                  NO DATA FOUND IN SECTOR
+                </div>
+              )}
+
+              {searchResults.slice((searchPage - 1) * itemsPerSearchPage, searchPage * itemsPerSearchPage).map((song) => {
+                const inPlaylist = songs.some(s => s.id === song.id);
+                return (
+                  <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
                     <div className="flex items-center gap-3 overflow-hidden">
-                       <img src={song.coverUrl} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
-                       <div className="min-w-0">
-                         <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
-                         <div className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider">{song.artist}</div>
-                       </div>
+                      <img src={song.coverUrl} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
+                        <div className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider">{song.artist}</div>
+                      </div>
                     </div>
-                    
+
                     <button
                       onClick={() => handleAddSong(song)}
                       disabled={inPlaylist}
@@ -1031,35 +1023,46 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                     >
                       {inPlaylist ? <Check size={18} /> : <Plus size={18} />}
                     </button>
-                 </div>
-               );
-             })}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Pagination */}
+            {Math.ceil(searchResults.length / itemsPerSearchPage) > 1 && (
+              <div className="shrink-0 pt-4 mt-2 border-t border-[var(--text-secondary)]/20">
+                <Pagination
+                  currentPage={searchPage}
+                  totalPages={Math.ceil(searchResults.length / itemsPerSearchPage)}
+                  onPageChange={setSearchPage}
+                />
+              </div>
+            )}
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {/* Karaoke Mode Layer */}
-    {isKaraokeOpen && current && (
-      <LyricsView 
-        song={current} 
-        currentTime={player.currentTime}
-        onClose={() => setIsKaraokeOpen(false)} 
-      />
-    )}
+      {/* Karaoke Mode Layer */}
+      {isKaraokeOpen && current && (
+        <LyricsView
+          song={current}
+          currentTime={player.currentTime}
+          onClose={() => setIsKaraokeOpen(false)}
+        />
+      )}
 
-    {/* Sleep Timer countdown HUD */}
-    {player.sleepTimer !== null && (
-      <div className="fixed bottom-12 md:bottom-24 right-4 md:right-8 z-[100] animate-in slide-in-from-right-10 duration-500">
-         <div className="bg-black/80 backdrop-blur-xl border border-[var(--accent)]/30 px-4 py-2 flex items-center gap-3 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
+      {/* Sleep Timer countdown HUD */}
+      {player.sleepTimer !== null && (
+        <div className="fixed bottom-12 md:bottom-24 right-4 md:right-8 z-[100] animate-in slide-in-from-right-10 duration-500">
+          <div className="bg-black/80 backdrop-blur-xl border border-[var(--accent)]/30 px-4 py-2 flex items-center gap-3 shadow-[0_0_20px_rgba(var(--accent-rgb),0.1)]">
             <Clock size={16} className="text-[var(--accent)] animate-pulse" />
             <div className="flex flex-col">
               <span className="text-[8px] font-mono text-[var(--accent)] uppercase tracking-widest leading-none mb-1">Deep Sleep Mode</span>
               <span className="text-xs font-mono text-white leading-none">{player.sleepTimer}M Remaining</span>
             </div>
-         </div>
-      </div>
-    )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

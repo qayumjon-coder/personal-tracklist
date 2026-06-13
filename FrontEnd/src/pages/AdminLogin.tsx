@@ -38,7 +38,7 @@ export function AdminLogin() {
       <div className="scanline" />
       
       <div className="relative z-10 w-full max-w-md">
-        <div id="login-box" className="bg-black/40 border border-[var(--text-secondary)] p-8 backdrop-blur-sm shadow-[0_0_40px_rgba(0,255,255,0.1)]">
+        <div id="login-box" className="bg-black/40 border border-[var(--text-secondary)] p-8 backdrop-blur-sm shadow-[0_0_40px_rgba(var(--accent-rgb),0.1)]">
           {/* Header */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-16 h-16 mb-4 border-2 border-[var(--accent)] bg-[var(--accent)]/10">
@@ -121,7 +121,7 @@ export function AdminLogin() {
               className="group flex items-center justify-center gap-2 w-full py-3 text-sm uppercase tracking-wider font-bold
                        border border-[var(--text-secondary)] text-[var(--text-secondary)] bg-black/50
                        hover:border-[var(--text-primary)] hover:text-black hover:bg-[var(--text-primary)]
-                       transition-all duration-300 shadow-[0_0_10px_rgba(0,255,255,0.05)]"
+                       transition-all duration-300 shadow-[0_0_10px_rgba(var(--accent-rgb),0.05)]"
             >
               <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform duration-300" />
               <span>Back to Player</span>

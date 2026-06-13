@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useSettings } from "../contexts/SettingsContext";
+import { useSettings, THEME_COLORS, hexToRgb } from "../contexts/SettingsContext";
 
 interface VisualizerProps {
   playing: boolean;
@@ -9,10 +9,12 @@ interface VisualizerProps {
 export function Visualizer({ playing, analyser }: VisualizerProps) {
   const { visualizerMode, theme } = useSettings();
   const accentColorRef = useRef('#00E5FF');
+  const accentRgbRef = useRef('0, 255, 255');
 
   useEffect(() => {
-    const rootStyles = getComputedStyle(document.documentElement);
-    accentColorRef.current = rootStyles.getPropertyValue('--accent').trim() || '#00E5FF';
+    const selected = THEME_COLORS[theme] || THEME_COLORS.aqua;
+    accentColorRef.current = selected.primary;
+    accentRgbRef.current = hexToRgb(selected.primary);
   }, [theme, visualizerMode]);
 
   // Refs for Bars
@@ -71,7 +73,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
           ctx.beginPath();
           ctx.moveTo(0, height / 2);
           ctx.lineTo(width, height / 2);
-          ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)'; // Faint line
+          ctx.strokeStyle = `rgba(${accentRgbRef.current}, 0.2)`; // Faint line
           ctx.lineWidth = 2;
           ctx.stroke();
           // animationRef.current = requestAnimationFrame(animateWave); // Optional: keep animating? No need if static.
@@ -81,8 +83,8 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
         analyser.getByteTimeDomainData(dataArray);
 
         ctx.lineWidth = 2;
-        // We can just use the static accent color for canvas contexts
-        const accentColor = '#00E5FF';
+        // We use the dynamic accent color
+        const accentColor = accentColorRef.current;
         ctx.strokeStyle = accentColor;
         ctx.shadowBlur = 10;
         ctx.shadowColor = accentColor;
@@ -128,7 +130,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
         ctx.stroke();
 
         if (playing) {
-            animationRef.current = requestAnimationFrame(animateWave);
+          animationRef.current = requestAnimationFrame(animateWave);
         }
       };
       animateWave();
@@ -144,146 +146,146 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
       // Colors based on the provided image
       const waveColors = [
-          'rgba(147, 51, 234, 0.7)',  // Purple
-          'rgba(236, 72, 153, 0.7)',  // Pink
-          'rgba(245, 158, 11, 0.7)',  // Orange
-          'rgba(253, 224, 71, 0.7)',  // Yellow
-          'rgba(34, 197, 94, 0.7)',   // Green
-          'rgba(59, 130, 246, 0.7)'   // Blue
+        'rgba(147, 51, 234, 0.7)',  // Purple
+        'rgba(236, 72, 153, 0.7)',  // Pink
+        'rgba(245, 158, 11, 0.7)',  // Orange
+        'rgba(253, 224, 71, 0.7)',  // Yellow
+        'rgba(34, 197, 94, 0.7)',   // Green
+        'rgba(59, 130, 246, 0.7)'   // Blue
       ];
       const numWaves = waveColors.length;
 
       const animateMultiWave = () => {
-          if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-              canvas.width = canvas.clientWidth;
-              canvas.height = canvas.clientHeight;
-          }
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+        }
 
-          const width = canvas.width;
-          const height = canvas.height;
-          const centerY = height / 2;
+        const width = canvas.width;
+        const height = canvas.height;
+        const centerY = height / 2;
 
-          ctx.clearRect(0, 0, width, height);
+        ctx.clearRect(0, 0, width, height);
 
-          if (!playing || !analyser) {
-              ctx.beginPath();
-              ctx.moveTo(0, centerY);
-              ctx.lineTo(width, centerY);
-              ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
-              ctx.lineWidth = 2;
-              ctx.stroke();
-              return;
-          }
-
-          analyser.getByteTimeDomainData(dataArray);
-          
-          // To make it react more dynamically like a visualizer, we can also use frequency data
-          const freqData = new Uint8Array(analyser.frequencyBinCount);
-          analyser.getByteFrequencyData(freqData);
-
-          let sum = 0;
-          for (let i = 0; i < bufferLength; i++) {
-              const v = dataArray[i] - 128;
-              sum += v * v;
-          }
-          const rms = Math.sqrt(sum / bufferLength); 
-          const baseAmplitude = (rms / 64) * (height / 3); 
-
-          const time = performance.now() / 1000;
-          
-          // Setup global styles for glowing, overlapping look
-          ctx.globalCompositeOperation = 'screen'; 
-          
-          for (let w = 0; w < numWaves; w++) {
-              const color = waveColors[w];
-              ctx.fillStyle = color;
-              
-              // Add a subtle glow
-              ctx.shadowBlur = 15;
-              ctx.shadowColor = color;
-              
-              const wavePhase = time * (1 + w * 0.5); 
-              const waveFreq = 0.003 + (w * 0.001);
-              
-              // Sample frequency data for this specific wave layer to give them independent reactions
-              const freqIdx = Math.floor((w / numWaves) * (freqData.length * 0.5)); // Focus on lower/mid freq
-              const freqAmpModifier = 1 + (freqData[freqIdx] / 255) * 1.5;
-
-              ctx.beginPath();
-              ctx.moveTo(0, centerY);
-
-              // Draw Top Half
-              for (let x = 0; x < width; x++) {
-                  const normX = x / width;
-                  
-                  // Envelope to taper ends to zero
-                  // Using a power sine curve for smoother tapering that matches the image
-                  const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
-                  
-                  const dataIdx = Math.floor(normX * bufferLength);
-                  const signal = ((dataArray[dataIdx] - 128) / 128); // -1 to 1
-                  
-                  // Combine sine wave, audio signal, and envelope
-                  // The sine function gives the basic rolling wave shape
-                  const sineOffset = Math.sin(x * waveFreq + wavePhase);
-                  
-                  // Modulate the offset heavily by the frequency and amplitude
-                  const yOffset = (sineOffset * 0.5 + signal * (0.5 + w * 0.2)) * baseAmplitude * freqAmpModifier * envelope;
-                  
-                  const y = centerY - Math.abs(yOffset); // Top half only
-                  ctx.lineTo(x, y);
-              }
-
-              // Draw Bottom Half (Reflection)
-              for (let x = width; x >= 0; x--) {
-                  const normX = x / width;
-                  const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
-                  const dataIdx = Math.floor(normX * bufferLength);
-                  const signal = ((dataArray[dataIdx] - 128) / 128);
-                  
-                  const sineOffset = Math.sin(x * waveFreq + wavePhase);
-                  const yOffset = (sineOffset * 0.5 + signal * (0.5 + w * 0.2)) * baseAmplitude * freqAmpModifier * envelope;
-                  
-                  const y = centerY + Math.abs(yOffset); // Bottom half reflection
-                  ctx.lineTo(x, y);
-              }
-              
-              ctx.closePath();
-              ctx.fill();
-          }
-
-          // Reset composite operation to default
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.shadowBlur = 0;
-          
-          // Add a central bright line to accentuate the audio center
+        if (!playing || !analyser) {
           ctx.beginPath();
           ctx.moveTo(0, centerY);
-          
-          // We use the raw signal for the center line for crisp reaction
-          const centerAmp = baseAmplitude * 0.5;
-          for (let x = 0; x < width; x++) {
-              const normX = x / width;
-              const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
-              const dataIdx = Math.floor(normX * bufferLength);
-              const signal = ((dataArray[dataIdx] - 128) / 128);
-              
-              const y = centerY + signal * centerAmp * envelope;
-              ctx.lineTo(x, y);
-          }
-          
-          // Use standard hex for the line
-          const accentColor = '#00E5FF';
-          ctx.strokeStyle = `rgba(0, 229, 255, 0.4)`;
-          ctx.lineWidth = 1;
-          ctx.shadowBlur = 5;
-          ctx.shadowColor = accentColor;
+          ctx.lineTo(width, centerY);
+          ctx.strokeStyle = `rgba(${accentRgbRef.current}, 0.2)`;
+          ctx.lineWidth = 2;
           ctx.stroke();
-          ctx.shadowBlur = 0;
+          return;
+        }
 
-          if (playing) {
-              animationRef.current = requestAnimationFrame(animateMultiWave);
+        analyser.getByteTimeDomainData(dataArray);
+
+        // To make it react more dynamically like a visualizer, we can also use frequency data
+        const freqData = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(freqData);
+
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] - 128;
+          sum += v * v;
+        }
+        const rms = Math.sqrt(sum / bufferLength);
+        const baseAmplitude = (rms / 64) * (height / 3);
+
+        const time = performance.now() / 1000;
+
+        // Setup global styles for glowing, overlapping look
+        ctx.globalCompositeOperation = 'screen';
+
+        for (let w = 0; w < numWaves; w++) {
+          const color = waveColors[w];
+          ctx.fillStyle = color;
+
+          // Add a subtle glow
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = color;
+
+          const wavePhase = time * (1 + w * 0.5);
+          const waveFreq = 0.003 + (w * 0.001);
+
+          // Sample frequency data for this specific wave layer to give them independent reactions
+          const freqIdx = Math.floor((w / numWaves) * (freqData.length * 0.5)); // Focus on lower/mid freq
+          const freqAmpModifier = 1 + (freqData[freqIdx] / 255) * 1.5;
+
+          ctx.beginPath();
+          ctx.moveTo(0, centerY);
+
+          // Draw Top Half
+          for (let x = 0; x < width; x++) {
+            const normX = x / width;
+
+            // Envelope to taper ends to zero
+            // Using a power sine curve for smoother tapering that matches the image
+            const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
+
+            const dataIdx = Math.floor(normX * bufferLength);
+            const signal = ((dataArray[dataIdx] - 128) / 128); // -1 to 1
+
+            // Combine sine wave, audio signal, and envelope
+            // The sine function gives the basic rolling wave shape
+            const sineOffset = Math.sin(x * waveFreq + wavePhase);
+
+            // Modulate the offset heavily by the frequency and amplitude
+            const yOffset = (sineOffset * 0.5 + signal * (0.5 + w * 0.2)) * baseAmplitude * freqAmpModifier * envelope;
+
+            const y = centerY - Math.abs(yOffset); // Top half only
+            ctx.lineTo(x, y);
           }
+
+          // Draw Bottom Half (Reflection)
+          for (let x = width; x >= 0; x--) {
+            const normX = x / width;
+            const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
+            const dataIdx = Math.floor(normX * bufferLength);
+            const signal = ((dataArray[dataIdx] - 128) / 128);
+
+            const sineOffset = Math.sin(x * waveFreq + wavePhase);
+            const yOffset = (sineOffset * 0.5 + signal * (0.5 + w * 0.2)) * baseAmplitude * freqAmpModifier * envelope;
+
+            const y = centerY + Math.abs(yOffset); // Bottom half reflection
+            ctx.lineTo(x, y);
+          }
+
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // Reset composite operation to default
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.shadowBlur = 0;
+
+        // Add a central bright line to accentuate the audio center
+        ctx.beginPath();
+        ctx.moveTo(0, centerY);
+
+        // We use the raw signal for the center line for crisp reaction
+        const centerAmp = baseAmplitude * 0.5;
+        for (let x = 0; x < width; x++) {
+          const normX = x / width;
+          const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
+          const dataIdx = Math.floor(normX * bufferLength);
+          const signal = ((dataArray[dataIdx] - 128) / 128);
+
+          const y = centerY + signal * centerAmp * envelope;
+          ctx.lineTo(x, y);
+        }
+
+        // Use dynamic color for the line
+        const accentColor = accentColorRef.current;
+        ctx.strokeStyle = `rgba(${accentRgbRef.current}, 0.4)`;
+        ctx.lineWidth = 1;
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = accentColor;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        if (playing) {
+          animationRef.current = requestAnimationFrame(animateMultiWave);
+        }
       };
       animateMultiWave();
     }
@@ -321,10 +323,10 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
         });
 
         if (playing) {
-            animationRef.current = requestAnimationFrame(animateBars);
+          animationRef.current = requestAnimationFrame(animateBars);
         }
       };
-      
+
       // We always run once to set the static baseline
       animateBars();
     }
@@ -337,9 +339,8 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      
-      const numBeams = 100; // Increased to 100 for exact high-density neon line replication
-      const prevHeights = new Array(numBeams).fill(0);
+
+      // const numBeams = 100; // Increased to 100 for exact high-density neon line replication
 
       // Define atmospheric colors dynamically linked to the website's themes
       const themePalettes: Record<string, {
@@ -358,7 +359,16 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
       };
 
       // Initialize 40 ambient floating particles (Aurora dust)
-
+      const numParticles = 45;
+      const particles = Array.from({ length: numParticles }, () => ({
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        size: 1.2 + Math.random() * 2.0,
+        speedY: 0.15 + Math.random() * 0.35,
+        amplitudeX: 0.3 + Math.random() * 1.2,
+        phase: Math.random() * Math.PI * 2,
+        speedPhase: 0.01 + Math.random() * 0.02
+      }));
       const animateAurora = () => {
         if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
           canvas.width = canvas.clientWidth;
@@ -372,6 +382,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
         ctx.clearRect(0, 0, width, height);
 
         let bassIntensity = 0;
+        let rms = 0;
 
         if (playing && analyser) {
           analyser.getByteFrequencyData(dataArray);
@@ -383,6 +394,14 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
             bassSum += dataArray[b] || 0;
           }
           bassIntensity = bassSum / (bassBins * 255);
+
+          // Calculate overall RMS/volume energy
+          let totalSum = 0;
+          const totalBins = Math.min(bufferLength, 128);
+          for (let b = 0; b < totalBins; b++) {
+            totalSum += dataArray[b] || 0;
+          }
+          rms = totalSum / (totalBins * 255);
         }
 
         const palette = themePalettes[theme] || themePalettes.aqua;
@@ -400,84 +419,131 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
         ctx.restore();
 
         // 2. Render & Update Floating Particles (Aurora Dust)
-        // Disabled to perfectly match the strict diamond neon equalizer image provided by the user.
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        for (let p = 0; p < numParticles; p++) {
+          const part = particles[p];
 
-        // 3. Draw Vertical Equalizer Beams (Pixel-Perfect Diamond Shape)
-        // The image has roughly 65-75 distinct glowing bars with clear gaps
-        const activeBeams = 75; 
-        const beamSpacing = width / activeBeams;
-        const midIndex = activeBeams / 2;
+          // Particles float upwards, speed is modulated by overall music volume
+          part.y -= part.speedY * (1.0 + rms * 2.5);
+          part.phase += part.speedPhase;
 
-        for (let i = 0; i < activeBeams; i++) {
-          // Calculate normalized horizontal distance from center (0 at center, 1 at edges)
-          const normDist = Math.abs(i - midIndex) / midIndex;
+          // Recycle particles going off-screen
+          if (part.y < -5) {
+            part.y = 105;
+            part.x = Math.random() * 100;
+          }
 
-          // Strict diamond/triangle envelope to taper edges sharply (matches image)
-          const envelope = Math.pow(Math.max(0, 1 - normDist), 1.4);
+          const px = (part.x / 100) * width + Math.sin(part.phase) * part.amplitudeX * 20;
+          const py = (part.y / 100) * height;
 
-          // Symmetrical frequency mapping (Center = Bass/0, Edges = Treble)
-          // We use only the lower half of frequencies for better visuals
-          const freqIdx = Math.floor(normDist * (bufferLength * 0.45));
-          const freqVal = playing && analyser ? dataArray[freqIdx] : 0;
+          // Glow bubble for the particle
+          const pRadius = part.size * (2.0 + rms * 2.5);
+          const pGlow = ctx.createRadialGradient(px, py, 0, px, py, pRadius);
+          pGlow.addColorStop(0, `rgba(${palette.primary}, ${0.8 + rms * 0.2})`);
+          pGlow.addColorStop(0.3, `rgba(${palette.secondary}, ${0.35 * (1.0 + rms)})`);
+          pGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
-          // Pure frequency target (NO sway, NO wave motion) - just raw audio equalizer
-          const target = (freqVal / 255) * (height * 0.85) * envelope + (envelope * 12);
-
-          // Smooth height transition (fast reaction for sharp visualizer look)
-          prevHeights[i] += (target - prevHeights[i]) * 0.35;
-          const h = Math.max(4, prevHeights[i]);
-
-          const x = i * beamSpacing + beamSpacing / 2;
-
-          // Two-tone gradient to match the image (Secondary outer glow, Primary inner glow)
-          const gradOuter = ctx.createLinearGradient(x, cy - h / 2, x, cy + h / 2);
-          gradOuter.addColorStop(0, `rgba(${palette.secondary}, 0)`);
-          gradOuter.addColorStop(0.2, `rgba(${palette.secondary}, 0.5)`);
-          gradOuter.addColorStop(0.5, `rgba(${palette.secondary}, 0.9)`);
-          gradOuter.addColorStop(0.8, `rgba(${palette.secondary}, 0.5)`);
-          gradOuter.addColorStop(1, `rgba(${palette.secondary}, 0)`);
-
-          const gradInner = ctx.createLinearGradient(x, cy - h / 2, x, cy + h / 2);
-          gradInner.addColorStop(0, `rgba(${palette.primary}, 0)`);
-          gradInner.addColorStop(0.3, `rgba(${palette.primary}, 0.6)`);
-          gradInner.addColorStop(0.5, `rgba(${palette.primary}, 1)`);
-          gradInner.addColorStop(0.7, `rgba(${palette.primary}, 0.6)`);
-          gradInner.addColorStop(1, `rgba(${palette.primary}, 0)`);
-
-          // Core line color: High contrast pure white center
-          const coreColor = `rgba(255, 255, 255, 0.95)`;
-
-          ctx.lineCap = 'round'; // Keeps the line ends clean
-          
-          // Gaps between lines: Ensure glow width is strictly less than beamSpacing
-          const maxGlowWidth = Math.min(12, beamSpacing * 0.75);
-
-          // Layer 1: Wide background aura (Secondary color)
+          ctx.fillStyle = pGlow;
           ctx.beginPath();
-          ctx.moveTo(x, cy - h / 2);
-          ctx.lineTo(x, cy + h / 2);
-          ctx.strokeStyle = gradOuter;
-          ctx.lineWidth = maxGlowWidth;
-          ctx.globalAlpha = 0.5;
-          ctx.stroke();
+          ctx.arc(px, py, pRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
 
-          // Layer 2: Medium neon glow (Primary color)
-          ctx.beginPath();
-          ctx.moveTo(x, cy - h / 2);
-          ctx.lineTo(x, cy + h / 2);
-          ctx.strokeStyle = gradInner;
-          ctx.lineWidth = maxGlowWidth * 0.45;
-          ctx.globalAlpha = 0.9;
-          ctx.stroke();
+        // 3. Ultra-Realistic Aurora Borealis Effect
+        ctx.globalCompositeOperation = 'screen';
+        const time = performance.now() * 0.0003;
 
-          // Layer 3: Soft glowing core line (White)
-          ctx.beginPath();
-          ctx.moveTo(x, cy - h / 2);
-          ctx.lineTo(x, cy + h / 2);
-          ctx.strokeStyle = coreColor;
-          ctx.lineWidth = Math.min(2.5, beamSpacing * 0.15);
-          ctx.globalAlpha = 1.0;
-          ctx.stroke();
+        const sliceWidth = 3;
+        const numSlices = Math.ceil(width / sliceWidth);
+
+        const getBaseY = (normX: number, layer: number) => {
+          const sway1 = Math.sin(time * 0.5 + normX * 3 + layer);
+          const sway2 = Math.sin(time * 0.8 + normX * 5 - layer * 2);
+          const sway3 = Math.cos(time * 0.3 + normX * 7 + layer * 3);
+
+          return cy + 60 + (sway1 * 40 + sway2 * 20 + sway3 * 10) - (bassIntensity * 40);
+        };
+
+        const [r1, g1, b1] = palette.primary.split(',').map(Number);
+        const [r2, g2, b2] = palette.secondary.split(',').map(Number);
+
+        // Pre-calculate smoothed frequency data to avoid jagged spikes (removes "fluid stream" look)
+        const smoothedAudio = new Array(numSlices).fill(0);
+        for (let i = 0; i < numSlices; i++) {
+          const normDist = Math.abs((i / numSlices) - 0.5) * 2;
+          const freqIdx = Math.floor(Math.min(1, normDist) * (bufferLength * 0.35));
+          const freqVal = playing && analyser ? dataArray[freqIdx] / 255 : 0;
+          smoothedAudio[i] = freqVal;
+        }
+
+        // Moving average to create broad majestic pillars instead of narrow fluid drops
+        const smoothRadius = Math.max(10, Math.floor(numSlices / 15));
+        const finalAudio = new Array(numSlices).fill(0);
+        for (let i = 0; i < numSlices; i++) {
+          let sum = 0;
+          let count = 0;
+          for (let j = -smoothRadius; j <= smoothRadius; j++) {
+            if (i + j >= 0 && i + j < numSlices) {
+              sum += smoothedAudio[i + j];
+              count++;
+            }
+          }
+          finalAudio[i] = sum / count;
+        }
+
+        // Draw 3 layers of aurora for immense depth
+        for (let layer = 0; layer < 3; layer++) {
+          const layerScale = 1 - layer * 0.2;
+
+          // Background layers naturally shift toward the secondary theme color
+          const blendL = layer * 0.4;
+          const rL = Math.round(r1 * (1 - blendL) + r2 * blendL);
+          const gL = Math.round(g1 * (1 - blendL) + g2 * blendL);
+          const bL = Math.round(b1 * (1 - blendL) + b2 * blendL);
+
+          for (let i = 0; i < numSlices; i++) {
+            const x = i * sliceWidth;
+            const normX = i / numSlices;
+            const normDist = Math.abs(normX - 0.5) * 2;
+            const envelope = Math.max(0, 1 - Math.pow(normDist, 2.0));
+
+            const baseY = getBaseY(normX, layer);
+
+            // Broad, majestic folds instead of narrow jittery ones
+            const fold = Math.sin(time * 2 + normX * 8 + layer * 5);
+            const foldIntensity = Math.max(0, fold); // 0 to 1
+
+            // Shimmering effect for the pillar
+            const shimmer = Math.sin(time * 3 + normX * 4 + layer) * 0.5 + 0.5;
+
+            // Smooth audio
+            const freqVal = finalAudio[i];
+
+            // Pillar height
+            let rayHeight = (height * 0.15) + (freqVal * height * 0.5) + (foldIntensity * height * 0.25);
+            rayHeight *= (1 + rms * 1.5);
+            rayHeight *= envelope * layerScale;
+
+            // Ensure no box cutoff
+            rayHeight = Math.min(rayHeight, baseY * 0.95);
+
+            if (rayHeight <= 1) continue;
+
+            const grad = ctx.createLinearGradient(x, baseY, x, baseY - rayHeight);
+
+            // The brightness at the bottom creates the "ribbon" naturally without drawing a harsh stroke line
+            const alpha = (0.05 + shimmer * 0.15 + foldIntensity * 0.2 + freqVal * 0.3) * layerScale * envelope;
+
+            grad.addColorStop(0, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 1.5})`); // Stronger base
+            grad.addColorStop(0.2, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 0.8})`);
+            grad.addColorStop(0.6, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 0.3})`);
+            grad.addColorStop(1, `rgba(${rL}, ${gL}, ${bL}, 0)`);
+
+            ctx.fillStyle = grad;
+            ctx.fillRect(x, baseY - rayHeight, sliceWidth + 1, rayHeight);
+          }
         }
 
         // Reset global alpha and states for safety
@@ -571,7 +637,7 @@ export function FadeVisualizer({ playing, analyser }: VisualizerProps) {
       }
 
       if (playing) {
-          animationRef.current = requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
       }
     };
 
@@ -602,12 +668,12 @@ export function useBeatScale(playing: boolean, analyser?: AnalyserNode | null, t
 
   useEffect(() => {
     if (!isActive || !targetRef) {
-       // Reset scale if disabled
-       if (targetRef?.current) {
-          targetRef.current.style.transform = 'none';
-       }
-       if (animationRef.current) cancelAnimationFrame(animationRef.current);
-       return;
+      // Reset scale if disabled
+      if (targetRef?.current) {
+        targetRef.current.style.transform = 'none';
+      }
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      return;
     }
 
     const bufferLength = analyser ? analyser.frequencyBinCount : 0;
@@ -641,11 +707,11 @@ export function useBeatScale(playing: boolean, analyser?: AnalyserNode | null, t
       currentScaleRef.current += (targetScale - currentScaleRef.current) * 0.3;
 
       if (targetRef.current) {
-         targetRef.current.style.transform = `scale(${currentScaleRef.current})`;
+        targetRef.current.style.transform = `scale(${currentScaleRef.current})`;
       }
 
       if (playing) {
-          animationRef.current = requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
       }
     };
 
@@ -659,6 +725,14 @@ export function useBeatScale(playing: boolean, analyser?: AnalyserNode | null, t
 }
 
 export function AmbientBackground({ playing, analyser }: VisualizerProps) {
+  const { theme } = useSettings();
+  const accentColorRef = useRef('#00E5FF');
+
+  useEffect(() => {
+    const selected = THEME_COLORS[theme] || THEME_COLORS.aqua;
+    accentColorRef.current = selected.primary;
+  }, [theme]);
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationRef = useRef<number | null>(null);
 
@@ -701,31 +775,24 @@ export function AmbientBackground({ playing, analyser }: VisualizerProps) {
       const maxRadius = Math.max(canvas.width, canvas.height) * 0.8;
 
       // Radius pulses with intensity
-      // Base radius 40% + up to 40% more
       const radius = maxRadius * (0.4 + (intensity * 0.4));
 
-      const accent = '#00E5FF';
+      const accentColor = accentColorRef.current;
 
       // Gradient
       const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-      // Inner color: accent with variable opacity
-      // Actually closer to CSS: rgba...
-      // Let's use globalAlpha for simplicity or just CSS opacity on canvas?
-      // Canvas gradient color parsing is strict.
-      // Let's use standard CSS color mix or just globalAlpha.
 
       ctx.globalAlpha = 0.1 + (intensity * 0.3); // Base 0.1, max 0.4
 
       ctx.fillStyle = gradient;
-      // We need valid color strings for gradient. 
-      gradient.addColorStop(0, accent);
+      gradient.addColorStop(0, accentColor);
       gradient.addColorStop(1, 'transparent');
 
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       if (playing) {
-          animationRef.current = requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
       }
     };
 
@@ -762,11 +829,11 @@ export function ConcentricWavesVisualizer({ playing, analyser }: VisualizerProps
     const numRings = 10;
     const rings: { freqModifier: number; speedOffset: number; nodes: number }[] = [];
     for (let i = 0; i < numRings; i++) {
-        rings.push({
-            freqModifier: 1 + (i * 0.15),
-            speedOffset: 0.5 + (i * 0.1),
-            nodes: 4 + Math.floor(i / 2) * 2 // Evens only for symmetrical waves
-        });
+      rings.push({
+        freqModifier: 1 + (i * 0.15),
+        speedOffset: 0.5 + (i * 0.1),
+        nodes: 4 + Math.floor(i / 2) * 2 // Evens only for symmetrical waves
+      });
     }
 
     let currentAccent = '#00E5FF';
@@ -779,19 +846,19 @@ export function ConcentricWavesVisualizer({ playing, analyser }: VisualizerProps
 
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
-      
+
       ctx.clearRect(0, 0, canvas.width, canvas.height); // completely clear previous frame
-      
+
       if (!playing || !analyser) {
         // Draw static faint rings when not playing
         for (let r = 0; r < numRings; r++) {
-            const radius = 60 + (r * 20);
-            ctx.beginPath();
-            ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-            ctx.strokeStyle = currentAccent;
-            ctx.globalAlpha = 0.1;
-            ctx.lineWidth = 1;
-            ctx.stroke();
+          const radius = 60 + (r * 20);
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = currentAccent;
+          ctx.globalAlpha = 0.1;
+          ctx.lineWidth = 1;
+          ctx.stroke();
         }
         ctx.globalAlpha = 1.0;
         return;
@@ -806,50 +873,50 @@ export function ConcentricWavesVisualizer({ playing, analyser }: VisualizerProps
       const time = performance.now() / 1000;
 
       for (let r = 0; r < numRings; r++) {
-          const ringInfo = rings[r];
-          // Smaller base radius for a tighter look
-          const baseRadius = 60 + (r * 25); 
-          
-          ctx.beginPath();
-          
-          ctx.strokeStyle = currentAccent;
-          ctx.globalAlpha = Math.max(0.05, 0.7 - (r * 0.05));
-          ctx.lineWidth = 1 + (r * 0.05); // Thinner outer lines compared to original
-          ctx.shadowBlur = 5;
-          ctx.shadowColor = currentAccent;
+        const ringInfo = rings[r];
+        // Smaller base radius for a tighter look
+        const baseRadius = 60 + (r * 25);
 
-          const numPoints = 180; // fidelity of the circle
-          const angleStep = (Math.PI * 2) / numPoints;
-          
-          // Speed offsets
-          const waveTime = time * ringInfo.speedOffset * 3;
+        ctx.beginPath();
 
-          for (let i = 0; i <= numPoints; i++) {
-              const angle = i * angleStep;
-              
-              // Sample frequency data symmetrically
-              const freqIndex = Math.floor(Math.abs(Math.sin(angle)) * (bufferLength * 0.3)); 
-              const freqValue = dataArray[freqIndex] || 0;
-              
-              const audioResponse = (freqValue / 255); 
-              
-              // Combine sine waves to make "wavy" circle edges explicitly linked to audio
-              const waviness = audioResponse * 30 * ringInfo.freqModifier * Math.sin(angle * ringInfo.nodes + waveTime);
+        ctx.strokeStyle = currentAccent;
+        ctx.globalAlpha = Math.max(0.05, 0.7 - (r * 0.05));
+        ctx.lineWidth = 1 + (r * 0.05); // Thinner outer lines compared to original
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = currentAccent;
 
-              const currentRadius = baseRadius + waviness + (audioResponse * 10);
+        const numPoints = 180; // fidelity of the circle
+        const angleStep = (Math.PI * 2) / numPoints;
 
-              const x = cx + Math.cos(angle) * currentRadius;
-              const y = cy + Math.sin(angle) * currentRadius;
+        // Speed offsets
+        const waveTime = time * ringInfo.speedOffset * 3;
 
-              if (i === 0) {
-                  ctx.moveTo(x, y);
-              } else {
-                  ctx.lineTo(x, y);
-              }
+        for (let i = 0; i <= numPoints; i++) {
+          const angle = i * angleStep;
+
+          // Sample frequency data symmetrically
+          const freqIndex = Math.floor(Math.abs(Math.sin(angle)) * (bufferLength * 0.3));
+          const freqValue = dataArray[freqIndex] || 0;
+
+          const audioResponse = (freqValue / 255);
+
+          // Combine sine waves to make "wavy" circle edges explicitly linked to audio
+          const waviness = audioResponse * 30 * ringInfo.freqModifier * Math.sin(angle * ringInfo.nodes + waveTime);
+
+          const currentRadius = baseRadius + waviness + (audioResponse * 10);
+
+          const x = cx + Math.cos(angle) * currentRadius;
+          const y = cy + Math.sin(angle) * currentRadius;
+
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
           }
-          
-          ctx.closePath();
-          ctx.stroke();
+        }
+
+        ctx.closePath();
+        ctx.stroke();
       }
 
       ctx.globalCompositeOperation = 'source-over';
@@ -857,7 +924,7 @@ export function ConcentricWavesVisualizer({ playing, analyser }: VisualizerProps
       ctx.shadowBlur = 0;
 
       if (playing) {
-          animationRef.current = requestAnimationFrame(animate);
+        animationRef.current = requestAnimationFrame(animate);
       }
     };
 

@@ -17,8 +17,10 @@ import { LoadingScreen } from "./components/LoadingScreen";
 import { useEffect } from "react";
 import { HelmetProvider } from 'react-helmet-async';
 
+import { Toaster } from "sonner";
+
 function MusicApp() {
-  const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist } = usePlaylist();
+  const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist } = usePlaylist();
   const { localSongs, isScanning, hasStoredHandle, requestAccess, restoreAccess, removeLocalFiles, removeLocalFile, error: localError } = useLocalFiles();
   
   // Combine both sources
@@ -72,7 +74,8 @@ function MusicApp() {
 
   return (
       <Router>
-        <div className="w-full min-h-screen flex items-start justify-center p-2 py-12 md:py-0 relative overflow-y-auto">
+        <Toaster theme="dark" position="bottom-right" toastOptions={{ style: { background: 'rgba(0, 0, 0, 0.8)', border: '1px solid rgba(var(--accent-rgb), 0.2)', color: 'white', backdropFilter: 'blur(10px)' } }} />
+        <div className="w-full min-h-screen flex items-start justify-center p-2 py-12 md:py-0 relative">
           <div className="retro-grid" />
           <div className="scanline" />
           <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
@@ -87,6 +90,7 @@ function MusicApp() {
                 onAddToPlaylist={addToPlaylist}
                 onRemoveFromPlaylist={handleRemoveFromPlaylist}
                 onBulkRemove={handleBulkRemove}
+                onReorderPlaylist={reorderPlaylist}
                 localFilesInfo={{
                   requestAccess,
                   restoreAccess,

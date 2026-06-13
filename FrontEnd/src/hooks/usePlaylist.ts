@@ -71,5 +71,13 @@ export function usePlaylist() {
         localStorage.setItem(PLAYLIST_KEY, JSON.stringify(ids));
     };
 
-    return { playlist, loading, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, error };
+    const reorderPlaylist = (startIndex: number, endIndex: number) => {
+        const newPlaylist = Array.from(playlist);
+        const [removed] = newPlaylist.splice(startIndex, 1);
+        newPlaylist.splice(endIndex, 0, removed);
+        setPlaylist(newPlaylist);
+        saveToStorage(newPlaylist);
+    };
+
+    return { playlist, loading, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist, error };
 }

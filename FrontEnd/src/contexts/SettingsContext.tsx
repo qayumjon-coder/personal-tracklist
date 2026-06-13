@@ -25,6 +25,23 @@ interface SettingsContextType {
   t: (key: string) => string;
 }
 
+export const THEME_COLORS = {
+  aqua: { primary: "#00FFFF", secondary: "#008888" },
+  green: { primary: "#00FF00", secondary: "#008800" },
+  amber: { primary: "#FFB000", secondary: "#885500" },
+  pink: { primary: "#FF00FF", secondary: "#880088" },
+  red: { primary: "#FF0000", secondary: "#880000" },
+  neon: { primary: "#00FFFF", secondary: "#FF00FF" },
+  toxic: { primary: "#00FF00", secondary: "#9D00FF" },
+  sunset: { primary: "#FFCC00", secondary: "#FF0066" },
+  matrix: { primary: "#00FF00", secondary: "#003300" },
+};
+
+export const hexToRgb = (hex: string) => {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : "0, 255, 255";
+};
+
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 const translations = {
@@ -98,20 +115,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Apply Theme CSS
   useEffect(() => {
     const root = document.documentElement;
-    const colors = {
-      aqua: { primary: "#00FFFF", secondary: "#008888" },
-      green: { primary: "#00FF00", secondary: "#008800" },
-      amber: { primary: "#FFB000", secondary: "#885500" },
-      pink: { primary: "#FF00FF", secondary: "#880088" },
-      red: { primary: "#FF0000", secondary: "#880000" },
-      neon: { primary: "#00FFFF", secondary: "#FF00FF" },
-      toxic: { primary: "#00FF00", secondary: "#9D00FF" },
-      sunset: { primary: "#FFCC00", secondary: "#FF0066" },
-      matrix: { primary: "#00FF00", secondary: "#003300" },
-    };
-    const selected = colors[theme] || colors.aqua;
+    const selected = THEME_COLORS[theme] || THEME_COLORS.aqua;
     root.style.setProperty("--text-primary", selected.primary);
     root.style.setProperty("--accent", selected.primary);
+    root.style.setProperty("--accent-rgb", hexToRgb(selected.primary));
     root.style.setProperty("--cursor-color", selected.primary);
     root.style.setProperty("--text-secondary", selected.secondary);
   }, [theme]);

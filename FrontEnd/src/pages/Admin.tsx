@@ -3,8 +3,10 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { getMusicList, updateSong, deleteSong } from "../services/musicApi";
 import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, PlayCircle, Users, Clock, FileText, TrendingUp } from "lucide-react";
+import { Pagination } from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { toast } from "sonner";
 
 interface Music {
   id: number;
@@ -28,10 +30,12 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<Music>>({});
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState<{ type: 'success' | 'error', message: string } | null>(null);
   const [newCategoryInput, setNewCategoryInput] = useState("");
 
   // Cover Update State
@@ -143,28 +147,26 @@ export default function Admin() {
 
   useEffect(() => {
     const q = debouncedQuery.trim().toLowerCase();
-    if (!q) return setFiltered(list);
+    if (!q) {
+      setFiltered(list);
+      return;
+    }
     setFiltered(list.filter(m => (
       (m.title || "").toLowerCase().includes(q) ||
       (m.artist || "").toLowerCase().includes(q) ||
       (m.category || "").toLowerCase().includes(q)
     )));
+    setCurrentPage(1);
   }, [debouncedQuery, list]);
 
-  // Clear status after 3 seconds
-  useEffect(() => {
-    if (status) {
-      const timer = setTimeout(() => setStatus(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [status]);
+  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const paginatedList = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   function startEdit(m: Music) {
     setEditingId(m.id);
     setEditForm({ title: m.title, artist: m.artist, category: m.category, lyrics: m.lyrics || "" });
     setNewCoverFile(null);
     setNewCoverPreview(null);
-    setStatus(null);
     setNewCategoryInput("");
   }
 
@@ -194,10 +196,10 @@ export default function Admin() {
       setEditForm({});
       setNewCoverFile(null);
       setNewCoverPreview(null);
-      setStatus({ type: 'success', message: 'Track updated successfully!' });
+      toast.success('Track updated successfully!');
     } catch (err) {
       console.error('Update error:', err);
-      setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Failed to update song' });
+      toast.error(err instanceof Error ? err.message : 'Failed to update song');
     } finally {
       setSaving(false);
     }
@@ -214,11 +216,11 @@ export default function Admin() {
     try {
       await deleteSong(deleteConfirmId);
       setList(prev => prev.filter(m => m.id !== deleteConfirmId));
-      setStatus({ type: 'success', message: 'Track deleted successfully!' });
+      toast.success('Track deleted successfully!');
       setDeleteConfirmId(null);
     } catch (err) {
       console.error('Delete error:', err);
-      setStatus({ type: 'error', message: err instanceof Error ? err.message : 'Failed to delete song' });
+      toast.error(err instanceof Error ? err.message : 'Failed to delete song');
     } finally {
       setSaving(false);
     }
@@ -253,7 +255,7 @@ export default function Admin() {
           </Link>
           <Link 
             to="/" 
-            className="flex items-center gap-2 px-4 py-2 border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--bg-main)] transition-all text-sm uppercase tracking-wider shadow-[0_0_10px_rgba(0,255,255,0.1)] hover:shadow-[0_0_20px_rgba(0,255,255,0.4)]"
+            className="flex items-center gap-2 px-4 py-2 border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--bg-main)] transition-all text-sm uppercase tracking-wider shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.4)]"
           >
             <ArrowLeft size={16} />
             Back to Player
@@ -273,7 +275,7 @@ export default function Admin() {
             value={query}
             onChange={e => setQuery(e.target.value)}
             placeholder="SEARCH DATABASE..."
-            className="w-full bg-black/40 border border-[var(--text-secondary)] pl-12 pr-4 py-4 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(0,255,255,0.1)] transition-all placeholder-[var(--text-secondary)]/50 text-base"
+            className="w-full bg-black/40 border border-[var(--text-secondary)] pl-12 pr-4 py-4 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/50 text-base"
           />
         </div>
 
@@ -378,18 +380,6 @@ export default function Admin() {
 
       {/* Main Content */}
       <div className="relative">
-        {/* Status Toast */}
-        {status && createPortal(
-          <div className={`fixed bottom-8 right-8 z-[100] px-6 py-3 border backdrop-blur-md animate-in slide-in-from-bottom-5 fade-in duration-300 shadow-lg ${
-            status.type === 'success' 
-              ? 'border-green-500 bg-green-900/60 text-green-400' 
-              : 'border-red-500 bg-red-900/60 text-red-400'
-          }`}>
-            <span className="font-bold uppercase tracking-wider text-sm">{status.message}</span>
-          </div>,
-          document.body
-        )}
-
         {loading ? (
            <div className="flex flex-col items-center justify-center p-32 border border-[var(--text-secondary)]/30 bg-black/40 backdrop-blur-sm relative overflow-hidden group">
              {/* Scanning Line Background */}
@@ -461,7 +451,7 @@ export default function Admin() {
 
             {/* List */}
             <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-              {filtered.map(m => (
+              {paginatedList.map(m => (
                 <div 
                   key={m.id} 
                   className={`grid grid-cols-[auto_2fr_1.5fr_1fr_0.5fr_1.5fr] gap-4 p-4 border-b border-[var(--text-secondary)]/20 items-center hover:bg-[var(--text-secondary)]/5 transition-colors ${
@@ -619,6 +609,16 @@ export default function Admin() {
                 </div>
               )}
             </div>
+            
+            {totalPages > 1 && (
+              <div className="p-4 border-t border-[var(--text-secondary)]/20 bg-black/40">
+                <Pagination 
+                  currentPage={currentPage} 
+                  totalPages={totalPages} 
+                  onPageChange={setCurrentPage} 
+                />
+              </div>
+            )}
           </div>
         )}
 
@@ -676,7 +676,7 @@ export default function Admin() {
       {/* Lyrics Modal */}
       {lyricsModalOpen && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[var(--bg-main)] border border-[var(--accent)] w-full max-w-2xl p-6 shadow-[0_0_50px_rgba(0,255,255,0.2)] flex flex-col h-[80vh]">
+          <div className="bg-[var(--bg-main)] border border-[var(--accent)] w-full max-w-2xl p-6 shadow-[0_0_50px_rgba(var(--accent-rgb),0.2)] flex flex-col h-[80vh]">
             <div className="flex justify-between items-center mb-4 border-b border-[var(--text-secondary)] pb-4">
               <h3 className="text-xl font-bold tracking-widest text-[var(--accent)]">EDIT LYRICS</h3>
               <button onClick={() => setLyricsModalOpen(false)} className="text-[var(--text-secondary)] hover:text-red-500">

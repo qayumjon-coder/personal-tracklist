@@ -34,7 +34,7 @@ export async function searchSongs(query: string): Promise<Song[]> {
     .from(DB_TABLES.SONGS)
     .select('*')
     .or(`title.ilike.%${query}%,artist.ilike.%${query}%`)
-    .limit(20);
+    .limit(50);
 
   if (error) {
     console.error('Error searching songs:', error);
