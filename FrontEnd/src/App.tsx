@@ -18,6 +18,8 @@ import { useEffect } from "react";
 import { HelmetProvider } from 'react-helmet-async';
 
 import { Toaster } from "sonner";
+import { Terminal } from "./components/Terminal";
+import { MatrixBackground } from "./components/MatrixBackground";
 
 function MusicApp() {
   const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist } = usePlaylist();
@@ -28,6 +30,25 @@ function MusicApp() {
   const player = useAudioPlayer(combinedSongs);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showBoot, setShowBoot] = useState(true);
+  
+  // Terminal state
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [systemCrashed, setSystemCrashed] = useState(false);
+
+  // Global Terminal Shortcut
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ctrl + ` (Backtick) or just ` depending on preference. Let's use Ctrl + `
+      if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        if (window.innerWidth > 768 && !systemCrashed) {
+          setIsTerminalOpen(prev => !prev);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [systemCrashed]);
 
   // Auto-play from URL ?track=ID
   useEffect(() => {
@@ -72,12 +93,35 @@ function MusicApp() {
 
   if (showBoot) return <LoadingScreen />;
 
+  if (systemCrashed) {
+    return (
+      <div className="w-full h-screen bg-black flex flex-col items-center justify-center font-mono text-red-500 overflow-hidden relative">
+        <h1 className="text-6xl font-bold mb-4 animate-pulse">SYSTEM IS DOWN</h1>
+        <p className="text-xl mb-8">CRITICAL FAILURE: ROOT DIRECTORY DELETED</p>
+        <p className="text-sm text-gray-500 opacity-50">Please reload the page to restore the system.</p>
+        {/* Fake random binary/hex output falling down could go here, but simple is effective */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, rgba(255,0,0,0.1) 0px, transparent 1px) 0 0 / 100% 4px' }} />
+      </div>
+    );
+  }
+
   return (
       <Router>
         <Toaster theme="dark" position="bottom-right" toastOptions={{ style: { background: 'rgba(0, 0, 0, 0.8)', border: '1px solid rgba(var(--accent-rgb), 0.2)', color: 'white', backdropFilter: 'blur(10px)' } }} />
         <div className="w-full min-h-screen flex items-start justify-center p-2 py-12 md:py-0 relative">
+          <MatrixBackground />
           <div className="retro-grid" />
           <div className="scanline" />
+          <Terminal 
+            isVisible={isTerminalOpen} 
+            onClose={() => setIsTerminalOpen(false)} 
+            player={player} 
+            songs={combinedSongs} 
+            onSystemCrash={() => {
+              setSystemCrashed(true);
+              player.pause(); // stop music immediately on crash
+            }}
+          />
           <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
           <Routes>
             <Route path="/" element={

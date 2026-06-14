@@ -48,7 +48,7 @@ interface PlayerProps {
 
 export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, onReorderPlaylist, loadingMore, hasMore, onLoadMore, localFilesInfo }: PlayerProps) {
   const { playClick, playHover } = useSoundEffects();
-  const { visualizerMode } = useSettings(); // Get visualizer mode
+  const { visualizerMode, zenMode, setZenMode } = useSettings(); // Get visualizer mode and zen mode
   // Removed beatScale from state to avoid 60fps re-renders of the entire Player component
   const coverImgRef = useRef<HTMLImageElement>(null);
   useBeatScale(player.playing, player.analyser, coverImgRef, visualizerMode === 'scale');
@@ -143,6 +143,18 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   };
 
   // Search Logic with History
+  useScrollLock();
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && zenMode) {
+        setZenMode(false);
+      }
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [zenMode, setZenMode]);
+
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 400);
@@ -496,6 +508,26 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] bg-red-900/40 border border-red-500 text-red-400 px-6 py-2 text-xs font-mono uppercase animate-in fade-in slide-in-from-top-4 flex items-center gap-2">
           <AlertTriangle size={14} />
           {player.audioError}
+        </div>
+      )}
+
+      {/* Global Esc listener for Zen Mode */}
+      {zenMode && (
+        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-500">
+          <div className="absolute inset-0 bg-gradient-to-b from-black via-transparent to-black z-[105] pointer-events-none" />
+          
+          <div className="absolute top-24 z-[110] text-center pointer-events-none">
+            <h2 className="text-4xl md:text-6xl font-mono text-white font-bold tracking-[0.2em] drop-shadow-[0_0_20px_rgba(var(--accent-rgb),1)]">{current?.title || 'NO TRACK'}</h2>
+            <p className="text-xl md:text-2xl font-mono text-[var(--accent)] mt-6 tracking-widest drop-shadow-[0_0_10px_rgba(var(--accent-rgb),0.5)]">{current?.artist || 'UNKNOWN'}</p>
+          </div>
+          
+          <div className="absolute inset-0 opacity-90 pointer-events-none">
+             <Visualizer mode={visualizerMode} isPlaying={player.playing} analyser={player.analyser} />
+          </div>
+
+          <div className="absolute bottom-12 z-[110] text-[var(--text-secondary)] opacity-40 text-xs font-mono uppercase tracking-[0.4em]">
+             Press ESC or type 'zen' to exit Zen Mode
+          </div>
         </div>
       )}
 

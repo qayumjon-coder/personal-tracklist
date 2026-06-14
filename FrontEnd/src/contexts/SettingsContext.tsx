@@ -20,6 +20,10 @@ interface SettingsContextType {
   setScanlines: (enabled: boolean) => void;
   grid: boolean;
   setGrid: (enabled: boolean) => void;
+  matrixBg: boolean;
+  setMatrixBg: (enabled: boolean) => void;
+  zenMode: boolean;
+  setZenMode: (enabled: boolean) => void;
 
   // Helpers
   t: (key: string) => string;
@@ -65,7 +69,8 @@ const translations = {
     fade: "FADE",
     scale: "SCALE",
     multiwave: "MULTIWAVE",
-    aurora: "AURORA"
+    aurora: "AURORA",
+    matrix_bg: "MATRIX RAIN"
   },
   uz: {
     system_config: "TIZIM_SOZLAMALARI",
@@ -87,7 +92,8 @@ const translations = {
     fade: "FADE",
     scale: "KATTALASHTIRISH",
     multiwave: "MULTIWAVE",
-    aurora: "AVRORA"
+    aurora: "AVRORA",
+    matrix_bg: "MATRITSA YOMG'IRI"
   }
 };
 
@@ -100,6 +106,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [autoplay, setAutoplay] = useState(() => localStorage.getItem("autoplay") !== "false"); // Default true
   const [scanlines, setScanlines] = useState(() => localStorage.getItem("scanlines") !== "false"); // Default true
   const [grid, setGrid] = useState(() => localStorage.getItem("grid") !== "false"); // Default true
+  const [matrixBg, setMatrixBg] = useState(() => localStorage.getItem("matrixBg") === "true"); // Default false
+  const [zenMode, setZenMode] = useState(() => localStorage.getItem("zenMode") === "true"); // Default false
 
   // Persistence
   useEffect(() => {
@@ -110,7 +118,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("autoplay", String(autoplay));
     localStorage.setItem("scanlines", String(scanlines));
     localStorage.setItem("grid", String(grid));
-  }, [theme, language, soundEnabled, visualizerMode, autoplay, scanlines, grid]);
+    localStorage.setItem("matrixBg", String(matrixBg));
+    localStorage.setItem("zenMode", String(zenMode));
+  }, [theme, language, soundEnabled, visualizerMode, autoplay, scanlines, grid, matrixBg, zenMode]);
 
   // Apply Theme CSS
   useEffect(() => {
@@ -128,8 +138,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     const scanlineEl = document.querySelector('.scanline') as HTMLElement;
     const gridEl = document.querySelector('.retro-grid') as HTMLElement;
     if (scanlineEl) scanlineEl.style.display = scanlines ? 'block' : 'none';
-    if (gridEl) gridEl.style.display = grid ? 'block' : 'none';
-  }, [scanlines, grid]);
+    // Hide grid if matrix background is active to prevent visual clutter
+    if (gridEl) gridEl.style.display = (grid && !matrixBg) ? 'block' : 'none';
+  }, [scanlines, grid, matrixBg]);
 
   // Translate helper
   const t = (key: string) => {
@@ -146,6 +157,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       autoplay, setAutoplay,
       scanlines, setScanlines,
       grid, setGrid,
+      matrixBg, setMatrixBg,
+      zenMode, setZenMode,
       t
     }}>
       {children}

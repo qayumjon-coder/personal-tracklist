@@ -534,7 +534,8 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
             const grad = ctx.createLinearGradient(x, baseY, x, baseY - rayHeight);
 
             // The brightness at the bottom creates the "ribbon" naturally without drawing a harsh stroke line
-            const alpha = (0.05 + shimmer * 0.15 + foldIntensity * 0.2 + freqVal * 0.3) * layerScale * envelope;
+            let alpha = (0.05 + shimmer * 0.15 + foldIntensity * 0.2 + freqVal * 0.3) * layerScale * envelope;
+            alpha *= 1.8; // Boost brightness significantly
 
             grad.addColorStop(0, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 1.5})`); // Stronger base
             grad.addColorStop(0.2, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 0.8})`);
@@ -543,6 +544,21 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
             ctx.fillStyle = grad;
             ctx.fillRect(x, baseY - rayHeight, sliceWidth + 1, rayHeight);
+
+            // Add downward rays (mirrored effect)
+            let downRayHeight = rayHeight * 0.7; // Slightly shorter for a reflection feel
+            downRayHeight = Math.min(downRayHeight, height - baseY);
+
+            if (downRayHeight > 1) {
+              const downGrad = ctx.createLinearGradient(x, baseY, x, baseY + downRayHeight);
+              downGrad.addColorStop(0, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 1.2})`); // Slightly softer base
+              downGrad.addColorStop(0.2, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 0.6})`);
+              downGrad.addColorStop(0.6, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 0.2})`);
+              downGrad.addColorStop(1, `rgba(${rL}, ${gL}, ${bL}, 0)`);
+
+              ctx.fillStyle = downGrad;
+              ctx.fillRect(x, baseY, sliceWidth + 1, downRayHeight);
+            }
           }
         }
 
