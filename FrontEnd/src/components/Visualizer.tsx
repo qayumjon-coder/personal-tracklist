@@ -522,20 +522,20 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
             const freqVal = finalAudio[i];
 
             // Pillar height: emphasize smooth folds over jagged frequencies for a true aurora look
-            let rayHeight = (height * 0.15) + (freqVal * height * 0.25) + (foldIntensity * height * 0.4);
-            rayHeight *= (1.2 + rms * 1.8);
+            let rayHeight = (height * 0.15) + (freqVal * height * 0.35) + (foldIntensity * height * 0.5);
+            rayHeight *= (1.0 + rms * 1.5);
             rayHeight *= envelope * layerScale;
 
-            // Ensure no box cutoff
-            rayHeight = Math.min(rayHeight, baseY * 0.95);
+            // Ensure no harsh box cutoff, let it flow naturally
+            rayHeight = Math.min(rayHeight, height * 0.9);
 
             if (rayHeight <= 1) continue;
 
             const grad = ctx.createLinearGradient(x, baseY, x, baseY - rayHeight);
 
             // The brightness at the bottom creates the "ribbon" naturally without drawing a harsh stroke line
-            let alpha = (0.08 + shimmer * 0.2 + foldIntensity * 0.25 + freqVal * 0.4) * layerScale * envelope;
-            alpha *= 2.5; // Boost brightness significantly
+            let alpha = (0.05 + shimmer * 0.15 + foldIntensity * 0.2 + freqVal * 0.3) * layerScale * envelope;
+            alpha *= 1.0; // Reduced to let individual rays breathe and prevent solid white blocks
 
             grad.addColorStop(0, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 1.5})`); // Stronger base
             grad.addColorStop(0.2, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 0.8})`);

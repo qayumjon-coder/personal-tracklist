@@ -80,6 +80,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
         addHistory('system',   ' ');
         addHistory('system',   '  [!] WARNING: Root privileges are active. Do NOT use destructive commands');
         addHistory('system',   '               like "sudo rm -rf /" - system crash is imminent.');
+        addHistory('system',   '  [!] NOTICE: Admin panel login requires SSH ("ssh admin").');
         break;
 
       case 'play':
@@ -199,6 +200,19 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
         } else {
           addHistory('error', 'Permission denied.');
         }
+        break;
+
+      case 'ssh':
+      case 'hack':
+      case 'login':
+        const target = args[0] || 'admin@fronto-server';
+        addHistory('response', `Initiating secure connection to ${target}...`);
+        
+        setTimeout(() => addHistory('system', 'Bypassing Node-1 firewall [||||      ] 42%'), 1000);
+        setTimeout(() => addHistory('system', 'Bypassing Node-1 firewall [||||||||||] 100%'), 2200);
+        setTimeout(() => addHistory('system', `Attempting Dictionary Attack on ${target}...`), 3000);
+        setTimeout(() => addHistory('error', 'ACCESS DENIED: Unauthorized Intrusion Detected.'), 4800);
+        setTimeout(() => addHistory('error', 'SECURITY COUNTERMEASURES ACTIVATED. IP Logged.'), 5500);
         break;
 
       default:
