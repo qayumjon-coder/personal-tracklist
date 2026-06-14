@@ -19,6 +19,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
     autoplay, setAutoplay,
     scanlines, setScanlines,
     grid, setGrid,
+    matrixBg, setMatrixBg,
     t
   } = useSettings();
 
@@ -148,6 +149,15 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                   </span>
                   <div className={`w-10 h-5 border flex items-center p-0.5 transition-colors ${grid ? 'border-[var(--text-primary)]' : 'border-[var(--text-secondary)]/20'}`}>
                     <div className={`w-3 h-3 transition-all duration-300 ${grid ? 'translate-x-5 bg-[var(--text-primary)] shadow-[0_0_8px_var(--text-primary)]' : 'translate-x-0 bg-[var(--text-secondary)]/20 shadow-none'}`} />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between group cursor-pointer" onClick={() => setMatrixBg(!matrixBg)}>
+                  <span className={`text-[11px] tracking-widest font-bold ${matrixBg ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]/60'}`}>
+                    {t('matrix_bg')}
+                  </span>
+                  <div className={`w-10 h-5 border flex items-center p-0.5 transition-colors ${matrixBg ? 'border-[var(--text-primary)]' : 'border-[var(--text-secondary)]/20'}`}>
+                    <div className={`w-3 h-3 transition-all duration-300 ${matrixBg ? 'translate-x-5 bg-[var(--text-primary)] shadow-[0_0_8px_var(--text-primary)]' : 'translate-x-0 bg-[var(--text-secondary)]/20 shadow-none'}`} />
                   </div>
                 </div>
 

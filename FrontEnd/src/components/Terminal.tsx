@@ -77,6 +77,9 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
         addHistory('response', '  nowplaying / np - Show current playing track info');
         addHistory('response', '  clear           - Clear terminal history');
         addHistory('response', '  exit / quit     - Close terminal');
+        addHistory('system',   ' ');
+        addHistory('system',   '  [!] WARNING: Root privileges are active. Do NOT use destructive commands');
+        addHistory('system',   '               like "sudo rm -rf /" - system crash is imminent.');
         break;
 
       case 'play':
@@ -295,7 +298,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
 
   return (
     <div 
-      className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl h-[70vh] bg-black/50 backdrop-blur-md z-[9999] border-2 border-[var(--accent)] rounded-xl font-mono text-sm overflow-hidden flex flex-col transition-all duration-300 ease-out shadow-[0_0_50px_rgba(var(--accent-rgb),0.5)] ${
+      className={`fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[95vw] max-w-6xl h-[75vh] bg-black/50 backdrop-blur-md z-[9999] border-2 border-[var(--accent)] rounded-xl font-mono text-sm overflow-hidden flex flex-col transition-all duration-300 ease-out shadow-[0_0_50px_rgba(var(--accent-rgb),0.5)] ${
         isVisible ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
       }`}
     >
@@ -304,7 +307,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
           {history.map((item) => (
             <div 
               key={item.id} 
-              className={`mb-1 animate-[fadeIn_0.2s_ease-out_forwards] ${
+              className={`mb-1 whitespace-pre-wrap break-words animate-[fadeIn_0.2s_ease-out_forwards] ${
                 item.type === 'error' ? 'text-red-500' : 
                 item.type === 'command' ? 'text-white font-bold' : 
                 item.type === 'system' ? 'text-gray-400' :

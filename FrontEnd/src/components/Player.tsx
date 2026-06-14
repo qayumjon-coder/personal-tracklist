@@ -143,7 +143,6 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   };
 
   // Search Logic with History
-  useScrollLock();
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -156,6 +155,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   }, [zenMode, setZenMode]);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  useScrollLock(isSearchOpen);
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearchQuery = useDebounce(searchQuery, 400);
   const [searchResults, setSearchResults] = useState<Song[]>([]);
@@ -522,7 +522,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           </div>
           
           <div className="absolute inset-0 opacity-90 pointer-events-none">
-             <Visualizer mode={visualizerMode} isPlaying={player.playing} analyser={player.analyser} />
+             <Visualizer playing={player.playing} analyser={player.analyser} />
           </div>
 
           <div className="absolute bottom-12 z-[110] text-[var(--text-secondary)] opacity-40 text-xs font-mono uppercase tracking-[0.4em]">

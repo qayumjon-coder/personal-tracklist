@@ -81,11 +81,14 @@ export function MatrixBackground() {
           drops[i] = 0;
         }
 
-        // Extremely slow falling (e.g. 0.2 to 0.5 units instead of 1)
-        drops[i] += 0.3;
+        // Discrete falling (exactly 1 row) prevents text smudging/overlapping
+        drops[i] += 1;
       }
 
-      animationRef.current = requestAnimationFrame(animateMatrix);
+      // Throttle to ~25fps for the classic discrete matrix look
+      setTimeout(() => {
+        animationRef.current = requestAnimationFrame(animateMatrix);
+      }, 40);
     };
 
     animateMatrix();

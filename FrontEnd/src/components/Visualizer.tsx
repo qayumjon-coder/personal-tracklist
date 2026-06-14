@@ -452,7 +452,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
         ctx.restore();
 
         // 3. Ultra-Realistic Aurora Borealis Effect
-        ctx.globalCompositeOperation = 'screen';
+        ctx.globalCompositeOperation = 'lighter';
         const time = performance.now() * 0.0003;
 
         const sliceWidth = 3;
@@ -521,9 +521,9 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
             // Smooth audio
             const freqVal = finalAudio[i];
 
-            // Pillar height
-            let rayHeight = (height * 0.15) + (freqVal * height * 0.5) + (foldIntensity * height * 0.25);
-            rayHeight *= (1 + rms * 1.5);
+            // Pillar height: emphasize smooth folds over jagged frequencies for a true aurora look
+            let rayHeight = (height * 0.15) + (freqVal * height * 0.25) + (foldIntensity * height * 0.4);
+            rayHeight *= (1.2 + rms * 1.8);
             rayHeight *= envelope * layerScale;
 
             // Ensure no box cutoff
@@ -534,8 +534,8 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
             const grad = ctx.createLinearGradient(x, baseY, x, baseY - rayHeight);
 
             // The brightness at the bottom creates the "ribbon" naturally without drawing a harsh stroke line
-            let alpha = (0.05 + shimmer * 0.15 + foldIntensity * 0.2 + freqVal * 0.3) * layerScale * envelope;
-            alpha *= 1.8; // Boost brightness significantly
+            let alpha = (0.08 + shimmer * 0.2 + foldIntensity * 0.25 + freqVal * 0.4) * layerScale * envelope;
+            alpha *= 2.5; // Boost brightness significantly
 
             grad.addColorStop(0, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 1.5})`); // Stronger base
             grad.addColorStop(0.2, `rgba(${rL}, ${gL}, ${bL}, ${alpha * 0.8})`);

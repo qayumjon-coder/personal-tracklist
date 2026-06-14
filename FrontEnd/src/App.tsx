@@ -20,6 +20,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import { Toaster } from "sonner";
 import { Terminal } from "./components/Terminal";
 import { MatrixBackground } from "./components/MatrixBackground";
+import { SystemCrash } from "./components/SystemCrash";
 
 function MusicApp() {
   const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist } = usePlaylist();
@@ -94,15 +95,7 @@ function MusicApp() {
   if (showBoot) return <LoadingScreen />;
 
   if (systemCrashed) {
-    return (
-      <div className="w-full h-screen bg-black flex flex-col items-center justify-center font-mono text-red-500 overflow-hidden relative">
-        <h1 className="text-6xl font-bold mb-4 animate-pulse">SYSTEM IS DOWN</h1>
-        <p className="text-xl mb-8">CRITICAL FAILURE: ROOT DIRECTORY DELETED</p>
-        <p className="text-sm text-gray-500 opacity-50">Please reload the page to restore the system.</p>
-        {/* Fake random binary/hex output falling down could go here, but simple is effective */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: 'repeating-linear-gradient(0deg, rgba(255,0,0,0.1) 0px, transparent 1px) 0 0 / 100% 4px' }} />
-      </div>
-    );
+    return <SystemCrash />;
   }
 
   return (
