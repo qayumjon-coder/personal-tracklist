@@ -32,10 +32,10 @@ export function PlaybackControls({
       <button
         onClick={() => { playClick(); onToggleShuffle(); }}
         onMouseEnter={playHover}
-        className={`p-1.5 sm:p-2 transition-all duration-300 rounded-none hover:bg-[var(--text-secondary)]/10 ${
+        className={`cyber-icon-btn w-10 h-10 sm:w-12 sm:h-12 ${
           shuffle 
-            ? 'text-[var(--accent)] border border-[var(--accent)] shadow-[0_0_10px_var(--accent)]' 
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent hover:border-[var(--text-secondary)]'
+            ? 'border-[var(--accent)] bg-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' 
+            : ''
         }`}
         title="Shuffle"
       >
@@ -46,7 +46,7 @@ export function PlaybackControls({
       <button
         onClick={() => { playClick(); onPrev(); }}
         onMouseEnter={playHover}
-        className="p-2 sm:p-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-secondary)]/10 transition-colors rounded-none border border-transparent hover:border-[var(--text-secondary)]"
+        className="cyber-icon-btn w-10 h-10 sm:w-14 sm:h-14"
         title="Previous"
       >
         <SkipBack className="w-5 h-5 sm:w-7 sm:h-7" />
@@ -56,13 +56,13 @@ export function PlaybackControls({
       <button
         onClick={() => { playClick(); playing ? onPause() : onPlay(); }}
         onMouseEnter={playHover}
-        className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center bg-[var(--accent)] text-[var(--bg-main)] shadow-[0_0_20px_var(--accent)] hover:shadow-[0_0_40px_var(--accent)] transition-all duration-300 group hover:scale-105 rounded-none border border-[var(--cursor-color)] shrink-0"
+        className="cyber-icon-btn bg-[var(--accent)]/10 border-[var(--accent)] hover:bg-[var(--accent)] hover:text-black hover:shadow-[0_0_20px_var(--accent-glow)] w-12 h-12 sm:w-16 sm:h-16 shrink-0 transition-all duration-300 group hover:scale-105"
         title={playing ? "Pause" : "Play"}
       >
         {playing ? (
-          <Pause className="w-6 h-6 sm:w-7 sm:h-7" strokeWidth={2.5} fill="currentColor" />
+          <Pause className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--accent)]" strokeWidth={2.5} fill="currentColor" />
         ) : (
-          <Play className="w-6 h-6 sm:w-7 sm:h-7" strokeWidth={2.5} fill="currentColor" />
+          <Play className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--accent)]" strokeWidth={2.5} fill="currentColor" />
         )}
       </button>
 
@@ -70,7 +70,7 @@ export function PlaybackControls({
       <button
         onClick={() => { playClick(); onNext(); }}
         onMouseEnter={playHover}
-        className="p-2 sm:p-3 text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-secondary)]/10 transition-colors rounded-none border border-transparent hover:border-[var(--text-secondary)]"
+        className="cyber-icon-btn w-10 h-10 sm:w-14 sm:h-14"
         title="Next"
       >
         <SkipForward className="w-5 h-5 sm:w-7 sm:h-7" />
@@ -80,10 +80,10 @@ export function PlaybackControls({
       <button
         onClick={() => { playClick(); onToggleRepeat(); }}
         onMouseEnter={playHover}
-        className={`p-1.5 sm:p-2 transition-all duration-300 relative rounded-none hover:bg-[var(--text-secondary)]/10 ${
+        className={`cyber-icon-btn w-10 h-10 sm:w-12 sm:h-12 ${
           repeat !== 'off' 
-            ? 'text-[var(--accent)] border border-[var(--accent)] shadow-[0_0_10px_var(--accent)]' 
-            : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent hover:border-[var(--text-secondary)]'
+            ? 'border-[var(--accent)] bg-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_10px_var(--accent-glow)]' 
+            : ''
         }`}
         title={`Repeat: ${repeat}`}
       >

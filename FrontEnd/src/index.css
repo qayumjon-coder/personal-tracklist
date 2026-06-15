@@ -189,3 +189,72 @@ html { font-size: 16px; }
 *, *::before, *::after {
   border-radius: 0;
 }
+
+/* Cyber-OS Styles */
+.cyber-btn {
+    border: 1px solid var(--accent);
+    background: rgba(var(--accent-rgb), 0.05);
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.2s ease-in-out;
+}
+.cyber-btn:hover {
+    background: var(--accent);
+    color: #000;
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+.cyber-icon-btn {
+    border: 1px solid rgba(var(--accent-rgb), 0.3);
+    background: rgba(var(--accent-rgb), 0.05);
+    color: var(--text-secondary);
+    transition: all 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.cyber-icon-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(var(--accent-rgb), 0.15);
+    box-shadow: 0 0 10px var(--accent-glow);
+}
+.cyber-panel {
+    background: var(--bg-card);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(var(--accent-rgb), 0.4);
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8), 0 0 15px rgba(var(--accent-rgb), 0.1);
+}
+
+/* EQ Slider Custom Styles */
+.custom-eq-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+
+.custom-eq-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 24px;
+  width: 14px;
+  background: var(--bg-main);
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--accent-glow);
+  margin-top: -11px; /* Align with track if track has height */
+}
+
+.custom-eq-slider::-moz-range-thumb {
+  height: 24px;
+  width: 14px;
+  background: var(--bg-main);
+  border: 1px solid var(--accent);
+  border-radius: 0;
+  cursor: pointer;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.custom-eq-slider:focus {
+  outline: none;
+}

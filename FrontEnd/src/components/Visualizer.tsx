@@ -144,16 +144,14 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Colors based on the provided image
-      const waveColors = [
-        'rgba(147, 51, 234, 0.7)',  // Purple
-        'rgba(236, 72, 153, 0.7)',  // Pink
-        'rgba(245, 158, 11, 0.7)',  // Orange
-        'rgba(253, 224, 71, 0.7)',  // Yellow
-        'rgba(34, 197, 94, 0.7)',   // Green
-        'rgba(59, 130, 246, 0.7)'   // Blue
+      // Holographic Neon Ribbons - 4 distinct layers
+      const waveConfigs = [
+        { color: '147, 51, 234', freqMod: 0.1, ampMod: 1.8, phaseSpeed: 0.5, name: 'Bass' },
+        { color: '236, 72, 153', freqMod: 0.3, ampMod: 1.2, phaseSpeed: 0.8, name: 'LowMid' },
+        { color: '59, 130, 246', freqMod: 0.6, ampMod: 0.8, phaseSpeed: 1.2, name: 'HighMid' },
+        { color: '34, 197, 94',  freqMod: 0.9, ampMod: 0.5, phaseSpeed: 1.6, name: 'Treble' }
       ];
-      const numWaves = waveColors.length;
+      const numWaves = waveConfigs.length;
 
       const animateMultiWave = () => {
         if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
@@ -179,7 +177,6 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
         analyser.getByteTimeDomainData(dataArray);
 
-        // To make it react more dynamically like a visualizer, we can also use frequency data
         const freqData = new Uint8Array(analyser.frequencyBinCount);
         analyser.getByteFrequencyData(freqData);
 
@@ -193,95 +190,105 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
         const time = performance.now() / 1000;
 
-        // Setup global styles for glowing, overlapping look
+        // Performance: Draw by taking steps instead of every pixel
+        const step = Math.max(1, Math.floor(width / 250)); // ~250 points across screen
+
+        // Use 'screen' for additive blending, but without expensive shadowBlur
         ctx.globalCompositeOperation = 'screen';
 
         for (let w = 0; w < numWaves; w++) {
-          const color = waveColors[w];
-          ctx.fillStyle = color;
-
-          // Add a subtle glow
-          ctx.shadowBlur = 15;
-          ctx.shadowColor = color;
-
-          const wavePhase = time * (1 + w * 0.5);
-          const waveFreq = 0.003 + (w * 0.001);
-
-          // Sample frequency data for this specific wave layer to give them independent reactions
-          const freqIdx = Math.floor((w / numWaves) * (freqData.length * 0.5)); // Focus on lower/mid freq
-          const freqAmpModifier = 1 + (freqData[freqIdx] / 255) * 1.5;
+          const config = waveConfigs[w];
+          const wavePhase = time * config.phaseSpeed;
+          
+          // Focus on different frequency bands based on layer
+          const freqIdx = Math.floor((w / numWaves) * (freqData.length * 0.7)); 
+          const freqAmpModifier = 1 + (freqData[freqIdx] / 255) * config.ampMod;
 
           ctx.beginPath();
           ctx.moveTo(0, centerY);
 
-          // Draw Top Half
-          for (let x = 0; x < width; x++) {
+          // Top Half (forward)
+          for (let x = 0; x <= width; x += step) {
             const normX = x / width;
-
-            // Envelope to taper ends to zero
-            // Using a power sine curve for smoother tapering that matches the image
             const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
 
-            const dataIdx = Math.floor(normX * bufferLength);
-            const signal = ((dataArray[dataIdx] - 128) / 128); // -1 to 1
+            const dataIdxFloat = normX * (bufferLength - 1);
+            const idx1 = Math.floor(dataIdxFloat);
+            const idx2 = Math.min(idx1 + 1, bufferLength - 1);
+            const frac = dataIdxFloat - idx1;
+            const smoothFrac = frac * frac * (3 - 2 * frac);
 
-            // Combine sine wave, audio signal, and envelope
-            // The sine function gives the basic rolling wave shape
-            const sineOffset = Math.sin(x * waveFreq + wavePhase);
+            const val1 = (dataArray[idx1] - 128) / 128;
+            const val2 = (dataArray[idx2] - 128) / 128;
+            const signal = val1 + (val2 - val1) * smoothFrac;
 
-            // Modulate the offset heavily by the frequency and amplitude
-            const yOffset = (sineOffset * 0.5 + signal * (0.5 + w * 0.2)) * baseAmplitude * freqAmpModifier * envelope;
+            // Sine wave offset to give flow even when audio is quiet
+            const sineOffset = Math.sin(normX * 10 * config.freqMod + wavePhase);
+            const yOffset = (sineOffset * 0.3 + signal * config.ampMod) * baseAmplitude * freqAmpModifier * envelope;
 
-            const y = centerY - Math.abs(yOffset); // Top half only
-            ctx.lineTo(x, y);
+            ctx.lineTo(x, centerY - Math.abs(yOffset));
           }
 
-          // Draw Bottom Half (Reflection)
-          for (let x = width; x >= 0; x--) {
+          // Bottom Half (backward reflection)
+          for (let x = width; x >= 0; x -= step) {
             const normX = x / width;
             const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
-            const dataIdx = Math.floor(normX * bufferLength);
-            const signal = ((dataArray[dataIdx] - 128) / 128);
 
-            const sineOffset = Math.sin(x * waveFreq + wavePhase);
-            const yOffset = (sineOffset * 0.5 + signal * (0.5 + w * 0.2)) * baseAmplitude * freqAmpModifier * envelope;
+            const dataIdxFloat = normX * (bufferLength - 1);
+            const idx1 = Math.floor(dataIdxFloat);
+            const idx2 = Math.min(idx1 + 1, bufferLength - 1);
+            const frac = dataIdxFloat - idx1;
+            const smoothFrac = frac * frac * (3 - 2 * frac);
 
-            const y = centerY + Math.abs(yOffset); // Bottom half reflection
-            ctx.lineTo(x, y);
+            const val1 = (dataArray[idx1] - 128) / 128;
+            const val2 = (dataArray[idx2] - 128) / 128;
+            const signal = val1 + (val2 - val1) * smoothFrac;
+
+            const sineOffset = Math.sin(normX * 10 * config.freqMod + wavePhase);
+            const yOffset = (sineOffset * 0.3 + signal * config.ampMod) * baseAmplitude * freqAmpModifier * envelope;
+
+            ctx.lineTo(x, centerY + Math.abs(yOffset));
           }
 
           ctx.closePath();
+
+          // Fill with subtle transparent color
+          ctx.fillStyle = `rgba(${config.color}, 0.15)`;
           ctx.fill();
+
+          // Stroke with solid glowing color
+          ctx.strokeStyle = `rgba(${config.color}, 0.8)`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
         }
 
-        // Reset composite operation to default
+        // Add a central bright pulse line
         ctx.globalCompositeOperation = 'source-over';
-        ctx.shadowBlur = 0;
-
-        // Add a central bright line to accentuate the audio center
         ctx.beginPath();
         ctx.moveTo(0, centerY);
 
-        // We use the raw signal for the center line for crisp reaction
-        const centerAmp = baseAmplitude * 0.5;
-        for (let x = 0; x < width; x++) {
+        const centerAmp = baseAmplitude * 0.6;
+        for (let x = 0; x <= width; x += step) {
           const normX = x / width;
           const envelope = Math.pow(Math.sin(normX * Math.PI), 2);
-          const dataIdx = Math.floor(normX * bufferLength);
-          const signal = ((dataArray[dataIdx] - 128) / 128);
+          
+          const dataIdxFloat = normX * (bufferLength - 1);
+          const idx1 = Math.floor(dataIdxFloat);
+          const idx2 = Math.min(idx1 + 1, bufferLength - 1);
+          const frac = dataIdxFloat - idx1;
+          const signal = ((dataArray[idx1] - 128) / 128) * (1 - frac) + ((dataArray[idx2] - 128) / 128) * frac;
 
-          const y = centerY + signal * centerAmp * envelope;
-          ctx.lineTo(x, y);
+          ctx.lineTo(x, centerY + signal * centerAmp * envelope);
         }
 
-        // Use dynamic color for the line
-        const accentColor = accentColorRef.current;
-        ctx.strokeStyle = `rgba(${accentRgbRef.current}, 0.4)`;
-        ctx.lineWidth = 1;
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = accentColor;
+        ctx.strokeStyle = `rgba(${accentRgbRef.current}, 0.8)`;
+        ctx.lineWidth = 2;
         ctx.stroke();
-        ctx.shadowBlur = 0;
+
+        // Inner glowing core
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
         if (playing) {
           animationRef.current = requestAnimationFrame(animateMultiWave);

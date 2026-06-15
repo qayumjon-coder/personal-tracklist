@@ -161,7 +161,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
           {isSelectionMode ? (
             <button
               onClick={() => { playClick(); selectAll(); }}
-              className="flex items-center gap-2 p-1 text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors border border-[var(--accent)]/30 px-2 shrink-0"
+              className="cyber-btn flex items-center gap-2 p-1 px-2 shrink-0 text-[var(--accent)]"
             >
               <CheckSquare2 size={12} />
               <span className="text-[8px] font-bold uppercase tracking-widest whitespace-nowrap">
@@ -174,9 +174,9 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
               <span className="text-[9px] text-[var(--accent)]/60 tracking-widest uppercase truncate flex items-center gap-3">
                 {songs.length} TRACKS
               </span>
-              <div className="flex bg-black/50 rounded-sm border border-[var(--text-secondary)]/20 ml-2 shrink-0">
-                <button onClick={() => { playClick(); setViewMode('list'); }} className={`p-1 rounded-sm transition-colors ${viewMode === 'list' ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="List View"><List size={12} /></button>
-                <button onClick={() => { playClick(); setViewMode('grid'); }} className={`p-1 rounded-sm transition-colors ${viewMode === 'grid' ? 'bg-[var(--accent)] text-black' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`} title="Grid View"><LayoutGrid size={12} /></button>
+              <div className="flex bg-black/50 rounded-none border border-[var(--text-secondary)]/20 ml-2 shrink-0">
+                <button onClick={() => { playClick(); setViewMode('list'); }} className={`cyber-icon-btn w-6 h-6 rounded-none ${viewMode === 'list' ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : ''}`} title="List View"><List size={12} /></button>
+                <button onClick={() => { playClick(); setViewMode('grid'); }} className={`cyber-icon-btn w-6 h-6 rounded-none ${viewMode === 'grid' ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : ''}`} title="Grid View"><LayoutGrid size={12} /></button>
               </div>
 
               {localFilesInfo && (
@@ -186,18 +186,18 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                   ) : (
                     <>
                       {localFilesInfo.hasStoredHandle && songs.filter(s => s.category === 'Local').length === 0 && (
-                        <button onClick={() => { playClick(); localFilesInfo.restoreAccess(); }} className="p-1 px-2 border border-[var(--accent)]/50 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black uppercase text-[8px] font-bold tracking-widest transition-colors flex items-center gap-1" title="Restore Local Library">
+                        <button onClick={() => { playClick(); localFilesInfo.restoreAccess(); }} className="cyber-btn p-1 px-2 text-[8px] flex items-center gap-1" title="Restore Local Library">
                           Restore Local
                         </button>
                       )}
                       {!localFilesInfo.hasStoredHandle && (
-                        <button onClick={() => { playClick(); localFilesInfo.requestAccess(); }} className="p-1 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors flex items-center gap-1" title="Add Local Folder">
-                          <FolderPlus size={14} />
-                          <span className="text-[8px] uppercase font-bold tracking-widest hidden sm:inline">Add Local</span>
+                        <button onClick={() => { playClick(); localFilesInfo.requestAccess(); }} className="cyber-btn p-1 px-2 text-[8px] flex items-center gap-1 border-dashed" title="Add Local Folder">
+                          <FolderPlus size={12} />
+                          <span className="hidden sm:inline">Add Local</span>
                         </button>
                       )}
                       {localFilesInfo.hasStoredHandle && (
-                        <button onClick={() => { playClick(); localFilesInfo.removeLocalFiles(); }} className="p-1 px-2 text-[var(--text-secondary)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 text-[8px] uppercase tracking-widest font-bold transition-all flex items-center gap-1 border border-transparent hover:border-[var(--danger)]/50" title="Disconnect Local Folder">
+                        <button onClick={() => { playClick(); localFilesInfo.removeLocalFiles(); }} className="cyber-btn p-1 px-2 text-[8px] flex items-center gap-1 text-[var(--danger)] border-[var(--danger)] hover:bg-[var(--danger)]" title="Disconnect Local Folder">
                           <Disc size={12} /> Eject
                         </button>
                       )}
@@ -213,7 +213,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
           {isSelectionMode && onBulkRemove && (
             <button
               onClick={() => { playClick(); handleBulkDelete(); }}
-              className="p-1.5 bg-[var(--danger)] text-black hover:bg-white transition-all shadow-[0_0_10px_rgba(255,0,85,0.3)] shrink-0"
+              className="cyber-icon-btn w-6 h-6 border-[var(--danger)] text-[var(--danger)] hover:bg-[var(--danger)] hover:text-black hover:shadow-[0_0_10px_rgba(255,0,85,0.5)] shrink-0"
               title="Purge Selected"
             >
               <Trash2 size={12} />
@@ -222,7 +222,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
           {isSelectionMode && (
             <button
               onClick={() => { playClick(); setSelectedIds(new Set()); }}
-              className="p-1.5 text-[var(--text-secondary)] hover:text-white transition-colors shrink-0"
+              className="cyber-icon-btn w-6 h-6 shrink-0"
             >
               <X size={14} />
             </button>

@@ -20,6 +20,7 @@ import { formatTime } from "../utils/formatTime";
 import { useState, useEffect, useRef } from "react";
 import { useDebounce } from "../hooks/useDebounce";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { EqualizerPanel } from './EqualizerPanel';
 
 import { useSoundEffects } from "../hooks/useSoundEffects";
 
@@ -164,9 +165,10 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
   const [isSearching, setIsSearching] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState<string>("");
+  const [isEqOpen, setIsEqOpen] = useState(false);
 
   // Lock body scroll when modals are open
-  useScrollLock(isSearchOpen || isKaraokeOpen || isConfigMenuOpen || isMobilePlaylistOpen);
+  useScrollLock(isSearchOpen || isKaraokeOpen || isConfigMenuOpen || isMobilePlaylistOpen || isEqOpen);
 
   // Load last search from localStorage on mount
   useEffect(() => {
@@ -531,8 +533,6 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         </div>
       )}
 
-      {/* Settings component moved to App.tsx */}
-
       {/* Responsive Page Wrapper */}
       <div className="w-full max-w-6xl mx-auto px-3 md:px-6 py-3 md:py-8 flex flex-col gap-8 md:gap-12 items-center">
 
@@ -639,6 +639,17 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 </button>
 
                 <button
+                  onClick={() => { playClick(); setIsEqOpen(true); }}
+                  onMouseEnter={playHover}
+                  className="text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] px-3 py-1 transition-all bg-black/50 uppercase group"
+                  title="Neural EQ"
+                >
+                  <span className="opacity-60 group-hover:opacity-100">[</span>
+                  <span className="mx-1">EQ</span>
+                  <span className="opacity-60 group-hover:opacity-100">]</span>
+                </button>
+
+                <button
                   onClick={() => { playClick(); setIsSearchOpen(true); }}
                   onMouseEnter={playHover}
                   className="text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] px-3 py-1 transition-all bg-black/50 uppercase group flex items-center gap-2"
@@ -671,7 +682,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   {/* Dynamic Visualizer Background */}
                   <div className={`absolute left-0 right-0 pointer-events-none mix-blend-screen transition-all duration-500 ${['orbit', 'grid', 'matrix'].includes(visualizerMode)
                       ? 'inset-0 opacity-35'
-                      : 'bottom-0 h-32 opacity-20'
+                      : 'bottom-0 h-[45%] opacity-30'
                     }`}>
                     <Visualizer playing={player.playing} analyser={player.analyser} />
                   </div>
@@ -992,6 +1003,17 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           </div>
         </div>
       </div>
+
+      {/* Modals */}
+      {isEqOpen && (
+        <EqualizerPanel
+          eq={player.eq}
+          setBass={player.setBass}
+          setMid={player.setMid}
+          setTreble={player.setTreble}
+          onClose={() => setIsEqOpen(false)}
+        />
+      )}
 
       {/* Search Modal */}
       {isSearchOpen && (

@@ -4,7 +4,7 @@ import { incrementPlayCount } from "../services/musicApi";
 
 export type RepeatMode = "off" | "one" | "all";
 
-export function useAudioPlayer(songs: { url: string, id?: number }[]) {
+export function useAudioPlayer(songs: { url: string; id?: number; title?: string; artist?: string; coverUrl?: string }[]) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -25,6 +25,12 @@ export function useAudioPlayer(songs: { url: string, id?: number }[]) {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const countedSongIdRef = useRef<number | null>(null);
 
+  // Equalizer State
+  const [eq, setEq] = useState({ bass: 0, mid: 0, treble: 0 });
+  const bassFilterRef = useRef<BiquadFilterNode | null>(null);
+  const midFilterRef = useRef<BiquadFilterNode | null>(null);
+  const trebleFilterRef = useRef<BiquadFilterNode | null>(null);
+
   // 1. Initialize Audio Element and Context
   useEffect(() => {
     const audio = new Audio();
@@ -38,12 +44,34 @@ export function useAudioPlayer(songs: { url: string, id?: number }[]) {
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 256;
 
+        const bassFilter = ctx.createBiquadFilter();
+        bassFilter.type = 'lowshelf';
+        bassFilter.frequency.value = 250;
+        bassFilter.gain.value = 0;
+
+        const midFilter = ctx.createBiquadFilter();
+        midFilter.type = 'peaking';
+        midFilter.frequency.value = 1000;
+        midFilter.Q.value = 1;
+        midFilter.gain.value = 0;
+
+        const trebleFilter = ctx.createBiquadFilter();
+        trebleFilter.type = 'highshelf';
+        trebleFilter.frequency.value = 4000;
+        trebleFilter.gain.value = 0;
+
         const source = ctx.createMediaElementSource(audio);
-        source.connect(analyser);
+        source.connect(bassFilter);
+        bassFilter.connect(midFilter);
+        midFilter.connect(trebleFilter);
+        trebleFilter.connect(analyser);
         analyser.connect(ctx.destination);
 
         audioContextRef.current = ctx;
         analyserRef.current = analyser;
+        bassFilterRef.current = bassFilter;
+        midFilterRef.current = midFilter;
+        trebleFilterRef.current = trebleFilter;
       } catch (e) {
         console.error("Audio Context Error:", e);
       }
@@ -142,18 +170,58 @@ export function useAudioPlayer(songs: { url: string, id?: number }[]) {
         audio.pause();
       }
     }
+
+    // Media Session API - Update Metadata
+    if ('mediaSession' in navigator && songs[index]) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: songs[index].title,
+        artist: songs[index].artist || 'Unknown Artist',
+        album: 'Fronto OS',
+        artwork: [
+          { src: songs[index].coverUrl || '/default-cover.png', sizes: '512x512', type: 'image/png' }
+        ]
+      });
+    }
   }, [index, songs, playing]);
+
+  // Media Session API - Action Handlers
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.setActionHandler('play', () => setPlaying(true));
+      navigator.mediaSession.setActionHandler('pause', () => setPlaying(false));
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        setIndex(prev => (prev === 0 ? songs.length - 1 : prev - 1));
+        setPlaying(true);
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        setIndex(prev => (prev + 1) % songs.length);
+        setPlaying(true);
+      });
+    }
+    return () => {
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+      }
+    };
+  }, [songs.length]);
+
 
   // 4. Handle End of Track
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
+    // Use native looping for 'one' to avoid play/pause race conditions
+    audio.loop = (repeat === 'one');
+
     const onEnded = () => {
-      if (repeat === 'one') {
-        audio.currentTime = 0;
-        audio.play();
-      } else if (autoplay || repeat === 'all') {
+      // If repeat is 'one', native loop handles it, but just in case:
+      if (repeat === 'one') return;
+
+      if (autoplay || repeat === 'all') {
         if (songs.length > 1 || repeat === 'all') {
           setIndex(prev => (prev + 1) % songs.length);
           setPlaying(true);
@@ -244,6 +312,19 @@ export function useAudioPlayer(songs: { url: string, id?: number }[]) {
     setPlaying(true);
   };
 
+  const setBass = (val: number) => {
+    if (bassFilterRef.current) bassFilterRef.current.gain.value = val;
+    setEq(prev => ({ ...prev, bass: val }));
+  };
+  const setMid = (val: number) => {
+    if (midFilterRef.current) midFilterRef.current.gain.value = val;
+    setEq(prev => ({ ...prev, mid: val }));
+  };
+  const setTreble = (val: number) => {
+    if (trebleFilterRef.current) trebleFilterRef.current.gain.value = val;
+    setEq(prev => ({ ...prev, treble: val }));
+  };
+
   return {
     index, playing, progress, volume, isMuted, currentTime, duration,
     shuffle, repeat, audioError, play, pause, next, prev, setVolume, toggleMute,
@@ -252,6 +333,10 @@ export function useAudioPlayer(songs: { url: string, id?: number }[]) {
     selectSong: (i: number) => { setIndex(i); setPlaying(true); setAudioError(null); },
     setSleepTimer,
     sleepTimer,
-    analyser: analyserRef.current
+    analyser: analyserRef.current,
+    eq,
+    setBass,
+    setMid,
+    setTreble
   };
 }

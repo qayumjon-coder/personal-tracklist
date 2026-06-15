@@ -11,7 +11,7 @@ export function VolumeControl({ volume, isMuted, onVolumeChange, onToggleMute }:
       {/* Mute button */}
       <button
         onClick={onToggleMute}
-        className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors p-1 rounded-none hover:bg-[var(--text-secondary)]/10"
+        className="cyber-icon-btn w-8 h-8 shrink-0"
         title={isMuted ? "Unmute" : "Mute"}
       >
         {isMuted || volume === 0 ? (
