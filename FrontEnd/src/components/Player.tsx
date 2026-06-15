@@ -43,6 +43,7 @@ interface PlayerProps {
     removeLocalFiles: () => void;
     hasStoredHandle: boolean;
     isScanning: boolean;
+    scanProgress?: { current: number; total: number; filename: string } | null;
     error: string | null;
   };
 }
@@ -596,7 +597,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   <button
                     onClick={() => { playClick(); setIsSleepTimerMenuOpen(!isSleepTimerMenuOpen); }}
                     onMouseEnter={playHover}
-                    className={`text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border ${player.sleepTimer ? 'border-[var(--accent)] text-[var(--accent)] shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]' : 'border-[var(--text-secondary)]/30'} px-3 py-1 transition-all bg-black/50 uppercase flex items-center gap-2 group`}
+                    className={`cyber-btn px-3 py-1 text-[9px] group flex items-center gap-2 ${player.sleepTimer ? 'border-[var(--accent)] text-[var(--accent)] shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]' : ''}`}
                     title="Sleep Timer"
                   >
                     <Moon size={10} fill={player.sleepTimer ? "currentColor" : "none"} />
@@ -631,7 +632,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 <button
                   onClick={() => { playClick(); onOpenSettings(); }}
                   onMouseEnter={playHover}
-                  className="text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] px-3 py-1 transition-all bg-black/50 uppercase group"
+                  className="cyber-btn px-3 py-1 text-[9px] group"
                 >
                   <span className="opacity-60 group-hover:opacity-100">[</span>
                   <span className="mx-1">Config</span>
@@ -641,7 +642,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 <button
                   onClick={() => { playClick(); setIsEqOpen(true); }}
                   onMouseEnter={playHover}
-                  className="text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] px-3 py-1 transition-all bg-black/50 uppercase group"
+                  className="cyber-btn px-3 py-1 text-[9px] group"
                   title="Neural EQ"
                 >
                   <span className="opacity-60 group-hover:opacity-100">[</span>
@@ -652,7 +653,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 <button
                   onClick={() => { playClick(); setIsSearchOpen(true); }}
                   onMouseEnter={playHover}
-                  className="text-[var(--text-secondary)] hover:text-[var(--accent)] font-mono text-[9px] tracking-widest border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] px-3 py-1 transition-all bg-black/50 uppercase group flex items-center gap-2"
+                  className="cyber-btn px-3 py-1 text-[9px] group flex items-center gap-2"
                 >
                   <Search size={10} />
                   <span>Search</span>
@@ -751,24 +752,24 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                         </p>
                       </div>
 
-                      {/* Lyrics Button - Visible only if lyrics exist */}
-                      {current.lyrics && (
+                      {/* Karaoke Button */}
+                      {current?.lyrics && (
                         <button
                           onClick={() => setIsKaraokeOpen(true)}
-                          className="p-3 md:p-4 rounded-full text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all duration-300 transform hover:scale-110 active:scale-95 shrink-0 mt-1"
+                          className="cyber-icon-btn w-10 h-10 shrink-0 mt-1"
                           title="Karaoke Mode"
                         >
-                          <Mic2 size={20} strokeWidth={1.5} />
+                          <Mic2 size={18} strokeWidth={1.5} />
                         </button>
                       )}
 
                       {/* Share Button */}
                       <button
                         onClick={copyShareLink}
-                        className="p-3 md:p-4 rounded-full text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all duration-300 transform hover:scale-110 active:scale-95 shrink-0 mt-1"
+                        className="cyber-icon-btn w-10 h-10 shrink-0 mt-1"
                         title="Share Track"
                       >
-                        <Share2 size={20} strokeWidth={1.5} />
+                        <Share2 size={18} strokeWidth={1.5} />
                       </button>
                     </div>
                   </div>

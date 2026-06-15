@@ -56,13 +56,13 @@ export function PlaybackControls({
       <button
         onClick={() => { playClick(); playing ? onPause() : onPlay(); }}
         onMouseEnter={playHover}
-        className="cyber-icon-btn bg-[var(--accent)]/10 border-[var(--accent)] hover:bg-[var(--accent)] hover:text-black hover:shadow-[0_0_20px_var(--accent-glow)] w-12 h-12 sm:w-16 sm:h-16 shrink-0 transition-all duration-300 group hover:scale-105"
+        className="cyber-icon-btn bg-[var(--accent)]/10 border-[var(--accent)] hover:!bg-[var(--accent)] hover:!text-black hover:shadow-[0_0_20px_var(--accent-glow)] w-12 h-12 sm:w-16 sm:h-16 shrink-0 transition-all duration-300 group hover:scale-105 text-[var(--accent)]"
         title={playing ? "Pause" : "Play"}
       >
         {playing ? (
-          <Pause className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--accent)]" strokeWidth={2.5} fill="currentColor" />
+          <Pause className="w-6 h-6 sm:w-7 sm:h-7 transition-colors duration-300" strokeWidth={2.5} fill="currentColor" />
         ) : (
-          <Play className="w-6 h-6 sm:w-7 sm:h-7 text-[var(--accent)]" strokeWidth={2.5} fill="currentColor" />
+          <Play className="w-6 h-6 sm:w-7 sm:h-7 transition-colors duration-300" strokeWidth={2.5} fill="currentColor" />
         )}
       </button>
 

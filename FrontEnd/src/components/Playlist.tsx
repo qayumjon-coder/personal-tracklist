@@ -22,6 +22,7 @@ interface PlaylistProps {
     removeLocalFiles: () => void;
     hasStoredHandle: boolean;
     isScanning: boolean;
+    scanProgress?: { current: number; total: number; filename: string } | null;
   }
 }
 
@@ -182,7 +183,19 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
               {localFilesInfo && (
                 <div className="flex items-center gap-1 ml-2 pl-2 border-l border-[var(--text-secondary)]/20">
                   {localFilesInfo.isScanning ? (
-                    <span className="text-[9px] text-[var(--accent)] font-bold animate-pulse uppercase">Scanning...</span>
+                    <div className="flex flex-col items-start gap-1 w-full max-w-[200px]">
+                      <span className="text-[9px] text-[var(--accent)] font-bold animate-pulse uppercase">
+                        Scanning Local Files... {localFilesInfo.scanProgress ? `(${localFilesInfo.scanProgress.current}/${localFilesInfo.scanProgress.total})` : ''}
+                      </span>
+                      {localFilesInfo.scanProgress && (
+                        <div className="w-full h-1 bg-[var(--text-secondary)]/20 overflow-hidden">
+                          <div 
+                            className="h-full bg-[var(--accent)] transition-all duration-300"
+                            style={{ width: `${(localFilesInfo.scanProgress.current / Math.max(1, localFilesInfo.scanProgress.total)) * 100}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
                   ) : (
                     <>
                       {localFilesInfo.hasStoredHandle && songs.filter(s => s.category === 'Local').length === 0 && (

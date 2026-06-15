@@ -8,6 +8,7 @@ const FOLDER_HANDLE_KEY = "fronto_local_folder_handle";
 export function useLocalFiles() {
   const [localSongs, setLocalSongs] = useState<Song[]>([]);
   const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState<{ current: number, total: number, filename: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasStoredHandle, setHasStoredHandle] = useState(false);
 
@@ -19,7 +20,6 @@ export function useLocalFiles() {
   }, []);
 
   const generateLocalId = (name: string) => {
-    // Unique deterministic-ish negative ID
     let hash = 0;
     for (let i = 0; i < name.length; i++) {
         hash = Math.imul(31, hash) + name.charCodeAt(i) | 0;
@@ -27,18 +27,32 @@ export function useLocalFiles() {
     return -Math.abs(hash || Math.floor(Math.random() * 1000000));
   };
 
+  const getAccurateDuration = (url: string): Promise<number> => {
+    return new Promise((resolve) => {
+      const audio = new Audio();
+      audio.addEventListener('loadedmetadata', () => {
+        resolve(audio.duration || 0);
+      });
+      audio.addEventListener('error', () => {
+        resolve(0);
+      });
+      audio.src = url;
+    });
+  };
+
   const processFileHandle = async (fileHandle: any): Promise<Song | null> => {
     try {
       const file = await fileHandle.getFile();
       if (!file.type.startsWith("audio/") && !file.name.endsWith(".mp3") && !file.name.endsWith(".wav") && !file.name.endsWith(".m4a")) {
-        return null; // Skip non-audio files
+        return null;
       }
 
-      // We read metadata
       let title = file.name.replace(/\.[^/.]+$/, "");
       let artist = "Unknown Artist";
-      let coverUrl = "/default_cover.jpg"; // Provide a fallback cover if needed
+      let coverUrl = "/default_cover.jpg";
       let duration = 0;
+      
+      const songUrl = URL.createObjectURL(file);
 
       try {
         const metadata = await mm.parseBlob(file, { duration: true });
@@ -56,7 +70,10 @@ export function useLocalFiles() {
         console.warn("Could not parse metadata for " + file.name, err);
       }
 
-      const songUrl = URL.createObjectURL(file);
+      // If duration from metadata is missing, invalid, or zero, use native Audio element
+      if (!duration || isNaN(duration)) {
+        duration = await getAccurateDuration(songUrl);
+      }
 
       return {
         id: generateLocalId(file.name),
@@ -65,7 +82,7 @@ export function useLocalFiles() {
         url: songUrl,
         cover_url: coverUrl,
         coverUrl: coverUrl,
-        duration: duration || 180, // Default 3 mins if duration read fails
+        duration: duration > 0 ? duration : 180, // Fallback to 180 if both fail
         category: "Local",
       };
     } catch (e) {
@@ -76,19 +93,37 @@ export function useLocalFiles() {
 
   const scanDirectory = async (directoryHandle: any) => {
     setIsScanning(true);
+    setScanProgress(null);
     setError(null);
     try {
-      const songs: Song[] = [];
-      // Simple shallow scan for now (can technically do recursive)
+      // First pass: count valid files quickly
+      let totalFiles = 0;
       for await (const entry of directoryHandle.values()) {
         if (entry.kind === 'file') {
-          const song = await processFileHandle(entry);
-          if (song) {
-            // Check if already parsed
-            if (!songs.some(s => s.id === song.id)) {
-               songs.push(song);
-            }
-          }
+           const name = entry.name.toLowerCase();
+           if (name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.m4a')) {
+              totalFiles++;
+           }
+        }
+      }
+
+      const songs: Song[] = [];
+      let current = 0;
+      
+      for await (const entry of directoryHandle.values()) {
+        if (entry.kind === 'file') {
+           const name = entry.name.toLowerCase();
+           if (name.endsWith('.mp3') || name.endsWith('.wav') || name.endsWith('.m4a')) {
+             current++;
+             setScanProgress({ current, total: totalFiles, filename: entry.name });
+             
+             const song = await processFileHandle(entry);
+             if (song) {
+               if (!songs.some(s => s.id === song.id)) {
+                  songs.push(song);
+               }
+             }
+           }
         }
       }
       setLocalSongs(songs);
@@ -101,12 +136,13 @@ export function useLocalFiles() {
       setLocalSongs([]);
     } finally {
       setIsScanning(false);
+      setScanProgress(null);
     }
   };
 
   const requestAccess = async () => {
     try {
-      // @ts-ignore (Browser specific API)
+      // @ts-ignore
       if (!window.showDirectoryPicker) {
          setError("Your browser does not support the File System Access API.");
          return;
@@ -125,7 +161,6 @@ export function useLocalFiles() {
     try {
       const handle = await idb.get(FOLDER_HANDLE_KEY);
       if (handle) {
-        // We must verify permission
         // @ts-ignore
         const permission = await handle.queryPermission({ mode: 'read' });
         if (permission === 'granted') {
@@ -158,6 +193,7 @@ export function useLocalFiles() {
   return {
     localSongs,
     isScanning,
+    scanProgress,
     error,
     hasStoredHandle,
     requestAccess,

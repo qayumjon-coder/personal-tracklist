@@ -24,7 +24,7 @@ import { SystemCrash } from "./components/SystemCrash";
 
 function MusicApp() {
   const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist } = usePlaylist();
-  const { localSongs, isScanning, hasStoredHandle, requestAccess, restoreAccess, removeLocalFiles, removeLocalFile, error: localError } = useLocalFiles();
+  const { localSongs, isScanning, scanProgress, hasStoredHandle, requestAccess, restoreAccess, removeLocalFiles, removeLocalFile, error: localError } = useLocalFiles();
   
   // Combine both sources
   const combinedSongs = [...playlist, ...localSongs];
@@ -134,6 +134,7 @@ function MusicApp() {
                   removeLocalFiles,
                   hasStoredHandle,
                   isScanning,
+                  scanProgress,
                   error: localError
                 }}
               />
