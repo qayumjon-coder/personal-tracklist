@@ -1,4 +1,4 @@
-import { Sliders, Activity } from 'lucide-react';
+import { Activity } from 'lucide-react';
 import { useRef, useCallback, useState } from 'react';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 import type { AudioEffect } from '../hooks/useAudioPlayer';
