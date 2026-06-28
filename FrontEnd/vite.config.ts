@@ -69,21 +69,7 @@ export default defineConfig({
     },
   },
   build: {
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (id.includes('node_modules')) {
-            // Provide a generic 'vendor' chunk for node_modules or split by library
-            if (id.includes('music-metadata')) return 'vendor-audio';
-            if (id.includes('react') || id.includes('react-dom') || id.includes('react-router')) return 'vendor-react';
-            if (id.includes('@supabase')) return 'vendor-supabase';
-            if (id.includes('lucide-react')) return 'vendor-icons';
-            return 'vendor-core';
-          }
-        }
-      }
-    },
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 1500,
   }
 })
 
