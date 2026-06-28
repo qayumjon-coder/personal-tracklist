@@ -3,6 +3,7 @@ import { useSettings } from "../contexts/SettingsContext";
 import { incrementPlayCount } from "../services/musicApi";
 
 export type RepeatMode = "off" | "one" | "all";
+export type AudioEffect = "none" | "underwater" | "radio" | "8d" | "bass-boost" | "echo";
 
 export function useAudioPlayer(songs: { url: string; id?: number; title?: string; artist?: string; coverUrl?: string }[]) {
   const [index, setIndex] = useState(0);
@@ -30,6 +31,21 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   const bassFilterRef = useRef<BiquadFilterNode | null>(null);
   const midFilterRef = useRef<BiquadFilterNode | null>(null);
   const trebleFilterRef = useRef<BiquadFilterNode | null>(null);
+
+  // FX State
+  const [activeEffect, setActiveEffectState] = useState<AudioEffect>("none");
+  const effectNodesRef = useRef<{
+    underwater: BiquadFilterNode | null;
+    radio: BiquadFilterNode | null;
+    panner: StereoPannerNode | null;
+    eightDLowpass: BiquadFilterNode | null;
+    eightDReverb: DelayNode | null;
+    eightDReverbGain: GainNode | null;
+    bassBoost: BiquadFilterNode | null;
+    echoDelay: DelayNode | null;
+    echoGain: GainNode | null;
+  }>({ underwater: null, radio: null, panner: null, eightDLowpass: null, eightDReverb: null, eightDReverbGain: null, bassBoost: null, echoDelay: null, echoGain: null });
+  const pannerRafRef = useRef<number | null>(null);
 
   // 1. Initialize Audio Element and Context
   useEffect(() => {
@@ -60,11 +76,43 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
         trebleFilter.frequency.value = 4000;
         trebleFilter.gain.value = 0;
 
+        // FX Nodes
+        const underwater = ctx.createBiquadFilter();
+        underwater.type = 'lowpass';
+        underwater.frequency.value = 300;
+
+        const radio = ctx.createBiquadFilter();
+        radio.type = 'bandpass';
+        radio.frequency.value = 1500;
+        radio.Q.value = 1.5;
+
+        const panner = ctx.createStereoPanner();
+        const eightDLowpass = ctx.createBiquadFilter();
+        eightDLowpass.type = 'lowpass';
+        eightDLowpass.frequency.value = 20000;
+        
+        const eightDReverb = ctx.createDelay();
+        eightDReverb.delayTime.value = 0.05; // 50ms room delay
+        const eightDReverbGain = ctx.createGain();
+        eightDReverbGain.gain.value = 0.3;
+        eightDReverb.connect(eightDReverbGain);
+        eightDReverbGain.connect(eightDReverb);
+        
+        const bassBoost = ctx.createBiquadFilter();
+        bassBoost.type = 'lowshelf';
+        bassBoost.frequency.value = 150;
+        bassBoost.gain.value = 15;
+
+        const echoDelay = ctx.createDelay();
+        echoDelay.delayTime.value = 0.3; // 300ms
+        const echoGain = ctx.createGain();
+        echoGain.gain.value = 0.4; // feedback amount
+
         const source = ctx.createMediaElementSource(audio);
         source.connect(bassFilter);
         bassFilter.connect(midFilter);
         midFilter.connect(trebleFilter);
-        trebleFilter.connect(analyser);
+        trebleFilter.connect(analyser); // Default route
         analyser.connect(ctx.destination);
 
         audioContextRef.current = ctx;
@@ -72,6 +120,10 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
         bassFilterRef.current = bassFilter;
         midFilterRef.current = midFilter;
         trebleFilterRef.current = trebleFilter;
+        effectNodesRef.current = { 
+          underwater, radio, panner, eightDLowpass, eightDReverb, eightDReverbGain, 
+          bassBoost, echoDelay, echoGain 
+        };
       } catch (e) {
         console.error("Audio Context Error:", e);
       }
@@ -114,6 +166,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.pause();
       audio.src = "";
+      if (pannerRafRef.current) cancelAnimationFrame(pannerRafRef.current);
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
       }
@@ -325,6 +378,88 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     setEq(prev => ({ ...prev, treble: val }));
   };
 
+  const setEffect = (effect: AudioEffect) => {
+    setActiveEffectState(effect);
+    const ctx = audioContextRef.current;
+    const eqOut = trebleFilterRef.current;
+    const analyser = analyserRef.current;
+    const fx = effectNodesRef.current;
+
+    if (!ctx || !eqOut || !analyser) return;
+
+    // Disconnect eqOut from everything
+    eqOut.disconnect();
+
+    // Disconnect all fx nodes to clean up previous routes
+    if (fx.underwater) fx.underwater.disconnect();
+    if (fx.radio) fx.radio.disconnect();
+    if (fx.panner) fx.panner.disconnect();
+    if (fx.eightDLowpass) fx.eightDLowpass.disconnect();
+    if (fx.eightDReverb) fx.eightDReverb.disconnect();
+    if (fx.eightDReverbGain) fx.eightDReverbGain.disconnect();
+    if (fx.bassBoost) fx.bassBoost.disconnect();
+    if (fx.echoDelay) fx.echoDelay.disconnect();
+    if (fx.echoGain) fx.echoGain.disconnect();
+    
+    // Stop 8D animation frame
+    if (pannerRafRef.current) {
+      cancelAnimationFrame(pannerRafRef.current);
+      pannerRafRef.current = null;
+    }
+
+    // Route based on effect
+    switch (effect) {
+      case "none":
+        eqOut.connect(analyser);
+        break;
+      case "underwater":
+        eqOut.connect(fx.underwater!);
+        fx.underwater!.connect(analyser);
+        break;
+      case "radio":
+        eqOut.connect(fx.radio!);
+        fx.radio!.connect(analyser);
+        break;
+      case "8d":
+        eqOut.connect(fx.panner!);
+        fx.panner!.connect(fx.eightDLowpass!);
+        fx.eightDLowpass!.connect(analyser);
+        
+        // Add room reverb for 8D
+        fx.eightDLowpass!.connect(fx.eightDReverb!);
+        fx.eightDReverb!.connect(analyser);
+
+        const startTime = ctx.currentTime;
+        const panLoop = () => {
+           if (fx.panner && fx.eightDLowpass && audioContextRef.current) {
+             const elapsed = audioContextRef.current.currentTime - startTime;
+             // Pan left to right
+             fx.panner.pan.value = Math.sin(elapsed * Math.PI / 4); 
+             
+             // Depth (Front to Back). cos(t) > 0 is front, cos(t) < 0 is back.
+             const depth = Math.cos(elapsed * Math.PI / 4);
+             const minFreq = 2000;  // Muffled when behind
+             const maxFreq = 20000; // Bright when in front
+             fx.eightDLowpass.frequency.value = minFreq + ((depth + 1) / 2) * (maxFreq - minFreq);
+           }
+           pannerRafRef.current = requestAnimationFrame(panLoop);
+        };
+        panLoop();
+        break;
+      case "bass-boost":
+        eqOut.connect(fx.bassBoost!);
+        fx.bassBoost!.connect(analyser);
+        break;
+      case "echo":
+        eqOut.connect(analyser); // Dry
+        eqOut.connect(fx.echoDelay!); // Wet
+        fx.echoDelay!.connect(fx.echoGain!);
+        fx.echoGain!.connect(fx.echoDelay!); // Feedback
+        fx.echoDelay!.connect(analyser);
+        break;
+    }
+  };
+
   return {
     index, playing, progress, volume, isMuted, currentTime, duration,
     shuffle, repeat, audioError, play, pause, next, prev, setVolume, toggleMute,
@@ -337,6 +472,8 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     eq,
     setBass,
     setMid,
-    setTreble
+    setTreble,
+    activeEffect,
+    setEffect
   };
 }

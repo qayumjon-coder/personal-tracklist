@@ -643,10 +643,10 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   onClick={() => { playClick(); setIsEqOpen(true); }}
                   onMouseEnter={playHover}
                   className="cyber-btn px-3 py-1 text-[9px] group"
-                  title="Neural EQ"
+                  title="Neural Audio (EQ / FX)"
                 >
                   <span className="opacity-60 group-hover:opacity-100">[</span>
-                  <span className="mx-1">EQ</span>
+                  <span className="mx-1">EQ/FX</span>
                   <span className="opacity-60 group-hover:opacity-100">]</span>
                 </button>
 
@@ -678,14 +678,13 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   <FadeVisualizer playing={player.playing} analyser={player.analyser} />
                 )}
 
-                {/* Background Visuals */}
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
                   {/* Dynamic Visualizer Background */}
-                  <div className={`absolute left-0 right-0 pointer-events-none mix-blend-screen transition-all duration-500 ${['orbit', 'grid', 'matrix'].includes(visualizerMode)
-                      ? 'inset-0 opacity-35'
-                      : 'bottom-0 h-[45%] opacity-30'
+                  <div className={`absolute inset-0 pointer-events-none mix-blend-screen transition-all duration-500 ${['orbit', 'grid', 'matrix'].includes(visualizerMode)
+                      ? 'opacity-35'
+                      : 'opacity-30'
                     }`}>
-                    <Visualizer playing={player.playing} analyser={player.analyser} />
+                    <Visualizer playing={player.playing} analyser={player.analyser} position="bottom" />
                   </div>
                 </div>
 
@@ -1012,6 +1011,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           setBass={player.setBass}
           setMid={player.setMid}
           setTreble={player.setTreble}
+          activeEffect={player.activeEffect}
+          setEffect={player.setEffect}
           onClose={() => setIsEqOpen(false)}
         />
       )}

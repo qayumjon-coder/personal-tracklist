@@ -4,9 +4,10 @@ import { useSettings, THEME_COLORS, hexToRgb } from "../contexts/SettingsContext
 interface VisualizerProps {
   playing: boolean;
   analyser?: AnalyserNode | null;
+  position?: 'center' | 'bottom';
 }
 
-export function Visualizer({ playing, analyser }: VisualizerProps) {
+export function Visualizer({ playing, analyser, position = 'center' }: VisualizerProps) {
   const { visualizerMode, theme } = useSettings();
   const accentColorRef = useRef('#00E5FF');
   const accentRgbRef = useRef('0, 255, 255');
@@ -70,9 +71,10 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
         if (!playing || !analyser) {
           // Draw a flat line if not playing
+          const cy = position === 'bottom' ? height * 0.75 : height / 2;
           ctx.beginPath();
-          ctx.moveTo(0, height / 2);
-          ctx.lineTo(width, height / 2);
+          ctx.moveTo(0, cy);
+          ctx.lineTo(width, cy);
           ctx.strokeStyle = `rgba(${accentRgbRef.current}, 0.2)`; // Faint line
           ctx.lineWidth = 2;
           ctx.stroke();
@@ -113,8 +115,9 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
         // Draw Sine Wave
         // We'll draw one or two periods across the width
         const frequency = 0.02; // Controls how many peaks visible
+        const cy = position === 'bottom' ? height * 0.75 : height / 2;
 
-        ctx.moveTo(0, height / 2);
+        ctx.moveTo(0, cy);
 
         for (let x = 0; x < width; x++) {
           // y = A * sin(B * x + C) + D
@@ -123,7 +126,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
           // C = phase (time)
           // D = vertical shift (height / 2)
 
-          const y = (height / 2) + Math.sin(x * frequency + time) * amplitude;
+          const y = cy + Math.sin(x * frequency + time) * amplitude;
           ctx.lineTo(x, y);
         }
 
@@ -161,7 +164,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
         const width = canvas.width;
         const height = canvas.height;
-        const centerY = height / 2;
+        const centerY = position === 'bottom' ? height * 0.75 : height / 2;
 
         ctx.clearRect(0, 0, width, height);
 
@@ -384,7 +387,7 @@ export function Visualizer({ playing, analyser }: VisualizerProps) {
 
         const width = canvas.width;
         const height = canvas.height;
-        const cy = height / 2;
+        const cy = position === 'bottom' ? height * 0.75 : height / 2;
 
         ctx.clearRect(0, 0, width, height);
 

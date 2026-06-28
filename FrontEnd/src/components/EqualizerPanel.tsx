@@ -1,12 +1,15 @@
-import { Sliders } from 'lucide-react';
-import { useRef, useCallback } from 'react';
+import { Sliders, Activity } from 'lucide-react';
+import { useRef, useCallback, useState } from 'react';
 import { useSoundEffects } from '../hooks/useSoundEffects';
+import type { AudioEffect } from '../hooks/useAudioPlayer';
 
 interface EqualizerPanelProps {
   eq: { bass: number; mid: number; treble: number };
   setBass: (val: number) => void;
   setMid: (val: number) => void;
   setTreble: (val: number) => void;
+  activeEffect: AudioEffect;
+  setEffect: (eff: AudioEffect) => void;
   onClose: () => void;
 }
 
@@ -107,8 +110,9 @@ function VerticalSlider({ label, value, setter, playClick }: SliderBand & { play
   );
 }
 
-export function EqualizerPanel({ eq, setBass, setMid, setTreble, onClose }: EqualizerPanelProps) {
+export function EqualizerPanel({ eq, setBass, setMid, setTreble, activeEffect, setEffect, onClose }: EqualizerPanelProps) {
   const { playClick, playHover } = useSoundEffects();
+  const [activeTab, setActiveTab] = useState<'eq' | 'fx'>('eq');
 
   const bands: SliderBand[] = [
     { label: 'BASS', value: eq.bass, setter: setBass },
@@ -116,15 +120,24 @@ export function EqualizerPanel({ eq, setBass, setMid, setTreble, onClose }: Equa
     { label: 'TREB', value: eq.treble, setter: setTreble },
   ];
 
+  const effects: { id: AudioEffect; label: string }[] = [
+    { id: 'none', label: 'OFF' },
+    { id: 'underwater', label: 'ABYSS' },
+    { id: 'radio', label: 'LO-FI' },
+    { id: '8d', label: '8D ORBIT' },
+    { id: 'bass-boost', label: 'BASS MAX' },
+    { id: 'echo', label: 'VOID' }
+  ];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="cyber-panel p-6 w-full max-w-xs flex flex-col gap-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-[var(--accent)]/30">
+      <div className="cyber-panel p-6 w-full max-w-sm flex flex-col gap-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-[var(--accent)]/30">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--text-secondary)]/20 pb-3">
           <div className="flex items-center gap-2 text-[var(--accent)]">
-            <Sliders size={18} />
-            <h2 className="font-mono font-bold tracking-widest text-sm uppercase">Neural EQ</h2>
+            <Activity size={18} />
+            <h2 className="font-mono font-bold tracking-widest text-sm uppercase">Neural Audio</h2>
           </div>
           <button
             onClick={() => { playClick(); onClose(); }}
@@ -135,11 +148,50 @@ export function EqualizerPanel({ eq, setBass, setMid, setTreble, onClose }: Equa
           </button>
         </div>
 
-        {/* Sliders */}
-        <div className="flex justify-around items-stretch h-52 px-2">
-          {bands.map((band, i) => (
-            <VerticalSlider key={i} {...band} playClick={playClick} />
-          ))}
+        {/* Tabs */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => { playClick(); setActiveTab('eq'); }}
+            onMouseEnter={playHover}
+            className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-widest border border-[var(--accent)]/30 transition-all ${activeTab === 'eq' ? 'bg-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]' : 'text-[var(--text-secondary)] hover:border-[var(--accent)]'}`}
+          >
+            Equalizer
+          </button>
+          <button
+            onClick={() => { playClick(); setActiveTab('fx'); }}
+            onMouseEnter={playHover}
+            className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-widest border border-[var(--accent)]/30 transition-all ${activeTab === 'fx' ? 'bg-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]' : 'text-[var(--text-secondary)] hover:border-[var(--accent)]'}`}
+          >
+            Effects
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="h-52 mt-2">
+          {activeTab === 'eq' ? (
+            <div className="flex justify-around items-stretch h-full px-2 animate-in fade-in zoom-in-95 duration-200">
+              {bands.map((band, i) => (
+                <VerticalSlider key={i} {...band} playClick={playClick} />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 h-full px-2 animate-in fade-in zoom-in-95 duration-200">
+              {effects.map(fx => (
+                <button
+                  key={fx.id}
+                  onClick={() => { playClick(); setEffect(fx.id); }}
+                  onMouseEnter={playHover}
+                  className={`cyber-btn flex items-center justify-center py-3 text-[10px] sm:text-xs tracking-widest uppercase transition-all ${
+                    activeEffect === fx.id 
+                      ? 'bg-[var(--accent)] text-black font-bold shadow-[0_0_15px_var(--accent)] border-transparent' 
+                      : 'opacity-70 hover:opacity-100'
+                  }`}
+                >
+                  {fx.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>
