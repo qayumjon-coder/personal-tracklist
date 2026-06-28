@@ -87,23 +87,26 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   // Mobile Drawer State
   const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
 
-  // Swipe Gestures State
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchCurrentX, setTouchCurrentX] = useState<number | null>(null);
   const minSwipeDistance = 50;
 
   const onTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
+    setTouchCurrentX(null);
+    setTouchStartX(e.targetTouches[0].clientX);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    setTouchCurrentX(e.targetTouches[0].clientX);
   };
 
   const onTouchEndEvent = () => {
-    if (!touchStart || !touchEnd) return;
-    const distance = touchStart - touchEnd;
+    if (touchStartX === null || touchCurrentX === null) {
+      setTouchStartX(null);
+      setTouchCurrentX(null);
+      return;
+    }
+    const distance = touchStartX - touchCurrentX;
     const isLeftSwipe = distance > minSwipeDistance;
     const isRightSwipe = distance < -minSwipeDistance;
 
@@ -112,7 +115,46 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     } else if (isRightSwipe) {
       player.prev(); // swipe right -> prev
     }
+    
+    setTouchStartX(null);
+    setTouchCurrentX(null);
   };
+
+  const coverDragDistance = (touchStartX !== null && touchCurrentX !== null) ? touchCurrentX - touchStartX : 0;
+  
+  // Drawer Gestures
+  const [drawerTouchStartY, setDrawerTouchStartY] = useState<number | null>(null);
+  const [drawerTouchCurrentY, setDrawerTouchCurrentY] = useState<number | null>(null);
+
+  const onDrawerTouchStart = (e: React.TouchEvent) => {
+    setDrawerTouchCurrentY(null);
+    setDrawerTouchStartY(e.targetTouches[0].clientY);
+  };
+
+  const onDrawerTouchMove = (e: React.TouchEvent) => {
+    if (drawerTouchStartY !== null) {
+      const currentY = e.targetTouches[0].clientY;
+      if (currentY > drawerTouchStartY) { // Only drag down
+        setDrawerTouchCurrentY(currentY);
+      }
+    }
+  };
+
+  const onDrawerTouchEnd = () => {
+    if (drawerTouchStartY === null || drawerTouchCurrentY === null) {
+      setDrawerTouchStartY(null);
+      setDrawerTouchCurrentY(null);
+      return;
+    }
+    const distance = drawerTouchCurrentY - drawerTouchStartY;
+    if (distance > 80) { // Close if dragged down sufficiently
+      setIsMobilePlaylistOpen(false);
+    }
+    setDrawerTouchStartY(null);
+    setDrawerTouchCurrentY(null);
+  };
+
+  const drawerDragDistance = (drawerTouchStartY !== null && drawerTouchCurrentY !== null) ? drawerTouchCurrentY - drawerTouchStartY : 0;
 
   // Show volume HUD when volume changes
   useEffect(() => {
@@ -535,7 +577,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       )}
 
       {/* Responsive Page Wrapper */}
-      <div className="w-full max-w-6xl mx-auto px-3 md:px-6 py-3 md:py-8 flex flex-col gap-8 md:gap-12 items-center">
+      <div className="w-full max-w-6xl mx-auto px-2 md:px-6 py-2 md:py-8 flex flex-col gap-4 md:gap-12 items-center">
 
         {/* Main Player Display */}
         <div className="flex-1 w-full">
@@ -556,7 +598,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               </div>
             </div>
           )}
-          <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[500px] md:h-[600px] lg:h-[650px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(var(--accent-rgb),0.1)] text-base md:text-lg">
+          <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[420px] md:h-[600px] lg:h-[650px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(var(--accent-rgb),0.1)] text-base md:text-lg">
             {/* Decorative Corners */}
             <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)] z-20"></div>
             <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--accent)] z-20"></div>
@@ -597,11 +639,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   <button
                     onClick={() => { playClick(); setIsSleepTimerMenuOpen(!isSleepTimerMenuOpen); }}
                     onMouseEnter={playHover}
-                    className={`cyber-btn px-3 py-1 text-[9px] group flex items-center gap-2 ${player.sleepTimer ? 'border-[var(--accent)] text-[var(--accent)] shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]' : ''}`}
+                    className={`cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center gap-2 ${player.sleepTimer ? 'border-[var(--accent)] text-[var(--accent)] shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]' : ''}`}
                     title="Sleep Timer"
                   >
-                    <Moon size={10} fill={player.sleepTimer ? "currentColor" : "none"} />
-                    <span className="mx-1">{player.sleepTimer ? `${player.sleepTimer}M` : 'Sleep'}</span>
+                    <Moon size={14} className="sm:w-2.5 sm:h-2.5" fill={player.sleepTimer ? "currentColor" : "none"} />
+                    <span className="mx-1 hidden sm:inline">{player.sleepTimer ? `${player.sleepTimer}M` : 'Sleep'}</span>
                   </button>
 
                   {isSleepTimerMenuOpen && (
@@ -632,31 +674,36 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 <button
                   onClick={() => { playClick(); onOpenSettings(); }}
                   onMouseEnter={playHover}
-                  className="cyber-btn px-3 py-1 text-[9px] group"
+                  className="cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center"
+                  title="Config"
                 >
-                  <span className="opacity-60 group-hover:opacity-100">[</span>
-                  <span className="mx-1">Config</span>
-                  <span className="opacity-60 group-hover:opacity-100">]</span>
+                  <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">[</span>
+                  <span className="mx-1 hidden sm:inline">Config</span>
+                  <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">]</span>
+                  {/* Icon for mobile only */}
+                  <span className="sm:hidden font-mono tracking-widest text-xs">CFG</span>
                 </button>
 
                 <button
                   onClick={() => { playClick(); setIsEqOpen(true); }}
                   onMouseEnter={playHover}
-                  className="cyber-btn px-3 py-1 text-[9px] group"
+                  className="cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center"
                   title="Neural Audio (EQ / FX)"
                 >
-                  <span className="opacity-60 group-hover:opacity-100">[</span>
-                  <span className="mx-1">EQ/FX</span>
-                  <span className="opacity-60 group-hover:opacity-100">]</span>
+                  <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">[</span>
+                  <span className="mx-1 hidden sm:inline">EQ/FX</span>
+                  <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">]</span>
+                  <span className="sm:hidden font-mono tracking-widest text-xs">EQ</span>
                 </button>
 
                 <button
                   onClick={() => { playClick(); setIsSearchOpen(true); }}
                   onMouseEnter={playHover}
-                  className="cyber-btn px-3 py-1 text-[9px] group flex items-center gap-2"
+                  className="cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center gap-2"
+                  title="Search"
                 >
-                  <Search size={10} />
-                  <span>Search</span>
+                  <Search size={14} className="sm:w-2.5 sm:h-2.5" />
+                  <span className="hidden sm:inline">Search</span>
                 </button>
               </div>
             </div>
@@ -671,7 +718,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               </div>
 
               {/* LEFT COLUMN: Player (Flexible) */}
-              <div className="flex-1 relative flex flex-col p-3 md:p-5 lg:p-6 border-b md:border-b-0 md:border-r border-transparent md:border-[var(--text-secondary)]/30 overflow-hidden z-10">
+              <div className="flex-1 relative flex flex-col p-2 sm:p-3 md:p-5 lg:p-6 border-b md:border-b-0 md:border-r border-transparent md:border-[var(--text-secondary)]/30 overflow-hidden z-10">
 
                 {/* Fade Visualizer Overlay (Player Box Only) */}
                 {visualizerMode === 'fade' && (
@@ -699,6 +746,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                     onTouchStart={onTouchStart}
                     onTouchMove={onTouchMove}
                     onTouchEnd={onTouchEndEvent}
+                    style={{
+                      transform: touchStartX !== null ? `translateX(${coverDragDistance}px) rotate(${coverDragDistance * 0.05}deg)` : '',
+                      opacity: touchStartX !== null ? Math.max(0.2, 1 - Math.abs(coverDragDistance) / 250) : 1,
+                      transition: touchStartX !== null ? 'none' : 'transform 0.4s cubic-bezier(0.32,0.72,0,1), opacity 0.4s ease'
+                    }}
                   >
                     {/* Rotating Inner Glow */}
                     <div className="absolute -inset-4 bg-[var(--accent)]/10 rounded-full blur-2xl animate-pulse opacity-0 group-hover/cover:opacity-100 transition-opacity duration-700"></div>
@@ -713,7 +765,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       </div>
                     )}
 
-                    <div className="relative w-56 h-56 md:w-60 md:h-60 lg:w-64 lg:h-64 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm animate-in zoom-in-95 duration-500 shrink-0">
+                    <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-60 md:h-60 lg:w-64 lg:h-64 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm animate-in zoom-in-95 duration-500 shrink-0">
                       {/* Decorative corner accents for cover */}
                       <div className="absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--accent)]"></div>
                       <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--accent)]"></div>
@@ -729,7 +781,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 </div>
 
                 {/* Track Info & Controls Section - Compact */}
-                <div className="w-full max-w-lg mx-auto space-y-4 md:space-y-5 relative z-10 pt-3 md:pt-4 pb-2">
+                <div className="w-full max-w-lg mx-auto space-y-3 md:space-y-5 relative z-10 pt-1 sm:pt-3 md:pt-4 pb-1 md:pb-2">
                   {/* Title & Artist & Actions Combined */}
                   <div className="text-center space-y-0.5 md:space-y-1">
                     <div className="flex items-start justify-center gap-2 md:gap-3">
@@ -842,14 +894,22 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               ${isMobilePlaylistOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}
               h-[80vh] md:h-full min-h-0 overflow-hidden
               shadow-[0_-10px_40px_rgba(0,0,0,0.8)] md:shadow-none
-            `}>
+            `}
+            style={{
+              transform: drawerDragDistance > 0 ? `translateY(${drawerDragDistance}px)` : undefined,
+              transition: drawerTouchStartY !== null ? 'none' : ''
+            }}
+            >
 
                 {/* Mobile Swipe Handle to Close */}
                 <div
                   className="w-full flex justify-center py-3 md:hidden cursor-pointer active:bg-white/5 border-b border-[var(--text-secondary)]/10"
                   onClick={() => setIsMobilePlaylistOpen(false)}
+                  onTouchStart={onDrawerTouchStart}
+                  onTouchMove={onDrawerTouchMove}
+                  onTouchEnd={onDrawerTouchEnd}
                 >
-                  <div className="flex items-center justify-center w-full">
+                  <div className="flex items-center justify-center w-full pointer-events-none">
                     <div className="w-12 h-1 bg-[var(--text-secondary)]/40 rounded-full" />
                     {/* Fallback chevron */}
                     <ChevronDown className="absolute right-4 text-[var(--text-secondary)]/50" size={16} />
