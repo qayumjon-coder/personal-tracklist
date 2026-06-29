@@ -134,6 +134,9 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     const handlePlay = () => { setPlaying(true); setAudioError(null); };
     const handlePause = () => setPlaying(false);
     const handleError = () => {
+      if (!audio.src || audio.src === window.location.href || audio.src.endsWith('/')) {
+        return; // Ignore error caused by emptying the src
+      }
       setPlaying(false);
       setAudioError('Audio playback failed. The file may be corrupted or unsupported.');
     };
@@ -186,7 +189,19 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   // 3. Handle Source / Playback state
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !songs.length || !songs[index]) return;
+    if (!audio) return;
+
+    if (songs.length === 0) {
+      if (!audio.paused) audio.pause();
+      audio.src = "";
+      setPlaying(false);
+      setProgress(0);
+      setCurrentTime(0);
+      currentTrackUrlRef.current = null;
+      return;
+    }
+
+    if (!songs[index]) return;
 
     const targetUrl = songs[index].url;
 

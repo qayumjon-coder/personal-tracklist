@@ -70,7 +70,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
         addHistory('response', '  prev            - Skip to previous track');
         addHistory('response', '  vol <0-100>     - Set volume level');
         addHistory('response', '  theme <name>    - Change theme (aqua, green, amber, pink, red, neon, toxic, sunset, matrix)');
-        addHistory('response', '  vis <mode>      - Change visualizer (bars, wave, multiwave, aurora, fade, scale, off)');
+        addHistory('response', '  vis <mode>      - Change visualizer (bars, wave, multiwave, aurora, stars, fade, scale, off)');
         addHistory('response', '  zen             - Toggle Zen Mode (Focus Mode)');
         addHistory('response', '  matrix          - Toggle Matrix background rain');
         addHistory('response', '  ls / list       - List all songs in the current playlist');
@@ -137,7 +137,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
         if (args.length === 0) {
           addHistory('error', 'Please specify a visualizer mode.');
         } else {
-          const validVis = ["bars", "wave", "multiwave", "fade", "scale", "aurora", "off"];
+          const validVis = ["bars", "wave", "multiwave", "fade", "scale", "aurora", "stars", "off"];
           if (validVis.includes(args[0].toLowerCase())) {
             setVisualizerMode(args[0].toLowerCase() as VisualizerMode);
             addHistory('response', `Visualizer mode changed to '${args[0].toLowerCase()}'.`);

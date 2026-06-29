@@ -60,7 +60,7 @@ export function ProgressBar({ progress, onSeek, duration }: ProgressBarProps) {
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Capture the pointer so we keep receiving events
-    try { e.currentTarget.setPointerCapture(e.pointerId); } catch {}
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch { }
     startDrag(e.clientX);
   };
 
@@ -112,7 +112,7 @@ export function ProgressBar({ progress, onSeek, duration }: ProgressBarProps) {
         className="absolute left-0 top-1/2 -translate-y-1/2 h-full bg-[var(--accent)] rounded-none pointer-events-none transition-[width] duration-75 ease-out opacity-80"
         style={{ width: `${safeProgress}%` }}
       />
-      
+
       {/* Thumb (Glow effect) */}
       <div
         className="absolute top-1/2 -translate-y-1/2 w-3 h-5 bg-[var(--bg-main)] border border-[var(--accent)] rounded-none shadow-[0_0_10px_var(--accent)] transform -translate-x-1/2 scale-0 group-hover:scale-100 transition-transform duration-200 z-10 pointer-events-none"

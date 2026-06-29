@@ -245,8 +245,17 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
 
       <div
         ref={scrollContainerRef}
-        className={`flex-1 p-1 w-full overflow-y-auto custom-scrollbar ${viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 px-2 pb-4 pt-2 content-start' : 'flex flex-col gap-0.5'}`}
+        className={`flex-1 p-1 w-full overflow-y-auto custom-scrollbar ${songs.length === 0 ? 'flex flex-col items-center justify-center' : viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-2 px-2 pb-4 pt-2 content-start' : 'flex flex-col gap-0.5'}`}
       >
+        {songs.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full w-full opacity-50 p-6 text-center animate-pulse">
+            <Disc size={48} className="text-[var(--text-secondary)] mb-4 opacity-50" strokeWidth={1} />
+            <h3 className="text-sm font-bold text-[var(--accent)] font-mono tracking-[0.2em] uppercase mb-2">NO DATA FOUND IN SECTOR</h3>
+            <p className="text-[10px] text-[var(--text-secondary)] font-mono uppercase tracking-widest leading-relaxed">
+              Upload local files or search the database<br />to initialize tracklist playback sequence.
+            </p>
+          </div>
+        ) : (
         <DragDropContext onDragEnd={handleDragEnd}>
           <Droppable droppableId="playlist-droppable" isDropDisabled={viewMode === 'grid'}>
             {(provided) => (
@@ -455,6 +464,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
             )}
           </Droppable>
         </DragDropContext>
+        )}
       </div>
 
       {totalPages > 1 && (

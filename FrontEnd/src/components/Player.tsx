@@ -2,7 +2,7 @@ import type { Song } from "../types/Song";
 import SEO from "./SEO";
 
 import { useSettings } from "../contexts/SettingsContext";
-import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, ChevronDown, Share2, Moon, Clock } from "lucide-react";
+import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, ChevronDown, Share2, Moon, Clock, Minus } from "lucide-react";
 import { Pagination } from "./Pagination";
 import { Link } from "react-router-dom";
 import { searchSongs, getTrendingSongs, incrementPlayCount } from "../services/musicApi";
@@ -21,6 +21,7 @@ import { useState, useEffect, useRef } from "react";
 import { useDebounce } from "../hooks/useDebounce";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { EqualizerPanel } from './EqualizerPanel';
+import { HotkeysMap } from './HotkeysMap';
 
 import { useSoundEffects } from "../hooks/useSoundEffects";
 
@@ -58,6 +59,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isKaraokeOpen, setIsKaraokeOpen] = useState(false);
+  const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
   const [isSleepTimerMenuOpen, setIsSleepTimerMenuOpen] = useState(false);
   // Likes stored in localStorage — instant, no network, no auth needed
   const [likedIds, setLikedIds] = useState<Set<number>>(() => {
@@ -211,7 +213,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [isEqOpen, setIsEqOpen] = useState(false);
 
   // Lock body scroll when modals are open
-  useScrollLock(isSearchOpen || isKaraokeOpen || isConfigMenuOpen || isMobilePlaylistOpen || isEqOpen);
+  useScrollLock(isSearchOpen || isKaraokeOpen || isConfigMenuOpen || isMobilePlaylistOpen || isEqOpen || isHotkeysOpen);
 
   // Load last search from localStorage on mount
   useEffect(() => {
@@ -315,13 +317,22 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         case 'Escape':
           if (isSearchOpen) setIsSearchOpen(false);
           if (isKaraokeOpen) setIsKaraokeOpen(false);
+          if (isHotkeysOpen) setIsHotkeysOpen(false);
+          break;
+        case 'KeyH':
+        case 'Slash': // '?' is often 'Slash' with shift
+          // Only trigger if we're not inside the search bar or typing
+          if (!isSearchOpen) {
+             e.preventDefault();
+             setIsHotkeysOpen(prev => !prev);
+          }
           break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [player, isSearchOpen, isKaraokeOpen]);
+  }, [player, isSearchOpen, isKaraokeOpen, isHotkeysOpen]);
 
 
 
@@ -338,6 +349,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     } else {
       toast.error(res.message);
     }
+  };
+
+  const handleRemoveSong = (song: Song) => {
+    onRemoveFromPlaylist(song.id);
+    toast.info(`${song.title} removed from playlist`);
   };
 
   const copyShareLink = () => {
@@ -577,7 +593,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       )}
 
       {/* Responsive Page Wrapper */}
-      <div className="w-full max-w-6xl mx-auto px-2 md:px-6 py-2 md:py-8 flex flex-col gap-4 md:gap-12 items-center">
+      <div className="w-full max-w-[1400px] mx-auto px-2 md:px-6 py-2 md:py-8 flex flex-col gap-4 md:gap-12 items-center">
 
         {/* Main Player Display */}
         <div className="flex-1 w-full">
@@ -886,7 +902,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
               <div className={`
               fixed inset-x-0 bottom-0 z-[50] md:relative md:z-10
-              w-full md:w-64 lg:w-80 flex flex-col 
+              w-full md:w-64 lg:w-96 xl:w-[400px] flex flex-col 
               bg-[var(--bg-main)]/95 md:bg-[var(--bg-main)]/50 
               border-t md:border-t-0 border-[var(--accent)]/30 md:border-transparent
               backdrop-blur-xl md:backdrop-blur-sm 
@@ -1079,8 +1095,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
       {/* Search Modal */}
       {isSearchOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-start pt-16 sm:pt-4 sm:justify-center p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[85vh] sm:max-h-[80vh] flex flex-col">
             <button
               onClick={() => setIsSearchOpen(false)}
               className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
@@ -1094,14 +1110,25 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
             {/* Search Form */}
             <form onSubmit={handleSearch} className="flex gap-2 mb-6">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="SEARCH ARTIST OR TITLE..."
-                className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-3 text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
-                autoFocus
-              />
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="SEARCH ARTIST OR TITLE..."
+                  className="w-full h-full bg-black/50 border border-[var(--text-secondary)] p-3 pr-10 text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
+                  autoFocus
+                />
+                {searchQuery && (
+                  <button 
+                    type="button" 
+                    onClick={() => { setSearchQuery(''); document.querySelector<HTMLInputElement>('input[placeholder="SEARCH ARTIST OR TITLE..."]')?.focus(); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--accent)]"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
               <button
                 type="submit"
                 disabled={isSearching}
@@ -1132,12 +1159,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                     </div>
 
                     <button
-                      onClick={() => handleAddSong(song)}
-                      disabled={inPlaylist}
-                      className={`p-2 transition-all ${inPlaylist ? 'text-green-500 cursor-default' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] border border-transparent hover:border-[var(--accent)]'}`}
-                      title={inPlaylist ? "Already in playlist" : "Add to playlist"}
+                      onClick={() => inPlaylist ? handleRemoveSong(song) : handleAddSong(song)}
+                      className={`p-2 transition-all border border-transparent ${inPlaylist ? 'text-[var(--accent)] hover:text-[var(--danger)] hover:border-[var(--danger)]' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]'}`}
+                      title={inPlaylist ? "Remove from playlist" : "Add to playlist"}
                     >
-                      {inPlaylist ? <Check size={18} /> : <Plus size={18} />}
+                      {inPlaylist ? <Minus size={18} /> : <Plus size={18} />}
                     </button>
                   </div>
                 );
@@ -1158,7 +1184,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         </div>
       )}
 
-      {/* Karaoke Mode Layer */}
+      {/* Mobile Modals / Drawers */}
+      <HotkeysMap isOpen={isHotkeysOpen} onClose={() => setIsHotkeysOpen(false)} />
       {isKaraokeOpen && current && (
         <LyricsView
           song={current}

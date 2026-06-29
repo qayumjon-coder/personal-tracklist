@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 type Theme = "aqua" | "green" | "amber" | "pink" | "red" | "neon" | "toxic" | "sunset" | "matrix";
 type Language = "en" | "uz";
-type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "aurora" | "off";
+type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "aurora" | "stars" | "off";
 
 interface SettingsContextType {
   theme: Theme;

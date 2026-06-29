@@ -58,6 +58,11 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
       if (!ctx) return;
 
       const animateWave = () => {
+        if (document.hidden) {
+          if (playing) animationRef.current = requestAnimationFrame(animateWave);
+          return;
+        }
+
         // Resize canvas to match display size
         if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
           canvas.width = canvas.clientWidth;
@@ -157,6 +162,11 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
       const numWaves = waveConfigs.length;
 
       const animateMultiWave = () => {
+        if (document.hidden) {
+          if (playing) animationRef.current = requestAnimationFrame(animateMultiWave);
+          return;
+        }
+
         if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
           canvas.width = canvas.clientWidth;
           canvas.height = canvas.clientHeight;
@@ -308,6 +318,11 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
       }
 
       const animateBars = () => {
+        if (document.hidden) {
+          if (playing) animationRef.current = requestAnimationFrame(animateBars);
+          return;
+        }
+
         if (playing && analyser) {
           analyser.getByteFrequencyData(dataArray);
         }
@@ -380,6 +395,11 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
         speedPhase: 0.01 + Math.random() * 0.02
       }));
       const animateAurora = () => {
+        if (document.hidden) {
+          if (playing) animationRef.current = requestAnimationFrame(animateAurora);
+          return;
+        }
+
         if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
           canvas.width = canvas.clientWidth;
           canvas.height = canvas.clientHeight;
@@ -582,6 +602,122 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
 
       animateAurora();
     }
+    // STARS / WARP DRIVE MODE
+    else if (visualizerMode === 'stars') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const numStars = 400;
+      const stars = Array.from({ length: numStars }, () => ({
+        x: Math.random() * 2000 - 1000,
+        y: Math.random() * 2000 - 1000,
+        z: Math.random() * 2000,
+        o: 0.1 + Math.random() * 0.9,
+      }));
+
+      const animateStars = () => {
+        if (document.hidden) {
+          if (playing) animationRef.current = requestAnimationFrame(animateStars);
+          return;
+        }
+
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+        }
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const cx = width / 2;
+        const cy = position === 'bottom' ? height * 0.75 : height / 2;
+
+        // Dark background with trail effect
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        ctx.fillRect(0, 0, width, height);
+
+        let bass = 0;
+        let rms = 0;
+        if (playing && analyser) {
+          analyser.getByteFrequencyData(dataArray);
+          let bSum = 0;
+          for (let i = 0; i < 15; i++) bSum += dataArray[i];
+          bass = bSum / (15 * 255);
+
+          let tSum = 0;
+          for (let i = 0; i < Math.min(bufferLength, 128); i++) tSum += dataArray[i];
+          rms = tSum / (Math.min(bufferLength, 128) * 255);
+        }
+
+        const [r, g, b] = accentRgbRef.current.split(',').map(Number);
+        
+        // Speed up the warp drive with bass
+        const speed = 2 + (bass * 40);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // Center explosion / glow on heavy bass
+        if (bass > 0.6) {
+            const glowRad = (bass - 0.5) * 400;
+            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, glowRad);
+            grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${bass * 0.3})`);
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, glowRad, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        ctx.globalCompositeOperation = 'screen';
+        
+        stars.forEach(star => {
+          star.z -= speed;
+          if (star.z <= 0) {
+            star.z = 2000;
+            star.x = Math.random() * 2000 - 1000;
+            star.y = Math.random() * 2000 - 1000;
+          }
+
+          const k = 128.0 / star.z;
+          const px = star.x * k;
+          const py = star.y * k;
+          
+          if (px > -cx && px < cx && py > -cy && py < cy) {
+            const size = (1 - star.z / 2000) * (1.5 + rms * 4);
+            const intensity = (1 - star.z / 2000);
+            
+            ctx.beginPath();
+            ctx.arc(px, py, size, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${star.o * intensity})`;
+            ctx.fill();
+            
+            // Warp trail (streak)
+            if (bass > 0.3) {
+              const trailLength = speed * (bass * 3);
+              const oldK = 128.0 / (star.z + trailLength);
+              const opx = star.x * oldK;
+              const opy = star.y * oldK;
+              ctx.beginPath();
+              ctx.moveTo(opx, opy);
+              ctx.lineTo(px, py);
+              ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${star.o * intensity * 0.6})`;
+              ctx.lineWidth = size * 0.6;
+              ctx.stroke();
+            }
+          }
+        });
+
+        ctx.restore();
+
+        if (playing) {
+          animationRef.current = requestAnimationFrame(animateStars);
+        }
+      };
+
+      animateStars();
+    }
 
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
@@ -590,7 +726,7 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
 
   if (visualizerMode === 'off' || visualizerMode === 'fade' || visualizerMode === 'scale') return null;
 
-  if (visualizerMode === 'wave' || visualizerMode === 'multiwave' || visualizerMode === 'aurora') {
+  if (visualizerMode === 'wave' || visualizerMode === 'multiwave' || visualizerMode === 'aurora' || visualizerMode === 'stars') {
     return <canvas ref={canvasRef} className="w-full h-full" />;
   }
 
@@ -620,6 +756,11 @@ export function FadeVisualizer({ playing, analyser }: VisualizerProps) {
     const dataArray = new Uint8Array(bufferLength);
 
     const animate = () => {
+      if (document.hidden) {
+        if (playing) animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
       let targetOption = 0;
 
       if (playing && analyser) {
@@ -772,6 +913,11 @@ export function AmbientBackground({ playing, analyser }: VisualizerProps) {
     const dataArray = new Uint8Array(bufferLength);
 
     const animate = () => {
+      if (document.hidden) {
+        if (playing) animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
       // Resize
       if (canvas.width !== window.innerWidth || canvas.height !== window.innerHeight) {
         canvas.width = window.innerWidth;
