@@ -137,8 +137,25 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       if (!audio.src || audio.src === window.location.href || audio.src.endsWith('/')) {
         return; // Ignore error caused by emptying the src
       }
+      // Ignore Abort errors (code 1) which happen when switching tracks rapidly
+      if (audio.error && audio.error.code === 1) {
+        return;
+      }
+      // Retry logic for potential Chrome CORS cache bug or stale cached media
+      if (audio.error && (audio.error.code === 3 || audio.error.code === 4)) {
+        if (audio.src.startsWith('http') && !audio.src.includes('?cb=')) {
+          console.warn("Retrying with cache buster due to error:", audio.error);
+          const separator = audio.src.includes('?') ? '&' : '?';
+          audio.src = audio.src + separator + 'cb=' + Date.now();
+          audio.load();
+          audio.play().catch(console.error);
+          return;
+        }
+      }
+
+      console.error("Audio Element Error:", audio.error);
       setPlaying(false);
-      setAudioError('Audio playback failed. The file may be corrupted or unsupported.');
+      setAudioError('AUDIO PLAYBACK FAILED. THE FILE MAY BE CORRUPTED OR UNSUPPORTED.');
     };
     const handleTimeUpdate = () => {
       setCurrentTime(audio.currentTime);
@@ -209,13 +226,11 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     if (currentTrackUrlRef.current !== targetUrl) {
       currentTrackUrlRef.current = targetUrl;
       
-      // Pause before switching source to prevent AbortError
-      if (!audio.paused) {
-        audio.pause();
-      }
-      
+      // Do not explicitly pause/load here. Setting src automatically aborts 
+      // the previous load and starts the new one. Calling pause() here 
+      // triggers the handlePause event which incorrectly sets playing to false.
       audio.src = targetUrl;
-      audio.load();
+      audio.load(); // Explicitly load to reset media element state
     }
 
     // Handle play/pause state independently

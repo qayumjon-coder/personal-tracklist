@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Player } from "./components/Player";
 import { Settings } from "./components/Settings";
@@ -14,9 +14,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Analytics } from "@vercel/analytics/react"
 import { LoadingScreen } from "./components/LoadingScreen";
-import { useEffect } from "react";
 import { HelmetProvider } from 'react-helmet-async';
-
 import { Toaster } from "sonner";
 import { Terminal } from "./components/Terminal";
 import { MatrixBackground } from "./components/MatrixBackground";
@@ -26,8 +24,8 @@ function MusicApp() {
   const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist } = usePlaylist();
   const { localSongs, isScanning, scanProgress, hasStoredHandle, requestAccess, restoreAccess, removeLocalFiles, removeLocalFile, error: localError } = useLocalFiles();
   
-  // Combine both sources
-  const combinedSongs = [...playlist, ...localSongs];
+  // Combine both sources and memoize to prevent infinite re-renders on timeupdate
+  const combinedSongs = useMemo(() => [...playlist, ...localSongs], [playlist, localSongs]);
   const player = useAudioPlayer(combinedSongs);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showBoot, setShowBoot] = useState(true);

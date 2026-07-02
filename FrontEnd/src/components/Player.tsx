@@ -70,7 +70,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   });
   const [showVolumeHUD, setShowVolumeHUD] = useState(false);
   const volumeTimerRef = useRef<any>(null);
-  const current: Song = songs[player.index];
+  const safeIndex = Math.min(Math.max(0, player.index), Math.max(0, songs.length - 1));
+  const current: Song | undefined = songs[safeIndex];
 
   // Trending songs from full DB
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
@@ -207,6 +208,14 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [searchResults, setSearchResults] = useState<Song[]>([]);
   const [searchPage, setSearchPage] = useState(1);
   const itemsPerSearchPage = 10;
+  const searchScrollRef = useRef<HTMLDivElement>(null);
+
+  // Reset scroll position when page changes
+  useEffect(() => {
+    if (searchScrollRef.current) {
+      searchScrollRef.current.scrollTop = 0;
+    }
+  }, [searchPage]);
 
   const [isSearching, setIsSearching] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState<string>("");
@@ -462,7 +471,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           </div>
         </div>
 
-        {/* Search Modal - DUPLICATED OR RENDERED HERE FOR EMPTY STATE */}
+        {/* Search Modal */}
         {isSearchOpen && (
           <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
             <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[80vh] flex flex-col">
@@ -511,7 +520,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 </button>
               </form>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
+              <div ref={searchScrollRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
                 {searchResults.length === 0 && !isSearching && searchQuery && (
                   <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
                     NO DATA FOUND IN SECTOR
@@ -560,7 +569,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       <SEO
         title={seoTitle}
         description={seoDesc}
-        image={current?.coverUrl}
+        image={current?.coverUrl || '/default-cover.png'}
       />
       {/* Global Atmospheric Background */}
       <AmbientBackground playing={player.playing} analyser={player.analyser} />
@@ -729,7 +738,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
               {/* Atmospheric Mobile Background - Appears behind the player only on mobile */}
               <div className="md:hidden absolute inset-0 pointer-events-none overflow-hidden opacity-40 mix-blend-screen z-0">
-                <img src={current?.coverUrl} className="w-full h-full object-cover blur-3xl scale-125 saturate-200" alt="" />
+                <img src={current?.coverUrl || '/default-cover.png'} className="w-full h-full object-cover blur-3xl scale-125 saturate-200" alt="" />
                 <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-main)]/50 via-black/50 to-black/90" />
               </div>
 
@@ -788,8 +797,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
                       <img
                         ref={coverImgRef}
-                        src={current.coverUrl}
-                        alt={current.title}
+                        src={current?.coverUrl || '/default-cover.png'}
+                        alt={current?.title || 'Unknown Track'}
                         className="w-full h-full object-cover transition-transform duration-75"
                       />
                     </div>
@@ -804,18 +813,18 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       {/* Like Button - Always visible */}
                       <button
                         onClick={toggleLike}
-                        className={`p-3 md:p-4 rounded-full transition-all duration-300 transform hover:scale-110 active:scale-95 shrink-0 mt-1 ${isLiked(current.id) ? 'text-[var(--accent)] drop-shadow-[0_0_10px_var(--accent)] bg-[var(--accent)]/10' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-secondary)]/10'}`}
+                        className={`p-3 md:p-4 rounded-full transition-all duration-300 transform hover:scale-110 active:scale-95 shrink-0 mt-1 ${current && isLiked(current.id) ? 'text-[var(--accent)] drop-shadow-[0_0_10px_var(--accent)] bg-[var(--accent)]/10' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-secondary)]/10'}`}
                       >
-                        <Heart size={20} fill={isLiked(current.id) ? "currentColor" : "none"} strokeWidth={1.5} />
+                        <Heart size={20} fill={current && isLiked(current.id) ? "currentColor" : "none"} strokeWidth={1.5} />
                       </button>
 
                       {/* Song Title & Artist - Always visible */}
                       <div className="flex flex-col items-center flex-1 min-w-0 px-1">
                         <h2 className="text-base md:text-xl lg:text-2xl font-black text-[var(--accent)] text-glow tracking-tight drop-shadow-lg truncate font-mono uppercase w-full">
-                          {current.title}
+                          {current?.title || 'UNKNOWN'}
                         </h2>
                         <p className="text-[9px] md:text-[10px] lg:text-xs text-[var(--text-secondary)] font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase mt-0.5 md:mt-1 opacity-80 truncate w-full">
-                          {current.artist}
+                          {current?.artist || 'UNKNOWN'}
                         </p>
                       </div>
 
@@ -1138,8 +1147,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               </button>
             </form>
 
-            {/* Search Form */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
+            {/* Search Results */}
+            <div ref={searchScrollRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
               {searchResults.length === 0 && !isSearching && searchQuery && (
                 <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
                   NO DATA FOUND IN SECTOR
