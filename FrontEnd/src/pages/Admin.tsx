@@ -2,10 +2,11 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { getMusicList, updateSong, deleteSong } from "../services/musicApi";
-import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, PlayCircle, Users, Clock, FileText, TrendingUp } from "lucide-react";
+import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, PlayCircle, Users, Clock, FileText, TrendingUp, CheckCircle, ShieldOff, ShieldCheck, Calendar, Inbox } from "lucide-react";
 import { Pagination } from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { supabase } from "../lib/supabase";
 import { toast } from "sonner";
 
 interface Music {
@@ -49,6 +50,104 @@ export default function Admin() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useScrollLock(!!deleteConfirmId || lyricsModalOpen);
+
+  // ── Upload Permission State ──────────────────────────────────────────────────
+  interface UploadRequest {
+    id: string;
+    created_at: string;
+    requester_name: string;
+    requester_message: string;
+    fingerprint: string;
+    status: 'pending' | 'approved' | 'rejected';
+  }
+  interface UploadPermission {
+    id: string;
+    granted_at: string;
+    expires_at: string | null;
+    fingerprint: string;
+    is_active: boolean;
+    request_id: string | null;
+  }
+
+  const [uploadRequests, setUploadRequests] = useState<UploadRequest[]>([]);
+  const [uploadPermissions, setUploadPermissions] = useState<UploadPermission[]>([]);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [activeAdminTab, setActiveAdminTab] = useState<'library' | 'requests'>('library');
+
+  // Approve modal state
+  const [approveModal, setApproveModal] = useState<{ request: UploadRequest } | null>(null);
+  const [approveDays, setApproveDays] = useState<number | 'forever' | 'custom'>('forever');
+  const [customDays, setCustomDays] = useState(7);
+  const [approving, setApproving] = useState(false);
+
+  async function loadUploadRequests() {
+    setLoadingRequests(true);
+    const { data: reqs } = await supabase
+      .from('upload_requests')
+      .select('*')
+      .order('created_at', { ascending: false });
+    const { data: perms } = await supabase
+      .from('upload_permissions')
+      .select('*')
+      .order('granted_at', { ascending: false });
+    if (reqs) setUploadRequests(reqs as UploadRequest[]);
+    if (perms) setUploadPermissions(perms as UploadPermission[]);
+    setLoadingRequests(false);
+  }
+
+  useEffect(() => { loadUploadRequests(); }, []);
+
+  async function approveRequest(request: UploadRequest, days: number | 'forever' | 'custom', customDaysVal: number) {
+    setApproving(true);
+    try {
+      const expiresAt = days === 'forever'
+        ? null
+        : (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + (days === 'custom' ? customDaysVal : days));
+            return d.toISOString();
+          })();
+
+      await supabase.from('upload_permissions').insert([{
+        fingerprint: request.fingerprint,
+        expires_at: expiresAt,
+        is_active: true,
+        request_id: request.id,
+      }]);
+
+      await supabase.from('upload_requests').update({ status: 'approved' }).eq('id', request.id);
+      toast.success(`"${request.requester_name}" ga ruxsat berildi!`);
+      setApproveModal(null);
+      loadUploadRequests();
+    } catch (err) {
+      toast.error('Ruxsat berishda xatolik');
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function rejectRequest(id: string) {
+    await supabase.from('upload_requests').update({ status: 'rejected' }).eq('id', id);
+    toast.success('So\'rov rad etildi');
+    loadUploadRequests();
+  }
+
+  async function revokePermission(id: string) {
+    await supabase.from('upload_permissions').update({ is_active: false }).eq('id', id);
+    toast.success('Ruxsat bekor qilindi');
+    loadUploadRequests();
+  }
+
+  function formatExpiresAt(expiresAt: string | null) {
+    if (!expiresAt) return '∞ Abadiy';
+    const d = new Date(expiresAt);
+    const now = new Date();
+    const diffMs = d.getTime() - now.getTime();
+    if (diffMs < 0) return '⚠ Muddati o\'tgan';
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return `${diffDays} kun qoldi (${d.toLocaleDateString('uz-UZ')})`;
+  }
+
 
   // Stats Calculations
   const stats = useMemo(() => {
@@ -263,6 +362,141 @@ export default function Admin() {
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="flex gap-0 mb-8 border border-[var(--text-secondary)]/30 w-fit">
+        <button
+          onClick={() => setActiveAdminTab('library')}
+          className={`flex items-center gap-2 px-5 py-2.5 text-xs font-mono uppercase tracking-widest transition-all ${activeAdminTab === 'library' ? 'bg-[var(--accent)] text-[var(--bg-main)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'}`}
+        >
+          <MusicIcon size={13} /> Library
+        </button>
+        <button
+          onClick={() => { setActiveAdminTab('requests'); loadUploadRequests(); }}
+          className={`flex items-center gap-2 px-5 py-2.5 text-xs font-mono uppercase tracking-widest transition-all relative ${activeAdminTab === 'requests' ? 'bg-[var(--accent)] text-[var(--bg-main)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'}`}
+        >
+          <Inbox size={13} /> Upload So&apos;rovlari
+          {uploadRequests.filter(r => r.status === 'pending').length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-yellow-400 text-black text-[9px] font-bold rounded-full flex items-center justify-center">
+              {uploadRequests.filter(r => r.status === 'pending').length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* Upload Requests Tab */}
+      {activeAdminTab === 'requests' && (
+        <div className="space-y-8">
+          {/* Pending Requests */}
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--accent)] mb-4 flex items-center gap-2">
+              <Calendar size={14} /> Kutilayotgan So&apos;rovlar
+            </h2>
+            {loadingRequests ? (
+              <div className="text-[var(--text-secondary)] text-xs font-mono animate-pulse">Yuklanmoqda...</div>
+            ) : uploadRequests.filter(r => r.status === 'pending').length === 0 ? (
+              <div className="border border-[var(--text-secondary)]/20 p-6 text-center text-[var(--text-secondary)] text-xs font-mono uppercase tracking-widest">
+                Hozircha kutilayotgan so&apos;rovlar yo&apos;q
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {uploadRequests.filter(r => r.status === 'pending').map(req => (
+                  <div key={req.id} className="border border-yellow-400/30 bg-yellow-400/5 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse shrink-0" />
+                        <span className="font-bold text-sm text-white">{req.requester_name}</span>
+                        <span className="text-[10px] text-[var(--text-secondary)] font-mono">{new Date(req.created_at).toLocaleString('uz-UZ')}</span>
+                      </div>
+                      {req.requester_message && (
+                        <p className="text-xs text-[var(--text-secondary)] font-mono leading-relaxed pl-4 border-l border-[var(--text-secondary)]/30">{req.requester_message}</p>
+                      )}
+                      <div className="text-[9px] text-[var(--text-secondary)]/50 font-mono mt-1 pl-4">FP: {req.fingerprint.slice(0,16)}...</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => { setApproveModal({ request: req }); setApproveDays('forever'); }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/10 border border-green-500/40 text-green-400 text-[10px] font-mono uppercase tracking-wider hover:bg-green-500/20 transition-all"
+                      >
+                        <CheckCircle size={12} /> Ruxsat Berish
+                      </button>
+                      <button
+                        onClick={() => rejectRequest(req.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/40 text-red-400 text-[10px] font-mono uppercase tracking-wider hover:bg-red-500/20 transition-all"
+                      >
+                        <ShieldOff size={12} /> Rad Etish
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Active Permissions */}
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--accent)] mb-4 flex items-center gap-2">
+              <ShieldCheck size={14} /> Berilgan Ruxsatlar
+            </h2>
+            {uploadPermissions.filter(p => p.is_active).length === 0 ? (
+              <div className="border border-[var(--text-secondary)]/20 p-6 text-center text-[var(--text-secondary)] text-xs font-mono uppercase tracking-widest">
+                Faol ruxsatlar yo&apos;q
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {uploadPermissions.filter(p => p.is_active).map(perm => {
+                  const req = uploadRequests.find(r => r.id === perm.request_id);
+                  const isExpired = perm.expires_at && new Date(perm.expires_at) < new Date();
+                  return (
+                    <div key={perm.id} className={`border p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 ${isExpired ? 'border-red-500/30 bg-red-500/5' : 'border-green-500/30 bg-green-500/5'}`}>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <ShieldCheck size={13} className={isExpired ? 'text-red-400' : 'text-green-400'} />
+                          <span className="font-bold text-sm text-white">{req?.requester_name || 'Noma\'lum'}</span>
+                          <span className={`text-[10px] font-mono ${isExpired ? 'text-red-400' : 'text-green-400'}`}>
+                            {formatExpiresAt(perm.expires_at)}
+                          </span>
+                        </div>
+                        <div className="text-[9px] text-[var(--text-secondary)]/50 font-mono pl-5">FP: {perm.fingerprint.slice(0,16)}...</div>
+                      </div>
+                      <button
+                        onClick={() => revokePermission(perm.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/40 text-red-400 text-[10px] font-mono uppercase tracking-wider hover:bg-red-500/20 transition-all shrink-0"
+                      >
+                        <X size={12} /> Bekor Qilish
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Rejected/History */}
+          <div>
+            <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--text-secondary)] mb-4 flex items-center gap-2">
+              <FileText size={14} /> Tarix (Rad Etilgan)
+            </h2>
+            <div className="space-y-2">
+              {uploadRequests.filter(r => r.status === 'rejected').map(req => (
+                <div key={req.id} className="border border-[var(--text-secondary)]/20 p-3 flex items-center justify-between opacity-60">
+                  <div>
+                    <span className="text-sm font-mono text-[var(--text-secondary)] line-through">{req.requester_name}</span>
+                    <span className="text-[10px] text-[var(--text-secondary)]/50 font-mono ml-3">{new Date(req.created_at).toLocaleDateString('uz-UZ')}</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-red-400/60 uppercase">rad etilgan</span>
+                </div>
+              ))}
+              {uploadRequests.filter(r => r.status === 'rejected').length === 0 && (
+                <div className="text-[var(--text-secondary)]/50 text-xs font-mono text-center py-4">Tarix bo&apos;sh</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Library Tab */}
+      {activeAdminTab === 'library' && (
+      <div>
       {/* Stats & Search */}
       <div className="space-y-6 mb-8">
         
@@ -621,8 +855,98 @@ export default function Admin() {
             )}
           </div>
         )}
+      </div>
+      </div>
+      )}
 
       {/* Delete Confirmation Modal */}
+
+      {/* Approve Duration Modal */}
+      {approveModal && createPortal(
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-sm bg-[var(--bg-main)] border border-green-500/50 shadow-[0_0_60px_rgba(0,255,0,0.1)] overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-80" />
+            <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-green-500" />
+            <div className="absolute top-0 right-0 w-3 h-3 border-t-2 border-r-2 border-green-500" />
+            <div className="absolute bottom-0 left-0 w-3 h-3 border-b-2 border-l-2 border-green-500" />
+            <div className="absolute bottom-0 right-0 w-3 h-3 border-b-2 border-r-2 border-green-500" />
+
+            <div className="px-6 py-4 border-b border-green-500/20 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={14} className="text-green-400" />
+                <span className="text-[10px] font-mono uppercase tracking-[0.25em] text-green-400">Ruxsat Muddatini Belgilang</span>
+              </div>
+              <button onClick={() => setApproveModal(null)} className="text-[var(--text-secondary)] hover:text-red-400"><X size={16} /></button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-sm font-mono text-white mb-1">{approveModal.request.requester_name}</p>
+              <p className="text-xs font-mono text-[var(--text-secondary)] mb-5">Quyida ruxsat muddatini tanlang:</p>
+
+              {/* Duration Buttons */}
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {[1, 2, 3, 5, 7, 10].map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setApproveDays(d)}
+                    className={`py-2 text-xs font-mono font-bold tracking-wider border transition-all ${approveDays === d ? 'bg-green-500 text-black border-green-500' : 'bg-black/40 border-[var(--text-secondary)]/40 text-[var(--text-secondary)] hover:border-green-500/50 hover:text-green-400'}`}
+                  >
+                    {d} KUN
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2 mb-4">
+                <button
+                  onClick={() => setApproveDays('forever')}
+                  className={`py-2.5 text-xs font-mono font-bold tracking-wider border transition-all ${approveDays === 'forever' ? 'bg-green-500 text-black border-green-500' : 'bg-black/40 border-[var(--text-secondary)]/40 text-[var(--text-secondary)] hover:border-green-500/50 hover:text-green-400'}`}
+                >
+                  ∞ ABADIY
+                </button>
+                <button
+                  onClick={() => setApproveDays('custom')}
+                  className={`py-2.5 text-xs font-mono font-bold tracking-wider border transition-all ${approveDays === 'custom' ? 'bg-green-500 text-black border-green-500' : 'bg-black/40 border-[var(--text-secondary)]/40 text-[var(--text-secondary)] hover:border-green-500/50 hover:text-green-400'}`}
+                >
+                  ✏ CUSTOM
+                </button>
+              </div>
+
+              {approveDays === 'custom' && (
+                <div className="mb-4">
+                  <label className="text-[10px] font-mono text-green-400 uppercase tracking-widest block mb-1.5">&gt; Kun soni kiriting:</label>
+                  <input
+                    type="number"
+                    min={1} max={365}
+                    value={customDays}
+                    onChange={e => setCustomDays(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full bg-black/40 border border-green-500/40 px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-green-500 transition-all"
+                  />
+                </div>
+              )}
+
+              <div className="text-[10px] font-mono text-[var(--text-secondary)] mb-5 border-l-2 border-green-500/30 pl-3">
+                {approveDays === 'forever' ? 'Ruxsat muddatsiz, bekor qilguningizcha amal qiladi.'
+                  : approveDays === 'custom' ? `Ruxsat ${customDays} kundan so'ng avtomatik tugaydi.`
+                  : `Ruxsat ${approveDays} kundan so'ng avtomatik tugaydi.`}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => setApproveModal(null)} className="py-2.5 border border-[var(--text-secondary)]/40 text-[var(--text-secondary)] text-xs font-mono tracking-widest uppercase hover:bg-white/5 transition-all">
+                  BEKOR
+                </button>
+                <button
+                  onClick={() => approveRequest(approveModal.request, approveDays, customDays)}
+                  disabled={approving}
+                  className="py-2.5 bg-green-500 text-black font-bold text-xs font-mono tracking-widest uppercase hover:bg-green-400 transition-all shadow-[0_0_20px_rgba(0,255,0,0.2)] disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {approving ? <><div className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin" /> SAQLANMOQDA</> : <><CheckCircle size={13} /> RUXSAT BERISH</>}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {deleteConfirmId && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
           <div className="bg-[#0a0a0a] border-2 border-red-500/30 w-full max-w-md p-8 shadow-[0_0_50px_rgba(239,68,68,0.15)] relative overflow-hidden">
@@ -702,7 +1026,6 @@ export default function Admin() {
         document.body
       )}
       
-      </div>
     </div>
   );
 }

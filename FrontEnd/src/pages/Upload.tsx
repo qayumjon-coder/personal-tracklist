@@ -4,6 +4,7 @@ import { useFetchSongs } from "../hooks/useFetchSongs";
 import { ArrowLeft, Music, Image as ImageIcon, AlertCircle, LogOut, Sparkles, Link2, Loader2, X } from "lucide-react";
 import { uploadSong } from "../services/musicApi";
 import { useAuth } from "../contexts/AuthContext";
+import { useUploadPermission } from "../hooks/useUploadPermission";
 import { parseBlob } from "music-metadata";
 import { toast } from "sonner";
 
@@ -73,6 +74,15 @@ async function urlToFile(imageUrl: string, filename: string): Promise<File> {
 export function Upload() {
   const navigate = useNavigate();
   const { logout } = useAuth();
+  const { status: permStatus } = useUploadPermission();
+
+  // Guard: redirect if no permission (once checking is done)
+  useEffect(() => {
+    if (permStatus !== 'checking' && permStatus !== 'granted') {
+      navigate('/', { replace: true });
+    }
+  }, [permStatus, navigate]);
+
   const [formData, setFormData] = useState({
     title: "",
     artist: "",

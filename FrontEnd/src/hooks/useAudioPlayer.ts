@@ -8,10 +8,8 @@ export type AudioEffect = "none" | "underwater" | "radio" | "8d" | "bass-boost" 
 export function useAudioPlayer(songs: { url: string; id?: number; title?: string; artist?: string; coverUrl?: string }[]) {
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [volume, setVolumeState] = useState(70);
   const [isMuted, setIsMuted] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>("off");
@@ -158,10 +156,6 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       setAudioError('AUDIO PLAYBACK FAILED. THE FILE MAY BE CORRUPTED OR UNSUPPORTED.');
     };
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
-      const val = (audio.currentTime / audio.duration) * 100;
-      setProgress(isNaN(val) ? 0 : val);
-
       // 15 Second Tracking logic for Trends
       if (audio.currentTime >= 15 && songs[index]?.id && countedSongIdRef.current !== songs[index].id) {
         countedSongIdRef.current = songs[index].id as number;
@@ -212,8 +206,6 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       if (!audio.paused) audio.pause();
       audio.src = "";
       setPlaying(false);
-      setProgress(0);
-      setCurrentTime(0);
       currentTrackUrlRef.current = null;
       return;
     }
@@ -491,7 +483,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   };
 
   return {
-    index, playing, progress, volume, isMuted, currentTime, duration,
+    index, playing, volume, isMuted, duration,
     shuffle, repeat, audioError, play, pause, next, prev, setVolume, toggleMute,
     seek, toggleShuffle: () => setShuffle(!shuffle),
     toggleRepeat: () => setRepeat(r => r === "off" ? "all" : r === "all" ? "one" : "off"),
@@ -499,6 +491,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     setSleepTimer,
     sleepTimer,
     analyser: analyserRef.current,
+    audioRef,
     eq,
     setBass,
     setMid,

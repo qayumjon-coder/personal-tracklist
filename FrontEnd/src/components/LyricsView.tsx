@@ -1,5 +1,7 @@
 import { X, Mic2 } from "lucide-react";
 import { useEffect, useRef, useMemo } from "react";
+import type { RefObject } from "react";
+import { useAudioTime } from "../hooks/useAudioTime";
 import type { Song } from "../types/Song";
 
 interface LyricsLine {
@@ -9,11 +11,12 @@ interface LyricsLine {
 
 interface LyricsViewProps {
   song: Song;
-  currentTime: number;
+  audioRef: RefObject<HTMLAudioElement | null>;
   onClose: () => void;
 }
 
-export function LyricsView({ song, currentTime, onClose }: LyricsViewProps) {
+export function LyricsView({ song, audioRef, onClose }: LyricsViewProps) {
+  const { currentTime } = useAudioTime(audioRef);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const activeLineRef = useRef<HTMLParagraphElement>(null);
 

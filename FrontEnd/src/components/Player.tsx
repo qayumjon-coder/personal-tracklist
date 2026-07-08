@@ -11,12 +11,11 @@ import { toast } from "sonner";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { Playlist } from "./Playlist";
 import { SkeletonPlaylist } from "./SkeletonPlaylist";
-import { ProgressBar } from "./ProgressBar";
+import { TrackProgress } from "./TrackProgress";
 import { PlaybackControls } from "./PlaybackControls";
 import { VolumeControl } from "./VolumeControl";
 import { Visualizer, FadeVisualizer, useBeatScale, AmbientBackground, ConcentricWavesVisualizer } from "./Visualizer";
 import { LyricsView } from "./LyricsView";
-import { formatTime } from "../utils/formatTime";
 import { useState, useEffect, useRef } from "react";
 import { useDebounce } from "../hooks/useDebounce";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -24,6 +23,8 @@ import { EqualizerPanel } from './EqualizerPanel';
 import { HotkeysMap } from './HotkeysMap';
 
 import { useSoundEffects } from "../hooks/useSoundEffects";
+import { useUploadPermission } from "../hooks/useUploadPermission";
+import { UploadRequestModal } from "./UploadRequestModal";
 
 interface PlayerProps {
   songs: Song[];
@@ -61,6 +62,9 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [isKaraokeOpen, setIsKaraokeOpen] = useState(false);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
   const [isSleepTimerMenuOpen, setIsSleepTimerMenuOpen] = useState(false);
+  // Upload permission
+  const uploadPerm = useUploadPermission();
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   // Likes stored in localStorage — instant, no network, no auth needed
   const [likedIds, setLikedIds] = useState<Set<number>>(() => {
     try {
@@ -850,18 +854,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                     </div>
                   </div>
 
-                  {/* Progress Bar & Times */}
-                  <div className="space-y-0.5 md:space-y-1">
-                    <ProgressBar
-                      progress={player.progress}
-                      onSeek={player.seek}
-                      duration={player.duration}
-                    />
-                    <div className="flex justify-between text-[10px] font-mono text-[var(--text-secondary)] tracking-wider">
-                      <span>{formatTime(player.currentTime)}</span>
-                      <span>{formatTime(player.duration)}</span>
-                    </div>
-                  </div>
+                  <TrackProgress
+                    audioRef={player.audioRef}
+                    duration={player.duration}
+                    onSeek={player.seek}
+                  />
 
                   {/* Main Controls - Prioritized visibility */}
                   <div className="flex flex-col items-center gap-2.5 md:gap-3 pb-1 md:pb-2">
@@ -1038,24 +1035,36 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto shrink-0">
-                  <Link
-                    to="/upload"
-                    className="group/btn relative px-10 py-5 bg-black/40 border-2 border-[var(--accent)] text-[var(--accent)] font-black tracking-[0.2em] uppercase text-xs overflow-hidden transition-all duration-500 hover:shadow-[0_0_50px_var(--accent)] text-center min-w-[220px] backdrop-blur-sm flex items-center justify-center"
-                  >
-                    {/* Content */}
-                    <div className="relative z-10 flex items-center justify-center gap-3 group-hover/btn:scale-105 transition-transform duration-300">
-                      <Upload size={18} strokeWidth={2.5} className="group-hover/btn:-translate-y-1 transition-transform duration-300" />
-                      <span className="font-black group-hover/btn:text-black">Upload Track</span>
-                    </div>
-
-                    {/* Animated Background */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)] via-[var(--accent)] to-[var(--accent)] translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500"></div>
-
-                    {/* Glow Effect */}
-                    <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-20 bg-[var(--accent)] blur-xl transition-opacity duration-500"></div>
-
-                    <style dangerouslySetInnerHTML={{ __html: `.group\\/btn:hover span { color: black !important; } .group\\/btn:hover svg { stroke: black !important; }` }} />
-                  </Link>
+                  {/* Upload Track Button — checks permission */}
+                  {uploadPerm.status === 'granted' ? (
+                    <Link
+                      to="/upload"
+                      className="group/btn relative px-10 py-5 bg-black/40 border-2 border-[var(--accent)] text-[var(--accent)] font-black tracking-[0.2em] uppercase text-xs overflow-hidden transition-all duration-500 hover:shadow-[0_0_50px_var(--accent)] text-center min-w-[220px] backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <div className="relative z-10 flex items-center justify-center gap-3 group-hover/btn:scale-105 transition-transform duration-300">
+                        <Upload size={18} strokeWidth={2.5} className="group-hover/btn:-translate-y-1 transition-transform duration-300" />
+                        <span className="font-black group-hover/btn:text-black">Upload Track</span>
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)] via-[var(--accent)] to-[var(--accent)] translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500"></div>
+                      <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-20 bg-[var(--accent)] blur-xl transition-opacity duration-500"></div>
+                      <style dangerouslySetInnerHTML={{ __html: `.group\/btn:hover span { color: black !important; } .group\/btn:hover svg { stroke: black !important; }` }} />
+                    </Link>
+                  ) : (
+                    <button
+                      onClick={() => setIsUploadModalOpen(true)}
+                      className="group/btn relative px-10 py-5 bg-black/40 border-2 border-[var(--accent)] text-[var(--accent)] font-black tracking-[0.2em] uppercase text-xs overflow-hidden transition-all duration-500 hover:shadow-[0_0_50px_var(--accent)] text-center min-w-[220px] backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <div className="relative z-10 flex items-center justify-center gap-3 group-hover/btn:scale-105 transition-transform duration-300">
+                        <Upload size={18} strokeWidth={2.5} className="group-hover/btn:-translate-y-1 transition-transform duration-300" />
+                        <span className="font-black group-hover/btn:text-black">
+                          {uploadPerm.status === 'pending' ? 'So\'rov Kutilmoqda' : 'Upload Track'}
+                        </span>
+                      </div>
+                      <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)] via-[var(--accent)] to-[var(--accent)] translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500"></div>
+                      <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-20 bg-[var(--accent)] blur-xl transition-opacity duration-500"></div>
+                      <style dangerouslySetInnerHTML={{ __html: `.group\/btn:hover span { color: black !important; } .group\/btn:hover svg { stroke: black !important; }` }} />
+                    </button>
+                  )}
 
                   <a
                     href="https://t.me/NomsizMe"
@@ -1197,8 +1206,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       <HotkeysMap isOpen={isHotkeysOpen} onClose={() => setIsHotkeysOpen(false)} />
       {isKaraokeOpen && current && (
         <LyricsView
-          song={current}
-          currentTime={player.currentTime}
+          song={current!}
+          audioRef={player.audioRef}
           onClose={() => setIsKaraokeOpen(false)}
         />
       )}
@@ -1214,6 +1223,15 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
             </div>
           </div>
         </div>
+      )}
+
+      {/* Upload Permission Modal */}
+      {isUploadModalOpen && (
+        <UploadRequestModal
+          status={uploadPerm.status}
+          onClose={() => setIsUploadModalOpen(false)}
+          onSubmit={uploadPerm.submitRequest}
+        />
       )}
     </div>
   );

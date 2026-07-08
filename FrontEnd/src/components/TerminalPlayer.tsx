@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useFetchSongs } from "../hooks/useFetchSongs";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
+import { useAudioTime } from "../hooks/useAudioTime";
 import { formatTime } from "../utils/formatTime";
 import { TerminalVisualizer } from "./TerminalVisualizer";
 
@@ -13,6 +14,7 @@ interface LogEntry {
 export function TerminalPlayer() {
   const { songs, loading } = useFetchSongs();
   const player = useAudioPlayer(songs);
+  const { currentTime, progress } = useAudioTime(player.audioRef);
   
   const [history, setHistory] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
@@ -231,7 +233,7 @@ export function TerminalPlayer() {
       case 'ff':
         if (player.duration > 0) {
              const skip = args.length > 0 ? parseInt(args[0]) : 10;
-             const target = Math.min(player.currentTime + skip, player.duration);
+             const target = Math.min(currentTime + skip, player.duration);
              const pct = (target / player.duration) * 100;
              player.seek(pct);
              addLog(`> Forward ${skip}s`);
@@ -242,7 +244,7 @@ export function TerminalPlayer() {
       case 'rw':
          if (player.duration > 0) {
              const skip = args.length > 0 ? parseInt(args[0]) : 10;
-             const target = Math.max(player.currentTime - skip, 0);
+             const target = Math.max(currentTime - skip, 0);
              const pct = (target / player.duration) * 100;
              player.seek(pct);
              addLog(`> Rewind ${skip}s`);
@@ -256,8 +258,8 @@ export function TerminalPlayer() {
         } else {
             const currentSong = songs[player.index];
             const progressBarLength = 30;
-            const progress = Math.floor((player.progress / 100) * progressBarLength);
-            const bar = "█".repeat(progress) + "░".repeat(progressBarLength - progress);
+            const progressValue = Math.floor((progress / 100) * progressBarLength);
+            const bar = "█".repeat(progressValue) + "░".repeat(progressBarLength - progressValue);
             
             addLog(
                 <div className="border border-[#00FFFF] p-2 max-w-lg mt-2 mb-2 bg-[#001111]">
@@ -265,7 +267,7 @@ export function TerminalPlayer() {
                    <div className="pl-2">
                        <div>TRACK:  {currentSong.title}</div>
                        <div>ARTIST: {currentSong.artist}</div>
-                       <div className="mt-1">[{bar}] {formatTime(player.currentTime)} / {formatTime(player.duration)}</div>
+                       <div className="mt-1">[{bar}] {formatTime(currentTime)} / {formatTime(player.duration)}</div>
                        <div className="mt-1 flex gap-4 text-xs text-[#00aaaa] uppercase">
                          <span>State: {player.playing ? "PLAYING" : "PAUSED"}</span>
                          <span>Vol: {player.volume}% {player.isMuted ? "(MUTED)" : ""}</span>
