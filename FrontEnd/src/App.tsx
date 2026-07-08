@@ -138,7 +138,7 @@ function MusicApp() {
               />
             } />
             <Route path="/admin/login" element={<AdminLogin />} />
-            <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+            <Route path="/upload" element={<Upload />} />
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

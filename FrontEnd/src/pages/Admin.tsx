@@ -363,7 +363,7 @@ export default function Admin() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-0 mb-8 border border-[var(--text-secondary)]/30 w-fit">
+      <div className="flex gap-0 mb-8 border border-[var(--text-secondary)]/30 w-fit bg-black/80 backdrop-blur-md">
         <button
           onClick={() => setActiveAdminTab('library')}
           className={`flex items-center gap-2 px-5 py-2.5 text-xs font-mono uppercase tracking-widest transition-all ${activeAdminTab === 'library' ? 'bg-[var(--accent)] text-[var(--bg-main)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/5'}`}
@@ -385,7 +385,7 @@ export default function Admin() {
 
       {/* Upload Requests Tab */}
       {activeAdminTab === 'requests' && (
-        <div className="space-y-8">
+        <div className="space-y-8 bg-black/80 backdrop-blur-md p-6 sm:p-8 border border-[var(--text-secondary)]/30 relative z-20">
           {/* Pending Requests */}
           <div>
             <h2 className="text-sm font-bold uppercase tracking-widest text-[var(--accent)] mb-4 flex items-center gap-2">

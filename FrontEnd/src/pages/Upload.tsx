@@ -73,15 +73,21 @@ async function urlToFile(imageUrl: string, filename: string): Promise<File> {
 
 export function Upload() {
   const navigate = useNavigate();
-  const { logout } = useAuth();
+  const { logout, isAuthenticated, isLoading: authLoading } = useAuth();
   const { status: permStatus } = useUploadPermission();
 
   // Guard: redirect if no permission (once checking is done)
   useEffect(() => {
-    if (permStatus !== 'checking' && permStatus !== 'granted') {
+    if (authLoading || permStatus === 'checking') return;
+    
+    // If logged in as admin, always allow
+    if (isAuthenticated) return;
+    
+    // Otherwise, check for granted fingerprint permission
+    if (permStatus !== 'granted') {
       navigate('/', { replace: true });
     }
-  }, [permStatus, navigate]);
+  }, [authLoading, isAuthenticated, permStatus, navigate]);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -376,35 +382,39 @@ export function Upload() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <Link 
-              to="/admin" 
-              className="group relative flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold
-                       border border-[var(--accent)] text-[var(--accent)]
-                       hover:bg-[var(--accent)] hover:text-black
-                       transition-all duration-300
-                       shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.6)]
-                       overflow-hidden"
-            >
-              <span className="relative z-10">Manage DB</span>
-              <div className="absolute inset-0 bg-[var(--accent)] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
-            </Link>
+            {isAuthenticated && (
+              <>
+                <Link 
+                  to="/admin" 
+                  className="group relative flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold
+                           border border-[var(--accent)] text-[var(--accent)]
+                           hover:bg-[var(--accent)] hover:text-black
+                           transition-all duration-300
+                           shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.6)]
+                           overflow-hidden"
+                >
+                  <span className="relative z-10">Manage DB</span>
+                  <div className="absolute inset-0 bg-[var(--accent)] transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+                </Link>
 
-            <button
-              onClick={() => {
-                logout();
-                navigate('/');
-              }}
-              className="group relative flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold
-                       border border-red-500 text-red-500
-                       hover:bg-red-500 hover:text-white
-                       transition-all duration-300
-                       shadow-[0_0_10px_rgba(239,68,68,0.2)] hover:shadow-[0_0_20px_rgba(239,68,68,0.6)]
-                       overflow-hidden"
-            >
-              <LogOut size={14} className="relative z-10" />
-              <span className="relative z-10">Exit</span>
-              <div className="absolute inset-0 bg-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
-            </button>
+                <button
+                  onClick={() => {
+                    logout();
+                    navigate('/');
+                  }}
+                  className="group relative flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold
+                           border border-red-500 text-red-500
+                           hover:bg-red-500 hover:text-white
+                           transition-all duration-300
+                           shadow-[0_0_10px_rgba(239,68,68,0.2)] hover:shadow-[0_0_20px_rgba(239,68,68,0.6)]
+                           overflow-hidden"
+                >
+                  <LogOut size={14} className="relative z-10" />
+                  <span className="relative z-10">Exit</span>
+                  <div className="absolute inset-0 bg-red-500 transform scale-x-0 group-hover:scale-x-100 transition-transform origin-left duration-300"></div>
+                </button>
+              </>
+            )}
 
             <Link 
               to="/" 
