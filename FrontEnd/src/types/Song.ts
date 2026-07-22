@@ -11,4 +11,6 @@ export interface Song {
   lyrics?: string;
   play_count?: number;
   created_at?: string;
+  uploaded_by?: string;
+  uploader_fp?: string;
 }

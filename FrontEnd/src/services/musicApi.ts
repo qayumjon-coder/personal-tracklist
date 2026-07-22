@@ -77,7 +77,9 @@ export async function uploadSong(
   duration: number,
   audioFile: File,
   coverFile: File,
-  lyrics?: string
+  lyrics?: string,
+  uploadedBy?: string,
+  uploaderFp?: string
 ): Promise<Song> {
   try {
     // Generate unique filenames and sanitize them
@@ -150,6 +152,8 @@ export async function uploadSong(
           duration,
           liked: false,
           lyrics: lyrics || '',
+          uploaded_by: uploadedBy || 'Admin',
+          uploader_fp: uploaderFp || null,
         },
       ])
       .select()

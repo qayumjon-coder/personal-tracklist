@@ -338,6 +338,9 @@ export function Upload() {
     }
 
     try {
+      const uploaderName = isAuthenticated ? 'Admin' : (localStorage.getItem('fronto_uploader_name') || 'User');
+      const uploaderFp = isAuthenticated ? 'admin' : (localStorage.getItem('fronto_fp') || 'unknown');
+
       await uploadSong(
         formData.title,
         formData.artist,
@@ -345,7 +348,9 @@ export function Upload() {
         finalDuration,
         audioFile,
         coverFile,
-        formData.lyrics
+        formData.lyrics,
+        uploaderName,
+        uploaderFp
       );
 
       clearInterval(progressInterval);

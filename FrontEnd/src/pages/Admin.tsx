@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { getMusicList, updateSong, deleteSong } from "../services/musicApi";
-import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, PlayCircle, Users, Clock, FileText, TrendingUp, CheckCircle, ShieldOff, ShieldCheck, Calendar, Inbox } from "lucide-react";
+import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, PlayCircle, Users, Clock, FileText, TrendingUp, CheckCircle, ShieldOff, ShieldCheck, Calendar, Inbox, Database } from "lucide-react";
 import { Pagination } from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -22,6 +22,8 @@ interface Music {
   lyrics?: string;
   play_count?: number;
   created_at?: string;
+  uploaded_by?: string;
+  uploader_fp?: string;
 }
 
 export default function Admin() {
@@ -179,7 +181,30 @@ export default function Admin() {
     const withLyrics = list.filter(m => m.lyrics && m.lyrics.trim().length > 0).length;
     const lyricsProgress = (withLyrics / list.length) * 100;
 
-    return { shortest, longest, topCat, totalDuration, avgDuration, uniqueArtists, totalPlays, mostPlayed, lyricsProgress };
+    // Uploaders
+    const uploaders: Record<string, number> = {};
+    list.forEach(m => {
+        const u = m.uploaded_by || 'Admin';
+        uploaders[u] = (uploaders[u] || 0) + 1;
+    });
+    const topUploader = Object.entries(uploaders).sort((a,b) => b[1] - a[1])[0];
+
+    // Today's Uploads
+    const now = new Date();
+    const todaysUploads = list.filter(m => {
+      if (!m.created_at) return false;
+      const createdAt = new Date(m.created_at);
+      return (now.getTime() - createdAt.getTime()) < 24 * 60 * 60 * 1000;
+    }).length;
+
+    // Storage Size Estimate (assuming ~5MB per audio+cover pair on average)
+    const storageEstimateMB = list.length * 5;
+
+    return { 
+      shortest, longest, topCat, totalDuration, avgDuration, 
+      uniqueArtists, totalPlays, mostPlayed, lyricsProgress,
+      topUploader, todaysUploads, storageEstimateMB
+    };
   }, [list]);
 
   // Cleanup audio on unmount
@@ -609,6 +634,39 @@ export default function Admin() {
                  {formatDuration(stats?.longest?.duration)}
               </div>
             </div>
+
+            {/* Top Uploader */}
+            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                 <Users size={12} /> Top Uploader
+              </div>
+              <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                 {stats?.topUploader?.[0] || 'Admin'}
+              </div>
+              <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                 {stats?.topUploader?.[1] || 0} tracks
+              </div>
+            </div>
+
+            {/* Today's Uploads */}
+            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                 <Calendar size={12} /> Uploaded Today
+              </div>
+              <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                 {stats?.todaysUploads || 0}
+              </div>
+            </div>
+
+            {/* Storage Size Estimate */}
+            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                 <Database size={12} /> Est. Storage
+              </div>
+              <div className="text-xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                 {stats?.storageEstimateMB || 0} MB
+              </div>
+            </div>
         </div>
       </div>
 
@@ -674,11 +732,12 @@ export default function Admin() {
         ) : (
           <div className="bg-black/40 border border-[var(--text-secondary)] backdrop-blur-sm overflow-hidden">
             {/* Table Header */}
-            <div className="grid grid-cols-[auto_2fr_1.5fr_1fr_0.5fr_1.5fr] gap-4 p-4 border-b border-[var(--text-secondary)] bg-[var(--text-secondary)]/5 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-semibold">
+            <div className="grid grid-cols-[auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-4 p-4 border-b border-[var(--text-secondary)] bg-[var(--text-secondary)]/5 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-semibold">
               <div className="w-12 text-center">Img</div>
               <div>Title</div>
               <div>Artist</div>
               <div>Category</div>
+              <div>Uploader</div>
               <div className="text-right">Time</div>
               <div className="text-right">Actions</div>
             </div>
@@ -688,7 +747,7 @@ export default function Admin() {
               {paginatedList.map(m => (
                 <div 
                   key={m.id} 
-                  className={`grid grid-cols-[auto_2fr_1.5fr_1fr_0.5fr_1.5fr] gap-4 p-4 border-b border-[var(--text-secondary)]/20 items-center hover:bg-[var(--text-secondary)]/5 transition-colors ${
+                  className={`grid grid-cols-[auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-4 p-4 border-b border-[var(--text-secondary)]/20 items-center hover:bg-[var(--text-secondary)]/5 transition-colors ${
                     editingId === m.id ? 'bg-[var(--text-secondary)]/10 ring-1 ring-inset ring-[var(--accent)]' : ''
                   }`}
                 >
@@ -768,6 +827,14 @@ export default function Admin() {
                         {m.category || "General"}
                       </div>
                     )}
+                  </div>
+
+                  {/* Uploader */}
+                  <div className="min-w-0 flex items-center gap-1.5">
+                    <Users size={12} className="text-[var(--text-secondary)] shrink-0" />
+                    <span className="text-xs text-[var(--text-secondary)] truncate" title={m.uploaded_by || 'Admin'}>
+                      {m.uploaded_by || 'Admin'}
+                    </span>
                   </div>
 
                   {/* Duration */}

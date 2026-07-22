@@ -103,6 +103,7 @@ export function useUploadPermission() {
         throw error;
       }
 
+      localStorage.setItem('fronto_uploader_name', name.trim());
       setStatus('pending');
       return { success: true };
     } catch (err: any) {
