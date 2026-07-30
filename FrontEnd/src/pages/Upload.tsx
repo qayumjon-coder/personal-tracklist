@@ -85,7 +85,8 @@ export function Upload() {
     
     // Otherwise, check for granted fingerprint permission
     if (permStatus !== 'granted') {
-      navigate('/', { replace: true });
+      const reason = permStatus === 'denied' ? 'expired' : permStatus === 'pending' ? 'pending' : 'none';
+      navigate('/', { replace: true, state: { uploadRedirect: reason } });
     }
   }, [authLoading, isAuthenticated, permStatus, navigate]);
 

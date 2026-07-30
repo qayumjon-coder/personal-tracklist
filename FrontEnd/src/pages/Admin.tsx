@@ -45,6 +45,65 @@ export default function Admin() {
   const [newCoverFile, setNewCoverFile] = useState<File | null>(null);
   const [newCoverPreview, setNewCoverPreview] = useState<string | null>(null);
 
+  // Bulk Edit State
+  const [selectedAdminIds, setSelectedAdminIds] = useState<Set<number>>(new Set());
+  const [bulkCategoryInput, setBulkCategoryInput] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  const toggleSelectAdmin = (id: number) => {
+    const next = new Set(selectedAdminIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedAdminIds(next);
+  };
+
+  const toggleSelectAllAdmin = (songs: Music[]) => {
+    const pageIds = songs.map(s => s.id);
+    const allSelected = pageIds.every(id => selectedAdminIds.has(id));
+    const next = new Set(selectedAdminIds);
+    if (allSelected) {
+      pageIds.forEach(id => next.delete(id));
+    } else {
+      pageIds.forEach(id => next.add(id));
+    }
+    setSelectedAdminIds(next);
+  };
+
+  const handleBulkCategoryApply = async () => {
+    if (selectedAdminIds.size === 0 || !bulkCategoryInput.trim()) return;
+    setBulkSaving(true);
+    try {
+      const category = bulkCategoryInput.trim();
+      const promises = Array.from(selectedAdminIds).map(id => updateSong(id, { category }));
+      await Promise.all(promises);
+      toast.success(`${selectedAdminIds.size} ta trek janri "${category}" ga o'zgartirildi!`);
+      setList(prev => prev.map(m => selectedAdminIds.has(m.id) ? { ...m, category } : m));
+      setSelectedAdminIds(new Set());
+      setBulkCategoryInput("");
+    } catch {
+      toast.error("Janrni o'zgartirishda xatolik");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const handleBulkDeleteAdmin = async () => {
+    if (selectedAdminIds.size === 0) return;
+    if (!window.confirm(`${selectedAdminIds.size} ta trekni o'chirishni tasdiqlaysizmi?`)) return;
+    setBulkSaving(true);
+    try {
+      const promises = Array.from(selectedAdminIds).map(id => deleteSong(id));
+      await Promise.all(promises);
+      toast.success(`${selectedAdminIds.size} ta trek o'chirildi!`);
+      setList(prev => prev.filter(m => !selectedAdminIds.has(m.id)));
+      setSelectedAdminIds(new Set());
+    } catch {
+      toast.error("O'chirishda xatolik");
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   // Audio Preview State
   const [previewId, setPreviewId] = useState<number | null>(null);
   const [lyricsModalOpen, setLyricsModalOpen] = useState(false);
@@ -139,6 +198,50 @@ export default function Admin() {
     toast.success('Ruxsat bekor qilindi');
     loadUploadRequests();
   }
+
+  async function extendPermission(id: string, currentExpiresAt: string | null, days: number) {
+    try {
+      const baseDate = currentExpiresAt ? new Date(currentExpiresAt) : new Date();
+      const now = new Date();
+      const start = baseDate > now ? baseDate : now;
+      start.setDate(start.getDate() + days);
+
+      await supabase.from('upload_permissions').update({
+        expires_at: start.toISOString(),
+        is_active: true
+      }).eq('id', id);
+
+      toast.success(`Ruxsat +${days} kunga uzaytirildi!`);
+      loadUploadRequests();
+    } catch (err) {
+      toast.error('Uzaytirishda xatolik');
+    }
+  }
+
+  const exportCSV = () => {
+    if (list.length === 0) return;
+    const headers = ['ID', 'Title', 'Artist', 'Category', 'Play Count', 'Uploaded By', 'Created At'];
+    const rows = list.map(m => [
+      m.id,
+      `"${(m.title || '').replace(/"/g, '""')}"`,
+      `"${(m.artist || '').replace(/"/g, '""')}"`,
+      `"${(m.category || '').replace(/"/g, '""')}"`,
+      m.play_count || 0,
+      `"${(m.uploaded_by || 'System').replace(/"/g, '""')}"`,
+      m.created_at || ''
+    ]);
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `music_library_${Date.now()}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('CSV yuklab olindi!');
+  };
 
   function formatExpiresAt(expiresAt: string | null) {
     if (!expiresAt) return '∞ Abadiy';
@@ -483,12 +586,28 @@ export default function Admin() {
                         </div>
                         <div className="text-[9px] text-[var(--text-secondary)]/50 font-mono pl-5">FP: {perm.fingerprint.slice(0,16)}...</div>
                       </div>
-                      <button
-                        onClick={() => revokePermission(perm.id)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/40 text-red-400 text-[10px] font-mono uppercase tracking-wider hover:bg-red-500/20 transition-all shrink-0"
-                      >
-                        <X size={12} /> Bekor Qilish
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => extendPermission(perm.id, perm.expires_at, 7)}
+                          className="px-2.5 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/40 text-[var(--accent)] text-[10px] font-mono uppercase tracking-wider hover:bg-[var(--accent)]/20 transition-all"
+                          title="7 kunga uzaytirish"
+                        >
+                          +7d
+                        </button>
+                        <button
+                          onClick={() => extendPermission(perm.id, perm.expires_at, 30)}
+                          className="px-2.5 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/40 text-[var(--accent)] text-[10px] font-mono uppercase tracking-wider hover:bg-[var(--accent)]/20 transition-all"
+                          title="30 kunga uzaytirish"
+                        >
+                          +30d
+                        </button>
+                        <button
+                          onClick={() => revokePermission(perm.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/40 text-red-400 text-[10px] font-mono uppercase tracking-wider hover:bg-red-500/20 transition-all"
+                        >
+                          <X size={12} /> Bekor Qilish
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -521,21 +640,30 @@ export default function Admin() {
 
       {/* Library Tab */}
       {activeAdminTab === 'library' && (
-      <div>
+        <div>
       {/* Stats & Search */}
       <div className="space-y-6 mb-8">
         
-        {/* Search Bar */}
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-            <Search className="w-5 h-5 text-[var(--text-secondary)] group-focus-within:text-[var(--accent)] transition-colors" />
+        {/* Search Bar & Actions */}
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative group flex-1">
+            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+              <Search className="w-5 h-5 text-[var(--text-secondary)] group-focus-within:text-[var(--accent)] transition-colors" />
+            </div>
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="SEARCH DATABASE..."
+              className="w-full bg-black/40 border border-[var(--text-secondary)] pl-12 pr-4 py-4 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/50 text-base"
+            />
           </div>
-          <input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="SEARCH DATABASE..."
-            className="w-full bg-black/40 border border-[var(--text-secondary)] pl-12 pr-4 py-4 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/50 text-base"
-          />
+          <button
+            onClick={exportCSV}
+            className="px-6 py-4 bg-black/40 border border-[var(--accent)]/50 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black font-mono font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shrink-0 shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)]"
+            title="Export full library as CSV file"
+          >
+            <Database size={16} /> Export CSV
+          </button>
         </div>
 
         {/* Stats Grid */}
@@ -668,6 +796,45 @@ export default function Admin() {
               </div>
             </div>
         </div>
+
+        {/* Play Count Trend Chart Card */}
+        <div className="bg-black/40 border border-[var(--text-secondary)]/30 p-6 backdrop-blur-sm mt-6">
+          <div className="flex items-center justify-between mb-4 border-b border-[var(--text-secondary)]/20 pb-3">
+            <div className="flex items-center gap-2 text-xs font-mono text-[var(--accent)] font-bold uppercase tracking-widest">
+              <TrendingUp size={16} /> Play Count Trend & Top Tracks
+            </div>
+            <div className="text-[10px] font-mono text-[var(--text-secondary)]">REAL-TIME DB METRICS</div>
+          </div>
+          <div className="space-y-3 font-mono">
+            {list
+              .slice()
+              .sort((a, b) => (b.play_count || 0) - (a.play_count || 0))
+              .slice(0, 5)
+              .map((song, idx) => {
+                const maxPlays = Math.max(1, ...list.map(s => s.play_count || 0));
+                const pct = Math.round(((song.play_count || 0) / maxPlays) * 100);
+                return (
+                  <div key={song.id} className="space-y-1">
+                    <div className="flex justify-between text-xs font-mono">
+                      <span className="text-white truncate max-w-[280px] sm:max-w-md">
+                        #{idx + 1} {song.title} <span className="text-[var(--text-secondary)]">({song.artist || 'Unknown'})</span>
+                      </span>
+                      <span className="text-[var(--accent)] font-bold shrink-0 ml-2">{song.play_count || 0} plays</span>
+                    </div>
+                    <div className="w-full h-2 bg-black/60 border border-[var(--text-secondary)]/20 overflow-hidden relative">
+                      <div
+                        className="h-full bg-gradient-to-r from-[var(--text-secondary)] via-[var(--accent)] to-[var(--accent)] transition-all duration-1000 shadow-[0_0_10px_var(--accent)]"
+                        style={{ width: `${Math.max(4, pct)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            {list.length === 0 && (
+              <div className="text-center py-6 text-xs text-[var(--text-secondary)] font-mono">NO TRACK METRICS AVAILABLE</div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -731,8 +898,53 @@ export default function Admin() {
           </div>
         ) : (
           <div className="bg-black/40 border border-[var(--text-secondary)] backdrop-blur-sm overflow-hidden">
+            {/* Bulk Action Bar */}
+            {selectedAdminIds.size > 0 && (
+              <div className="p-3 bg-[var(--accent)]/10 border-b border-[var(--accent)]/40 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+                <div className="flex items-center gap-2 text-xs font-mono text-[var(--accent)] font-bold">
+                  <span>{selectedAdminIds.size} TA TREK TANLANDI</span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 font-mono">
+                  <input
+                    type="text"
+                    value={bulkCategoryInput}
+                    onChange={e => setBulkCategoryInput(e.target.value)}
+                    placeholder="Yangi janr (masalan: Rock)..."
+                    className="bg-black/60 border border-[var(--text-secondary)] px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[var(--accent)]"
+                  />
+                  <button
+                    onClick={handleBulkCategoryApply}
+                    disabled={bulkSaving || !bulkCategoryInput.trim()}
+                    className="px-3 py-1.5 bg-[var(--accent)] text-black font-bold text-xs uppercase hover:opacity-90 disabled:opacity-40"
+                  >
+                    Janrni O'zgartirish
+                  </button>
+                  <button
+                    onClick={handleBulkDeleteAdmin}
+                    disabled={bulkSaving}
+                    className="px-3 py-1.5 bg-red-500/20 border border-red-500 text-red-400 font-bold text-xs uppercase hover:bg-red-500 hover:text-black transition-all"
+                  >
+                    O'chirish ({selectedAdminIds.size})
+                  </button>
+                  <button
+                    onClick={() => setSelectedAdminIds(new Set())}
+                    className="px-2 py-1.5 text-[var(--text-secondary)] hover:text-white text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Table Header */}
-            <div className="grid grid-cols-[auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-4 p-4 border-b border-[var(--text-secondary)] bg-[var(--text-secondary)]/5 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-semibold">
+            <div className="grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--text-secondary)] bg-[var(--text-secondary)]/5 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-semibold items-center">
+              <input
+                type="checkbox"
+                checked={paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id))}
+                onChange={() => toggleSelectAllAdmin(paginatedList)}
+                className="cursor-pointer accent-[var(--accent)]"
+                title="Select/Deselect All on page"
+              />
               <div className="w-12 text-center">Img</div>
               <div>Title</div>
               <div>Artist</div>
@@ -743,19 +955,31 @@ export default function Admin() {
             </div>
 
             {/* List */}
+            {/* Horizontal scroll hint for small screens */}
+            <div className="block sm:hidden text-[9px] font-mono text-[var(--text-secondary)]/40 text-right px-4 py-1 border-b border-[var(--text-secondary)]/10">
+              ← Jadval uchun suring →
+            </div>
+            <div className="overflow-x-auto custom-scrollbar">
+            <div className="min-w-[700px]">
             <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
               {paginatedList.map(m => (
                 <div 
                   key={m.id} 
-                  className={`grid grid-cols-[auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-4 p-4 border-b border-[var(--text-secondary)]/20 items-center hover:bg-[var(--text-secondary)]/5 transition-colors ${
-                    editingId === m.id ? 'bg-[var(--text-secondary)]/10 ring-1 ring-inset ring-[var(--accent)]' : ''
+                  className={`grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--text-secondary)]/20 items-center hover:bg-[var(--text-secondary)]/5 transition-colors ${
+                    editingId === m.id ? 'bg-[var(--text-secondary)]/10 ring-1 ring-inset ring-[var(--accent)]' : selectedAdminIds.has(m.id) ? 'bg-[var(--accent)]/5' : ''
                   }`}
                 >
+                  <input
+                    type="checkbox"
+                    checked={selectedAdminIds.has(m.id)}
+                    onChange={() => toggleSelectAdmin(m.id)}
+                    className="cursor-pointer accent-[var(--accent)]"
+                  />
                   {/* Cover */}
                   <div className="w-12 h-12 border border-[var(--text-secondary)] overflow-hidden bg-black relative group/cover">
                     <img 
                       src={newCoverPreview || m.cover || m.coverUrl || '/placeholder.png'} 
-                      alt="" 
+                      alt={`${m.title} cover`}
                       className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
                     />
                     {editingId === m.id && (
@@ -910,6 +1134,8 @@ export default function Admin() {
                 </div>
               )}
             </div>
+            </div>{/* /min-w */}
+            </div>{/* /overflow-x-auto */}
             
             {totalPages > 1 && (
               <div className="p-4 border-t border-[var(--text-secondary)]/20 bg-black/40">
@@ -923,8 +1149,8 @@ export default function Admin() {
           </div>
         )}
       </div>
-      </div>
-      )}
+    </div>
+  )}
 
       {/* Delete Confirmation Modal */}
 

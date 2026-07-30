@@ -2,9 +2,9 @@ import type { Song } from "../types/Song";
 import SEO from "./SEO";
 
 import { useSettings } from "../contexts/SettingsContext";
-import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, ChevronDown, Share2, Moon, Clock, Minus } from "lucide-react";
+import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, ChevronDown, Share2, Moon, Clock, Minus, QrCode } from "lucide-react";
 import { Pagination } from "./Pagination";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { searchSongs, getTrendingSongs, incrementPlayCount } from "../services/musicApi";
 import { toast } from "sonner";
 
@@ -52,10 +52,24 @@ interface PlayerProps {
 
 export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, onReorderPlaylist, loadingMore, hasMore, onLoadMore, localFilesInfo }: PlayerProps) {
   const { playClick, playHover } = useSoundEffects();
-  const { visualizerMode, zenMode, setZenMode } = useSettings(); // Get visualizer mode and zen mode
+  const { visualizerMode, zenMode, setZenMode } = useSettings();
+  const location = useLocation();
   // Removed beatScale from state to avoid 60fps re-renders of the entire Player component
   const coverImgRef = useRef<HTMLImageElement>(null);
   useBeatScale(player.playing, player.analyser, coverImgRef, visualizerMode === 'scale');
+
+  // Show toast if redirected from Upload due to expired/missing permission
+  useEffect(() => {
+    const state = location.state as { uploadRedirect?: string } | null;
+    if (state?.uploadRedirect === 'expired') {
+      toast.error('Upload ruxsatingiz muddati tugagan yoki bekor qilingan.', { duration: 5000 });
+    } else if (state?.uploadRedirect === 'pending') {
+      toast.info("So'rovingiz hali ko'rib chiqilmagan. Ruxsat berilguncha kuting.", { duration: 5000 });
+    }
+    // Clear state so toast doesn't repeat on re-renders
+    window.history.replaceState({}, '', location.pathname);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [isConfigMenuOpen, setIsConfigMenuOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -91,8 +105,27 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     }
   }, [player.playing, current?.id]);
 
+  // C3: Now Playing Toast Notification on track change
+  const prevTrackIdRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (current && player.playing && prevTrackIdRef.current !== current.id) {
+      prevTrackIdRef.current = current.id;
+      toast.custom(() => (
+        <div className="bg-black/90 border border-[var(--accent)] text-white p-3 backdrop-blur-xl shadow-[0_0_30px_rgba(var(--accent-rgb),0.3)] font-mono flex items-center gap-3 w-80 animate-in slide-in-from-bottom-5 duration-300">
+          <img src={current.coverUrl || '/default-cover.png'} alt={`${current.title} cover`} className="w-10 h-10 object-cover border border-[var(--accent)]/40 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <div className="text-[8px] text-[var(--accent)] tracking-[0.2em] uppercase font-bold">NOW PLAYING</div>
+            <div className="text-xs font-bold truncate uppercase">{current.title}</div>
+            <div className="text-[9px] text-[var(--text-secondary)] truncate uppercase">{current.artist || 'Unknown'}</div>
+          </div>
+        </div>
+      ), { duration: 3500 });
+    }
+  }, [current, player.playing]);
+
   // Mobile Drawer State
   const [isMobilePlaylistOpen, setIsMobilePlaylistOpen] = useState(false);
+  const [isShareMenuOpen, setIsShareMenuOpen] = useState(false);
 
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchCurrentX, setTouchCurrentX] = useState<number | null>(null);
@@ -128,6 +161,18 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   };
 
   const coverDragDistance = (touchStartX !== null && touchCurrentX !== null) ? touchCurrentX - touchStartX : 0;
+
+  // Track change animation state
+  const [coverFading, setCoverFading] = useState(false);
+  const prevIndexRef = useRef(safeIndex);
+  useEffect(() => {
+    if (prevIndexRef.current !== safeIndex) {
+      setCoverFading(true);
+      const timer = setTimeout(() => setCoverFading(false), 50);
+      prevIndexRef.current = safeIndex;
+      return () => clearTimeout(timer);
+    }
+  }, [safeIndex]);
   
   // Drawer Gestures
   const [drawerTouchStartY, setDrawerTouchStartY] = useState<number | null>(null);
@@ -224,6 +269,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [isSearching, setIsSearching] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState<string>("");
   const [isEqOpen, setIsEqOpen] = useState(false);
+  const [isSpeedMenuOpen, setIsSpeedMenuOpen] = useState(false);
+  const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Lock body scroll when modals are open
   useScrollLock(isSearchOpen || isKaraokeOpen || isConfigMenuOpen || isMobilePlaylistOpen || isEqOpen || isHotkeysOpen);
@@ -374,8 +421,16 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     const url = new URL(window.location.href);
     url.searchParams.set('track', current.id.toString());
     navigator.clipboard.writeText(url.toString());
-
     toast.success("Link copied to clipboard!");
+  };
+
+  const shareToTelegram = () => {
+    if (!current) return;
+    const url = new URL(window.location.href);
+    url.searchParams.set('track', current.id.toString());
+    const text = encodeURIComponent(`${current.title} — ${current.artist || 'Unknown'}`);
+    const shareUrl = encodeURIComponent(url.toString());
+    window.open(`https://t.me/share/url?url=${shareUrl}&text=${text}`, '_blank', 'noopener,noreferrer');
   };
 
   const categoriesList = Array.from(new Set(songs.map(s => s.category || "General"))).filter(c => c !== "Trending");
@@ -383,14 +438,14 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const categories = [
     "All",
     "Trending",
-    ...(likedCount > 0 ? ["Liked ♥"] : []),
+    ...(likedCount > 0 ? ["Favorites"] : []),
     ...categoriesList,
   ];
 
   const filteredSongs =
     selectedCategory === "All" ? songs :
       selectedCategory === "Trending" ? trendingSongs :
-        selectedCategory === "Liked ♥" ? songs.filter(s => likedIds.has(s.id)) :
+        selectedCategory === "Favorites" ? songs.filter(s => likedIds.has(s.id)) :
           songs.filter(s => (s.category || "General") === selectedCategory);
 
   if (loading) {
@@ -536,7 +591,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   return (
                     <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
                       <div className="flex items-center gap-3 overflow-hidden">
-                        <img src={song.coverUrl} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
+                        <img src={song.coverUrl} alt={`${song.title} cover`} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
                           <div className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider">{song.artist}</div>
@@ -602,6 +657,14 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           <div className="absolute bottom-12 z-[110] text-[var(--text-secondary)] opacity-40 text-xs font-mono uppercase tracking-[0.4em]">
              Press ESC or type 'zen' to exit Zen Mode
           </div>
+
+          {/* Mobile exit button — ESC yo'q mobilda */}
+          <button
+            onClick={() => setZenMode(false)}
+            className="absolute top-4 right-4 z-[120] md:hidden flex items-center gap-2 px-4 py-2 bg-black/60 border border-white/20 text-white/60 text-xs font-mono uppercase tracking-widest hover:text-white hover:border-white/40 transition-all backdrop-blur-sm"
+          >
+            <X size={14} /> Exit
+          </button>
         </div>
       )}
 
@@ -612,7 +675,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         <div className="flex-1 w-full">
           {/* Volume HUD */}
           {showVolumeHUD && (
-            <div className="fixed top-24 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in zoom-in slide-in-from-top-4 duration-300">
+            <div className="fixed top-14 left-1/2 -translate-x-1/2 z-[100] animate-in fade-in zoom-in slide-in-from-top-4 duration-300">
               <div className="bg-black/80 backdrop-blur-xl border border-[var(--accent)]/30 px-6 py-2 shadow-[0_0_30px_rgba(var(--accent-rgb),0.2)]">
                 <div className="flex items-center gap-4">
                   <span className="text-[10px] font-mono text-[var(--accent)] tracking-[0.3em] uppercase">VOLUME</span>
@@ -635,34 +698,57 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
             <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)] z-20"></div>
 
             {/* Top Toolbar - Global */}
-            <div className="absolute top-0 left-0 right-0 h-10 border-b border-[var(--text-secondary)]/30 flex items-center justify-between px-4 bg-[var(--bg-main)]/80 backdrop-blur-md z-30">
-              {/* Status Status */}
+            <div className="absolute top-0 left-0 right-0 h-10 flex items-center justify-between px-4 bg-[var(--bg-main)]/80 backdrop-blur-md z-30" style={{ borderBottom: '1px solid transparent', borderImage: `linear-gradient(90deg, transparent, var(--accent), transparent) 1` }}>
+              {/* Status Indicator */}
               <div className="flex items-center gap-3">
                 <div className={`w-1.5 h-1.5 rounded-full ${player.playing ? 'bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]' : 'bg-[var(--text-secondary)]/30'}`}></div>
-                <span className="text-[9px] font-mono text-[var(--accent)] tracking-[0.2em] font-bold uppercase">SYS.LINK_ACTIVE</span>
+                <span className="text-[9px] font-mono text-[var(--accent)] tracking-[0.2em] font-bold uppercase">
+                  {player.playing ? 'SYS.PLAYING' : current ? 'SYS.PAUSED' : 'SYS.IDLE'}
+                </span>
                 <div className="hidden sm:block h-3 w-px bg-[var(--text-secondary)]/20 mx-1"></div>
-                <span className="hidden sm:inline text-[9px] font-mono text-[var(--text-secondary)]/50 tracking-widest uppercase">STP_FLTR: ON</span>
+                <span className="hidden sm:inline text-[9px] font-mono text-[var(--text-secondary)]/50 tracking-widest uppercase">
+                  TRK: {songs.length > 0 ? `${safeIndex + 1}/${songs.length}` : '0/0'}
+                </span>
                 <span className="hidden sm:inline left-[50px] text-[12px] font-mono font-bold text-[var(--accent)] tracking-widest uppercase">Personal Tracklist</span>
               </div>
 
-              {/* Tech Labels */}
+              {/* Tech Labels - Real Data */}
               <div className="hidden lg:flex gap-6 text-[9px] text-[var(--text-secondary)]/40 font-mono tracking-[0.3em] uppercase">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[var(--accent)]/30">BUFR:</span>
-                  <span>100%</span>
+                  <span>{(() => {
+                    const audio = player.audioRef?.current;
+                    if (!audio || !audio.duration || audio.buffered.length === 0) return '0%';
+                    const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+                    return `${Math.round((bufferedEnd / audio.duration) * 100)}%`;
+                  })()}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="text-[var(--accent)]/30">RATE:</span>
-                  <span>44.1KHZ</span>
+                  <span>{(() => {
+                    try {
+                      const ctx = player.analyser?.context;
+                      if (ctx) return `${(ctx.sampleRate / 1000).toFixed(1)}KHZ`;
+                    } catch {}
+                    return '—';
+                  })()}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[var(--accent)]/30">BITD:</span>
-                  <span>24-BIT</span>
+                  <span className="text-[var(--accent)]/30">FMT:</span>
+                  <span>{(() => {
+                    if (!current?.url) return '—';
+                    const ext = current.url.split('.').pop()?.split('?')[0]?.toUpperCase();
+                    return ext || '—';
+                  })()}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[var(--accent)]/30">SPD:</span>
+                  <span>{player.playbackRate}X</span>
                 </div>
               </div>
 
               {/* Controls */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 sm:gap-2">
                 {/* Sleep Timer */}
                 <div className="relative">
                   <button
@@ -709,20 +795,46 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">[</span>
                   <span className="mx-1 hidden sm:inline">Config</span>
                   <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">]</span>
-                  {/* Icon for mobile only */}
-                  <span className="sm:hidden font-mono tracking-widest text-xs">CFG</span>
+                  <span className="sm:hidden font-mono tracking-widest text-xs">⚙</span>
                 </button>
+
+                {/* Playback Speed */}
+                <div className="relative">
+                  <button
+                    onClick={() => { playClick(); setIsSpeedMenuOpen(!isSpeedMenuOpen); }}
+                    onMouseEnter={playHover}
+                    className={`cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center gap-1 font-mono ${player.playbackRate !== 1 ? 'border-[var(--accent)] text-[var(--accent)]' : ''}`}
+                    title="Playback Speed"
+                  >
+                    <span>{player.playbackRate}x</span>
+                  </button>
+
+                  {isSpeedMenuOpen && (
+                    <div className="absolute top-full mt-1 right-0 w-24 bg-black/95 backdrop-blur-xl border border-[var(--accent)]/30 z-50 shadow-2xl animate-in fade-in zoom-in duration-200">
+                      <div className="px-3 py-1.5 border-b border-white/5 text-[7px] font-mono text-[var(--accent)] uppercase tracking-[0.2em] opacity-60">Speed</div>
+                      {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(rate => (
+                        <button
+                          key={rate}
+                          onClick={() => { playClick(); player.setPlaybackRate(rate); setIsSpeedMenuOpen(false); }}
+                          className={`w-full text-left px-3 py-2 text-[9px] font-mono tracking-wider hover:bg-[var(--accent)]/10 transition-colors flex justify-between items-center ${player.playbackRate === rate ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'}`}
+                        >
+                          <span>{rate}x</span>
+                          {player.playbackRate === rate && <div className="w-1 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_5px_var(--accent)]" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
                 <button
                   onClick={() => { playClick(); setIsEqOpen(true); }}
                   onMouseEnter={playHover}
-                  className="cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center"
+                  className="hidden sm:flex cyber-btn px-2 sm:px-3 py-1 text-[9px] group items-center justify-center"
                   title="Neural Audio (EQ / FX)"
                 >
                   <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">[</span>
                   <span className="mx-1 hidden sm:inline">EQ/FX</span>
                   <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">]</span>
-                  <span className="sm:hidden font-mono tracking-widest text-xs">EQ</span>
                 </button>
 
                 <button
@@ -794,16 +906,36 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       </div>
                     )}
 
-                    <div className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-60 md:h-60 lg:w-64 lg:h-64 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm animate-in zoom-in-95 duration-500 shrink-0">
+                    {/* Album art with neon glow + fade animation */}
+                    <div 
+                      className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-60 md:h-60 lg:w-64 lg:h-64 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm shrink-0"
+                      style={{ boxShadow: `0 0 25px rgba(var(--accent-rgb), 0.25), 0 0 60px rgba(var(--accent-rgb), 0.1), inset 0 0 15px rgba(var(--accent-rgb), 0.05)` }}
+                    >
                       {/* Decorative corner accents for cover */}
                       <div className="absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--accent)]"></div>
                       <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--accent)]"></div>
+                      <div className="absolute -top-1 -right-1 w-2 h-2 border-t border-r border-[var(--accent)]"></div>
+                      <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b border-l border-[var(--accent)]"></div>
 
                       <img
                         ref={coverImgRef}
                         src={current?.coverUrl || '/default-cover.png'}
                         alt={current?.title || 'Unknown Track'}
-                        className="w-full h-full object-cover transition-transform duration-75"
+                        className={`w-full h-full object-cover transition-all duration-500 ease-out ${coverFading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+                      />
+                    </div>
+
+                    {/* Cover Art Reflection */}
+                    <div className="relative w-48 sm:w-56 md:w-60 lg:w-64 h-12 overflow-hidden pointer-events-none -mt-0.5 hidden md:block">
+                      <img
+                        src={current?.coverUrl || '/default-cover.png'}
+                        alt=""
+                        className="w-full h-48 sm:h-56 md:h-60 lg:h-64 object-cover transform scale-y-[-1] opacity-20"
+                        style={{ 
+                          maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 100%)',
+                          WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 100%)',
+                          filter: 'blur(2px) saturate(0.5)'
+                        }}
                       />
                     </div>
                   </div>
@@ -843,14 +975,43 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                         </button>
                       )}
 
-                      {/* Share Button */}
-                      <button
-                        onClick={copyShareLink}
-                        className="cyber-icon-btn w-10 h-10 shrink-0 mt-1"
-                        title="Share Track"
-                      >
-                        <Share2 size={18} strokeWidth={1.5} />
-                      </button>
+                      {/* Share Menu */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setIsShareMenuOpen(!isShareMenuOpen)}
+                          onBlur={() => setTimeout(() => setIsShareMenuOpen(false), 200)}
+                          className={`cyber-icon-btn w-10 h-10 shrink-0 mt-1 ${isShareMenuOpen ? 'text-[var(--accent)] ring-1 ring-[var(--accent)]/30 bg-[var(--accent)]/10' : ''}`}
+                          title="Share Options"
+                        >
+                          <Share2 size={18} strokeWidth={1.5} />
+                        </button>
+                        
+                        {isShareMenuOpen && (
+                          <div className="absolute bottom-full right-0 mb-2 p-1 bg-black/95 border border-[var(--text-secondary)]/30 backdrop-blur-md shadow-[0_0_20px_rgba(0,0,0,0.5)] flex flex-col gap-1 z-50 min-w-[140px] animate-in fade-in slide-in-from-bottom-2 duration-200">
+                            <button
+                              onClick={() => { copyShareLink(); setIsShareMenuOpen(false); }}
+                              className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--text-secondary)]/10 text-[10px] font-mono font-bold tracking-widest uppercase text-[var(--text-secondary)] hover:text-white transition-colors w-full text-left"
+                            >
+                              <Share2 size={14} className="text-[var(--accent)]" /> 
+                              <span>Copy Link</span>
+                            </button>
+                            <button
+                              onClick={() => { shareToTelegram(); setIsShareMenuOpen(false); }}
+                              className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--text-secondary)]/10 text-[10px] font-mono font-bold tracking-widest uppercase text-[var(--text-secondary)] hover:text-white transition-colors w-full text-left"
+                            >
+                              <Send size={14} className="text-[var(--accent)]" /> 
+                              <span>Telegram</span>
+                            </button>
+                            <button
+                              onClick={() => { playClick(); setIsQrModalOpen(true); setIsShareMenuOpen(false); }}
+                              className="flex items-center gap-3 px-3 py-2.5 hover:bg-[var(--text-secondary)]/10 text-[10px] font-mono font-bold tracking-widest uppercase text-[var(--text-secondary)] hover:text-white transition-colors w-full text-left"
+                            >
+                              <QrCode size={14} className="text-[var(--accent)]" /> 
+                              <span>QR Code</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -890,10 +1051,10 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               <div className="md:hidden flex items-center justify-center px-4 pb-4 bg-transparent z-10 w-full">
                 <button
                   onClick={() => setIsMobilePlaylistOpen(true)}
-                  className="flex items-center gap-2 justify-center w-full py-3 border border-[var(--text-secondary)]/30 bg-black/50 backdrop-blur-md text-[10px] uppercase font-mono tracking-[0.2em] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors"
+                  className="flex items-center gap-2 justify-center w-full py-4 border border-[var(--text-secondary)]/30 bg-black/50 backdrop-blur-md text-xs uppercase font-mono tracking-[0.2em] font-bold text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors min-h-[48px]"
                   title="Open Playlist"
                 >
-                  <ListMusic size={14} /> View Tracklist
+                  <ListMusic size={16} /> View Tracklist
                 </button>
               </div>
 
@@ -1049,16 +1210,28 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-20 bg-[var(--accent)] blur-xl transition-opacity duration-500"></div>
                       <style dangerouslySetInnerHTML={{ __html: `.group\/btn:hover span { color: black !important; } .group\/btn:hover svg { stroke: black !important; }` }} />
                     </Link>
+                  ) : uploadPerm.status === 'pending' ? (
+                    /* Pending state — yellow border + pulsing dot */
+                    <button
+                      onClick={() => setIsUploadModalOpen(true)}
+                      className="relative px-10 py-5 bg-yellow-400/5 border-2 border-yellow-400/60 text-yellow-400 font-black tracking-[0.2em] uppercase text-xs min-w-[220px] backdrop-blur-sm flex items-center justify-center gap-3 cursor-default"
+                      title="So'rovingiz admin tomonidan ko'rib chiqilmoqda"
+                    >
+                      <span className="relative flex h-2.5 w-2.5 shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-yellow-400" />
+                      </span>
+                      <span>So'rov Kutilmoqda</span>
+                    </button>
                   ) : (
+                    /* None/denied — normal upload request button */
                     <button
                       onClick={() => setIsUploadModalOpen(true)}
                       className="group/btn relative px-10 py-5 bg-black/40 border-2 border-[var(--accent)] text-[var(--accent)] font-black tracking-[0.2em] uppercase text-xs overflow-hidden transition-all duration-500 hover:shadow-[0_0_50px_var(--accent)] text-center min-w-[220px] backdrop-blur-sm flex items-center justify-center"
                     >
                       <div className="relative z-10 flex items-center justify-center gap-3 group-hover/btn:scale-105 transition-transform duration-300">
                         <Upload size={18} strokeWidth={2.5} className="group-hover/btn:-translate-y-1 transition-transform duration-300" />
-                        <span className="font-black group-hover/btn:text-black">
-                          {uploadPerm.status === 'pending' ? 'So\'rov Kutilmoqda' : 'Upload Track'}
-                        </span>
+                        <span className="font-black group-hover/btn:text-black">Upload Track</span>
                       </div>
                       <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)] via-[var(--accent)] to-[var(--accent)] translate-y-full group-hover/btn:translate-y-0 transition-transform duration-500"></div>
                       <div className="absolute inset-0 opacity-0 group-hover/btn:opacity-20 bg-[var(--accent)] blur-xl transition-opacity duration-500"></div>
@@ -1232,6 +1405,43 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           onClose={() => setIsUploadModalOpen(false)}
           onSubmit={uploadPerm.submitRequest}
         />
+      )}
+
+      {/* QR Code Modal */}
+      {isQrModalOpen && current && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-sm bg-[var(--bg-main)] border border-[var(--accent)] p-6 shadow-[0_0_50px_rgba(var(--accent-rgb),0.2)] text-center flex flex-col items-center font-mono">
+            <button
+              onClick={() => setIsQrModalOpen(false)}
+              className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)] transition-colors"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="text-[10px] font-mono text-[var(--accent)] tracking-[0.3em] uppercase mb-2">QR MATRIX SHARE</div>
+            <h3 className="text-base font-bold text-white truncate max-w-[260px] uppercase">{current.title}</h3>
+            <p className="text-[10px] text-[var(--text-secondary)] truncate max-w-[260px] uppercase mb-4">{current.artist || 'Unknown Artist'}</p>
+
+            <div className="p-3 bg-white border-2 border-[var(--accent)] shadow-[0_0_20px_var(--accent)] mb-4">
+              <img
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`${window.location.origin}/?track=${current.id}`)}`}
+                alt="Track QR Code"
+                className="w-48 h-48 object-contain"
+              />
+            </div>
+
+            <p className="text-[9px] text-[var(--text-secondary)] uppercase tracking-wider mb-4">
+              Scan with phone camera to open track
+            </p>
+
+            <button
+              onClick={() => { copyShareLink(); setIsQrModalOpen(false); }}
+              className="w-full py-2.5 bg-[var(--accent)] text-black font-bold text-xs uppercase tracking-widest hover:opacity-90 transition-all flex items-center justify-center gap-2"
+            >
+              <Share2 size={14} /> Copy Link
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

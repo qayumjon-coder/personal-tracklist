@@ -15,8 +15,12 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   const [repeat, setRepeat] = useState<RepeatMode>("off");
   const [audioError, setAudioError] = useState<string | null>(null);
   const [sleepTimer, setSleepTimer] = useState<number | null>(null);
+  const [playbackRate, setPlaybackRateState] = useState(() => {
+    const saved = localStorage.getItem('fronto_playback_rate');
+    return saved ? parseFloat(saved) : 1;
+  });
 
-  const { autoplay } = useSettings();
+  const { autoplay, crossfade } = useSettings();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const previousVolumeRef = useRef(70);
@@ -187,6 +191,20 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     };
   }, []);
 
+  // Apply playback rate changes
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.playbackRate = playbackRate;
+  }, [playbackRate]);
+
+  const setPlaybackRate = (rate: number) => {
+    const clamped = Math.round(rate * 10) / 10; // round to 1 decimal
+    setPlaybackRateState(clamped);
+    localStorage.setItem('fronto_playback_rate', String(clamped));
+    if (audioRef.current) audioRef.current.playbackRate = clamped;
+  };
+
   // 2. Safety: Keep index in bounds and Reset tracker
   useEffect(() => {
     if (songs.length > 0 && index >= songs.length) {
@@ -218,11 +236,25 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     if (currentTrackUrlRef.current !== targetUrl) {
       currentTrackUrlRef.current = targetUrl;
       
-      // Do not explicitly pause/load here. Setting src automatically aborts 
-      // the previous load and starts the new one. Calling pause() here 
-      // triggers the handlePause event which incorrectly sets playing to false.
+      const targetVol = isMuted ? 0 : volume / 100;
       audio.src = targetUrl;
-      audio.load(); // Explicitly load to reset media element state
+      audio.load();
+
+      if (crossfade > 0 && playing) {
+        audio.volume = 0;
+        let fadeStep = 0;
+        const fadeSteps = 10;
+        const fadeInterval = (crossfade * 1000) / fadeSteps;
+        const timer = setInterval(() => {
+          fadeStep++;
+          if (audioRef.current) {
+            audioRef.current.volume = Math.min(targetVol, (fadeStep / fadeSteps) * targetVol);
+          }
+          if (fadeStep >= fadeSteps) clearInterval(timer);
+        }, fadeInterval);
+      } else {
+        audio.volume = targetVol;
+      }
     }
 
     // Handle play/pause state independently
@@ -497,6 +529,8 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     setMid,
     setTreble,
     activeEffect,
-    setEffect
+    setEffect,
+    playbackRate,
+    setPlaybackRate
   };
 }

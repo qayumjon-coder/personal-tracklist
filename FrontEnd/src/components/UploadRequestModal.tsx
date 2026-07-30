@@ -77,16 +77,63 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
           )}
 
           {/* Denied state */}
-          {status === 'denied' && (
+          {status === 'denied' && !submitted && (
             <div className="flex flex-col items-center gap-4 py-4 text-center">
               <ShieldOff size={40} className="text-red-400" />
               <h2 className="text-lg font-bold font-mono tracking-wider text-red-400">RUXSAT BERILMAGAN</h2>
               <p className="text-[var(--text-secondary)] text-sm font-mono leading-relaxed">
-                Upload qilish huquqiga ega emassiz yoki so'rovingiz rad etilgan.
+                Upload qilish huquqiga ega emassiz yoki so'rovingiz rad etilgan.<br/>
+                Sababni tushuntirgan holda qayta so'rov yuborishingiz mumkin.
               </p>
-              <button onClick={onClose} className="mt-2 px-6 py-2 border border-red-500/50 text-red-400 text-xs font-mono tracking-widest uppercase hover:bg-red-500/10 transition-all">
-                YOPISH
-              </button>
+
+              {/* Re-submit form */}
+              <div className="w-full space-y-3 mt-2 text-left">
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-1.5">
+                    &gt; ISMINGIZ <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    placeholder="To'liq ism..."
+                    maxLength={60}
+                    className="w-full bg-black/40 border border-[var(--text-secondary)]/40 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/40"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-1.5">
+                    &gt; SABAB / IZOH
+                  </label>
+                  <textarea
+                    value={message}
+                    onChange={e => setMessage(e.target.value)}
+                    placeholder="Nima maqsadda yuklash istaysiz..."
+                    maxLength={300}
+                    rows={2}
+                    className="w-full bg-black/40 border border-[var(--text-secondary)]/40 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[var(--accent)] transition-all placeholder-[var(--text-secondary)]/40 resize-none"
+                  />
+                </div>
+
+                {submitError && (
+                  <div className="text-red-400 text-xs font-mono border border-red-400/30 bg-red-400/5 px-3 py-2">
+                    ⚠ {submitError}
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="flex-1 py-2.5 bg-[var(--accent)] text-[var(--bg-main)] font-bold font-mono text-xs tracking-[0.2em] uppercase hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {loading ? <><Loader2 size={12} className="animate-spin" /> Yuborilmoqda...</> : <>Qayta So'rov Yuborish</>}
+                  </button>
+                  <button onClick={onClose} className="px-4 py-2.5 border border-[var(--text-secondary)]/40 text-[var(--text-secondary)] text-xs font-mono hover:border-[var(--text-secondary)] transition-all">
+                    Yopish
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

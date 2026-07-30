@@ -24,6 +24,10 @@ interface SettingsContextType {
   setMatrixBg: (enabled: boolean) => void;
   zenMode: boolean;
   setZenMode: (enabled: boolean) => void;
+  crossfade: number;
+  setCrossfade: (seconds: number) => void;
+  progressBarMode: "standard" | "waveform";
+  setProgressBarMode: (mode: "standard" | "waveform") => void;
 
   // Helpers
   t: (key: string) => string;
@@ -105,9 +109,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [visualizerMode, setVisualizerMode] = useState<VisualizerMode>(() => (localStorage.getItem("visualizerMode") as VisualizerMode) || "bars");
   const [autoplay, setAutoplay] = useState(() => localStorage.getItem("autoplay") !== "false"); // Default true
   const [scanlines, setScanlines] = useState(() => localStorage.getItem("scanlines") !== "false"); // Default true
-  const [grid, setGrid] = useState(() => localStorage.getItem("grid") !== "false"); // Default true
   const [matrixBg, setMatrixBg] = useState(() => localStorage.getItem("matrixBg") === "true"); // Default false
+  const [grid, setGrid] = useState(() => {
+    const isMatrix = localStorage.getItem("matrixBg") === "true";
+    if (isMatrix) return false;
+    return localStorage.getItem("grid") !== "false";
+  });
   const [zenMode, setZenMode] = useState(() => localStorage.getItem("zenMode") === "true"); // Default false
+  const [crossfade, setCrossfade] = useState(() => {
+    const saved = localStorage.getItem("crossfade");
+    return saved ? parseInt(saved, 10) : 2;
+  });
+  const [progressBarMode, setProgressBarMode] = useState<"standard" | "waveform">(() => {
+    return (localStorage.getItem("progressBarMode") as "standard" | "waveform") || "standard";
+  });
 
   // Persistence
   useEffect(() => {
@@ -120,7 +135,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     localStorage.setItem("grid", String(grid));
     localStorage.setItem("matrixBg", String(matrixBg));
     localStorage.setItem("zenMode", String(zenMode));
-  }, [theme, language, soundEnabled, visualizerMode, autoplay, scanlines, grid, matrixBg, zenMode]);
+    localStorage.setItem("crossfade", String(crossfade));
+    localStorage.setItem("progressBarMode", progressBarMode);
+  }, [theme, language, soundEnabled, visualizerMode, autoplay, scanlines, grid, matrixBg, zenMode, crossfade, progressBarMode]);
 
   // Apply Theme CSS
   useEffect(() => {
@@ -134,13 +151,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   // Apply Global Visuals
-  useEffect(() => {
-    const scanlineEl = document.querySelector('.scanline') as HTMLElement;
-    const gridEl = document.querySelector('.retro-grid') as HTMLElement;
-    if (scanlineEl) scanlineEl.style.display = scanlines ? 'block' : 'none';
-    // Hide grid if matrix background is active to prevent visual clutter
-    if (gridEl) gridEl.style.display = (grid && !matrixBg) ? 'block' : 'none';
-  }, [scanlines, grid, matrixBg]);
+  // Grid and scanlines are now conditionally rendered in App.tsx
 
   // Translate helper
   const t = (key: string) => {
@@ -159,6 +170,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       grid, setGrid,
       matrixBg, setMatrixBg,
       zenMode, setZenMode,
+      crossfade, setCrossfade,
+      progressBarMode, setProgressBarMode,
       t
     }}>
       {children}

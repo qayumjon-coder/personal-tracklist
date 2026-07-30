@@ -9,7 +9,7 @@ import { NotFound } from "./pages/NotFound";
 import { usePlaylist } from "./hooks/usePlaylist";
 import { useLocalFiles } from "./hooks/useLocalFiles";
 import { useAudioPlayer } from "./hooks/useAudioPlayer";
-import { SettingsProvider } from "./contexts/SettingsContext";
+import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { Analytics } from "@vercel/analytics/react"
@@ -19,10 +19,12 @@ import { Toaster } from "sonner";
 import { Terminal } from "./components/Terminal";
 import { MatrixBackground } from "./components/MatrixBackground";
 import { SystemCrash } from "./components/SystemCrash";
+import { MiniPlayer } from "./components/MiniPlayer";
 
 function MusicApp() {
   const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist } = usePlaylist();
   const { localSongs, isScanning, scanProgress, hasStoredHandle, requestAccess, restoreAccess, removeLocalFiles, removeLocalFile, error: localError } = useLocalFiles();
+  const { grid, scanlines, matrixBg } = useSettings();
   
   // Combine both sources and memoize to prevent infinite re-renders on timeupdate
   const combinedSongs = useMemo(() => [...playlist, ...localSongs], [playlist, localSongs]);
@@ -101,8 +103,8 @@ function MusicApp() {
         <Toaster theme="dark" position="bottom-right" toastOptions={{ style: { background: 'rgba(0, 0, 0, 0.8)', border: '1px solid rgba(var(--accent-rgb), 0.2)', color: 'white', backdropFilter: 'blur(10px)' } }} />
         <div className="w-full min-h-screen flex items-start justify-center p-2 py-12 md:py-0 relative">
           <MatrixBackground />
-          <div className="retro-grid" />
-          <div className="scanline" />
+          {grid && !matrixBg && <div className="retro-grid" />}
+          {scanlines && <div className="scanline" />}
           <Terminal 
             isVisible={isTerminalOpen} 
             onClose={() => setIsTerminalOpen(false)} 
@@ -114,6 +116,14 @@ function MusicApp() {
             }}
           />
           <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+          <MiniPlayer 
+            currentSong={combinedSongs[player.index]} 
+            playing={player.playing} 
+            onPlay={player.play} 
+            onPause={player.pause} 
+            onNext={player.next} 
+            onPrev={player.prev} 
+          />
           <Routes>
             <Route path="/" element={
               <Player 

@@ -4,7 +4,7 @@ import type { Song } from "../types/Song";
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
-import { Trash2, MoreVertical, Check, Square, CheckSquare2, X, LayoutGrid, List, FolderPlus, Disc, GripVertical } from "lucide-react";
+import { Trash2, MoreVertical, Check, Square, CheckSquare2, X, LayoutGrid, List, FolderPlus, Disc, GripVertical, Download } from "lucide-react";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Pagination } from "./Pagination";
 import { updateSong } from "../services/musicApi";
@@ -146,6 +146,40 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
     return `${mins}:${secs}`;
   }
 
+  const exportPlaylist = (format: 'm3u' | 'json') => {
+    if (songs.length === 0) return;
+    let content = '';
+    let mimeType = 'text/plain';
+    let ext = 'm3u';
+
+    if (format === 'json') {
+      content = JSON.stringify(songs.map(s => ({
+        title: s.title,
+        artist: s.artist,
+        url: s.url,
+        coverUrl: s.coverUrl,
+        category: s.category,
+        duration: s.duration
+      })), null, 2);
+      mimeType = 'application/json';
+      ext = 'json';
+    } else {
+      content = '#EXTM3U\n' + songs.map(s => `#EXTINF:${Math.round(s.duration || 0)},${s.artist || 'Unknown'} - ${s.title}\n${s.url}`).join('\n');
+      mimeType = 'audio/x-mpegurl';
+      ext = 'm3u';
+    }
+
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `playlist_${Date.now()}.${ext}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination || !onReorder) return;
     const sourceGlobalIndex = (currentPage - 1) * itemsPerPage + result.source.index;
@@ -178,6 +212,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
               <div className="flex bg-black/50 rounded-none border border-[var(--text-secondary)]/20 ml-2 shrink-0">
                 <button onClick={() => { playClick(); setViewMode('list'); }} className={`cyber-icon-btn w-6 h-6 rounded-none ${viewMode === 'list' ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : ''}`} title="List View"><List size={12} /></button>
                 <button onClick={() => { playClick(); setViewMode('grid'); }} className={`cyber-icon-btn w-6 h-6 rounded-none ${viewMode === 'grid' ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : ''}`} title="Grid View"><LayoutGrid size={12} /></button>
+                <button onClick={() => { playClick(); exportPlaylist('m3u'); }} className="cyber-icon-btn w-6 h-6 rounded-none hover:bg-[var(--accent)]/20 text-[var(--text-secondary)] hover:text-[var(--accent)]" title="Export Playlist (M3U)"><Download size={12} /></button>
               </div>
 
               {localFilesInfo && (
@@ -399,8 +434,15 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                                 <div className={`text-[8px] truncate font-mono uppercase tracking-wider flex-1 ${isActive ? 'opacity-80' : 'opacity-30 group-hover/item:opacity-60'}`}>
                                   {song.artist}
                                 </div>
-                                <div className={`text-[8px] font-mono shrink-0 opacity-40 ${isActive ? 'text-[var(--accent)] opacity-80' : ''}`}>
-                                  {formatDuration(song.duration || dynamicDurations[song.id])}
+                                <div className="flex items-center gap-2 shrink-0">
+                                  {(song.play_count !== undefined && song.play_count > 0) && (
+                                    <div className={`text-[7px] font-mono opacity-30 group-hover/item:opacity-60 ${isActive ? 'text-[var(--accent)] opacity-70' : ''}`} title={`${song.play_count} marta tinglangan`}>
+                                      ▶ {song.play_count}
+                                    </div>
+                                  )}
+                                  <div className={`text-[8px] font-mono opacity-40 ${isActive ? 'text-[var(--accent)] opacity-80' : ''}`}>
+                                    {formatDuration(song.duration || dynamicDurations[song.id])}
+                                  </div>
                                 </div>
                               </div>
                             </button>
