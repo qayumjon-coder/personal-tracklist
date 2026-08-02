@@ -1,8 +1,15 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useSoundEffects } from '../hooks/useSoundEffects';
 
 export function LoadingScreen() {
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
+  const { playClick, playStartup, playScan } = useSoundEffects();
+  
+  // Track if interaction has happened so we can play sounds
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const interactedRef = useRef(false);
+  const bootFinishedRef = useRef(false);
   
   const bootLogs = [
     "INITIALIZING_SYSTEM_CORE...",
@@ -20,19 +27,52 @@ export function LoadingScreen() {
       if (currentLog < bootLogs.length) {
         setLogs(prev => [...prev.slice(-3), `> ${bootLogs[currentLog]}`]);
         setProgress(Math.min(100, (currentLog + 1) * 15));
+        
+        // Play scan sound if we have interacted
+        if (interactedRef.current && currentLog < bootLogs.length - 1) {
+           playScan();
+        } else if (interactedRef.current && currentLog === bootLogs.length - 1) {
+           playStartup(); // Play final boot sound
+        }
+
         currentLog++;
       } else {
         setProgress(100);
+        bootFinishedRef.current = true;
         clearInterval(interval);
       }
     }, 400);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [playScan, playStartup]);
+
+  const handleInteraction = () => {
+    if (!hasInteracted) {
+      setHasInteracted(true);
+      interactedRef.current = true;
+      
+      if (bootFinishedRef.current) {
+        // If boot is already done, just play the startup sound immediately
+        playStartup();
+      } else {
+        // Try to initialize audio context on first click
+        playClick(); 
+      }
+    }
+  };
 
   return (
-    <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center font-mono">
-      <div className="w-64 space-y-4">
+    <div 
+      className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center font-mono cursor-pointer"
+      onClick={handleInteraction}
+    >
+      {!hasInteracted && (
+        <div className="absolute top-10 text-[10px] text-[var(--accent)]/60 animate-pulse tracking-widest uppercase">
+          [ Tap anywhere to enable sound ]
+        </div>
+      )}
+      
+      <div className="w-64 space-y-4 relative z-10">
         <div className="flex justify-between text-[10px] text-[var(--accent)] tracking-widest animate-pulse">
             <span>SYS_BOOT_REv.5.0</span>
             <span>{progress}%</span>

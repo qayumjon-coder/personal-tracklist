@@ -51,12 +51,18 @@ interface PlayerProps {
 }
 
 export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, onReorderPlaylist, loadingMore, hasMore, onLoadMore, localFilesInfo }: PlayerProps) {
-  const { playClick, playHover } = useSoundEffects();
+  const { playClick, playHover, playStartup } = useSoundEffects();
   const { visualizerMode, zenMode, setZenMode } = useSettings();
   const location = useLocation();
   // Removed beatScale from state to avoid 60fps re-renders of the entire Player component
   const coverImgRef = useRef<HTMLImageElement>(null);
   useBeatScale(player.playing, player.analyser, coverImgRef, visualizerMode === 'scale');
+
+  useEffect(() => {
+    if (loading) {
+      playStartup();
+    }
+  }, [loading, playStartup]);
 
   // Show toast if redirected from Upload due to expired/missing permission
   useEffect(() => {
