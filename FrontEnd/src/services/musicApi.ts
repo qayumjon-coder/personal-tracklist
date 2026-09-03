@@ -68,7 +68,7 @@ export async function getSongsByIds(ids: number[]): Promise<Song[]> {
 }
 
 /**
- * Upload a new song with audio and cover files
+ * Upload a new song with audio and cover files or URLs
  */
 export async function uploadSong(
   title: string,
@@ -76,21 +76,21 @@ export async function uploadSong(
   category: string,
   duration: number,
   audioFile: File,
-  coverFile: File,
+  cover: File | string,
   lyrics?: string,
   uploadedBy?: string,
   uploaderFp?: string
 ): Promise<Song> {
+  let uploadedAudioPath: string | null = null;
+  let uploadedCoverPath: string | null = null;
+
   try {
     // Generate unique filenames and sanitize them
     const sanitizeFilename = (name: string) => name.replace(/[^\x00-\x7F]/g, "").replace(/\s+/g, "_").replace(/[^a-zA-Z0-9._-]/g, "");
 
     const timestamp = Date.now();
     const cleanAudioName = sanitizeFilename(audioFile.name);
-    const cleanCoverName = sanitizeFilename(coverFile.name);
-
     const audioFileName = `audio/${timestamp}-${cleanAudioName}`;
-    const coverFileName = `covers/${timestamp}-${cleanCoverName}`;
 
     // Input sanitization for basic XSS protection
     const sanitizeHtml = (str: string) => str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -98,7 +98,7 @@ export async function uploadSong(
     const safeArtist = sanitizeHtml(artist.trim());
     const safeCategory = sanitizeHtml(category.trim());
 
-    // Upload audio file
+    // 1. Upload audio file
     const { error: audioError } = await supabase.storage
       .from(STORAGE_BUCKETS.MUSIC_FILES)
       .upload(audioFileName, audioFile, {
@@ -110,45 +110,94 @@ export async function uploadSong(
       console.error('Audio upload error:', audioError);
       throw new Error(`Audio Upload Failed: ${audioError.message}`);
     }
+    uploadedAudioPath = audioFileName;
 
-    // Upload cover file
-    const { error: coverError } = await supabase.storage
-      .from(STORAGE_BUCKETS.MUSIC_FILES)
-      .upload(coverFileName, coverFile, {
-        contentType: coverFile.type,
-        upsert: false,
-      });
+    // 2. Handle cover image (File object or URL string)
+    let finalCoverUrl = '';
 
-    if (coverError) {
-      console.error('Cover upload error:', coverError);
-      // Cleanup: delete audio file if cover upload fails
-      try {
-        await supabase.storage.from(STORAGE_BUCKETS.MUSIC_FILES).remove([audioFileName]);
-      } catch(cleanupErr) {
-        console.error('CRITICAL: Orphaned audio file could not be cleaned up!', cleanupErr, audioFileName);
+    if (cover instanceof File) {
+      const cleanCoverName = sanitizeFilename(cover.name || 'cover.jpg');
+      const coverFileName = `covers/${timestamp}-${cleanCoverName}`;
+
+      const { error: coverError } = await supabase.storage
+        .from(STORAGE_BUCKETS.MUSIC_FILES)
+        .upload(coverFileName, cover, {
+          contentType: cover.type || 'image/jpeg',
+          upsert: false,
+        });
+
+      if (coverError) {
+        console.error('Cover upload error:', coverError);
+        throw new Error(`Cover Upload Failed: ${coverError.message}`);
       }
-      throw new Error(`Cover Upload Failed: ${coverError.message}`);
+      uploadedCoverPath = coverFileName;
+
+      const { data: coverUrlData } = supabase.storage
+        .from(STORAGE_BUCKETS.MUSIC_FILES)
+        .getPublicUrl(coverFileName);
+
+      finalCoverUrl = coverUrlData.publicUrl;
+    } else if (typeof cover === 'string' && cover.trim()) {
+      const trimmedUrl = cover.trim();
+      finalCoverUrl = trimmedUrl;
+
+      // Best effort: try downloading remote image to persist it in Supabase Storage
+      try {
+        let blob: Blob | null = null;
+        try {
+          const res = await fetch(trimmedUrl);
+          if (res.ok) blob = await res.blob();
+        } catch {
+          // Try CORS image proxy
+          try {
+            const proxyRes = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(trimmedUrl)}&output=jpg`);
+            if (proxyRes.ok) blob = await proxyRes.blob();
+          } catch {
+            // Ignore proxy failure
+          }
+        }
+
+        if (blob && blob.size > 0) {
+          const ext = blob.type.split('/')[1] || 'jpg';
+          const coverFileName = `covers/${timestamp}-remote_cover.${ext}`;
+          const { error: coverStorageErr } = await supabase.storage
+            .from(STORAGE_BUCKETS.MUSIC_FILES)
+            .upload(coverFileName, blob, {
+              contentType: blob.type || 'image/jpeg',
+              upsert: false,
+            });
+
+          if (!coverStorageErr) {
+            uploadedCoverPath = coverFileName;
+            const { data: coverUrlData } = supabase.storage
+              .from(STORAGE_BUCKETS.MUSIC_FILES)
+              .getPublicUrl(coverFileName);
+            finalCoverUrl = coverUrlData.publicUrl;
+          }
+        }
+      } catch (err) {
+        console.warn('Could not re-host remote cover in storage, using direct link:', err);
+        finalCoverUrl = trimmedUrl;
+      }
+    } else {
+      throw new Error('Cover file or URL is required');
     }
 
-    // Get public URLs
+    // Get public audio URL
     const { data: audioUrlData } = supabase.storage
       .from(STORAGE_BUCKETS.MUSIC_FILES)
       .getPublicUrl(audioFileName);
 
-    const { data: coverUrlData } = supabase.storage
-      .from(STORAGE_BUCKETS.MUSIC_FILES)
-      .getPublicUrl(coverFileName);
-
-    // Insert song metadata into database
+    // 3. Insert song metadata into database
     const { data: newSong, error: dbError } = await supabase
       .from(DB_TABLES.SONGS)
       .insert([
         {
           title: safeTitle,
           artist: safeArtist,
-          category: safeCategory,
+          category: safeCategory || 'General',
           url: audioUrlData.publicUrl,
-          cover_url: coverUrlData.publicUrl,
+          cover_url: finalCoverUrl,
           duration,
           liked: false,
           lyrics: lyrics || '',
@@ -161,18 +210,23 @@ export async function uploadSong(
 
     if (dbError) {
       console.error('Database error:', dbError);
-      // Cleanup: delete uploaded files if database insert fails
-      try {
-        await supabase.storage.from(STORAGE_BUCKETS.MUSIC_FILES).remove([audioFileName, coverFileName]);
-      } catch(cleanupErr) {
-        console.error('CRITICAL: Orphaned files could not be cleaned up!', cleanupErr, [audioFileName, coverFileName]);
-      }
-      throw new Error('Failed to save song to database');
+      throw new Error(`Failed to save song to database: ${dbError.message}`);
     }
 
     return newSong;
   } catch (error) {
     console.error('Upload song error:', error);
+    // Cleanup any uploaded storage files
+    const filesToRemove: string[] = [];
+    if (uploadedAudioPath) filesToRemove.push(uploadedAudioPath);
+    if (uploadedCoverPath) filesToRemove.push(uploadedCoverPath);
+    if (filesToRemove.length > 0) {
+      try {
+        await supabase.storage.from(STORAGE_BUCKETS.MUSIC_FILES).remove(filesToRemove);
+      } catch (cleanupErr) {
+        console.error('Failed to cleanup orphaned storage files:', cleanupErr);
+      }
+    }
     throw error;
   }
 }
@@ -182,53 +236,57 @@ export async function uploadSong(
  */
 export async function updateSong(
   id: number,
-  updates: Partial<Omit<Song, 'id' | 'url' | 'cover_url' | 'created_at'>>,
-  newCoverFile?: File
+  updates: Partial<Omit<Song, 'id' | 'url' | 'cover_url' | 'created_at'>> & { cover_url?: string },
+  newCover?: File | string
 ): Promise<Song> {
   let finalUpdates = { ...updates };
 
-  if (newCoverFile) {
-    // 1. Get old song data to find old cover path
-    const { data: song } = await supabase
-      .from(DB_TABLES.SONGS)
-      .select('cover_url')
-      .eq('id', id)
-      .single();
+  if (newCover) {
+    if (newCover instanceof File) {
+      // 1. Get old song data to find old cover path
+      const { data: song } = await supabase
+        .from(DB_TABLES.SONGS)
+        .select('cover_url')
+        .eq('id', id)
+        .single();
 
-    // 2. Upload new cover
-    const timestamp = Date.now();
-    const coverFileName = `covers/${timestamp}-${newCoverFile.name}`;
+      // 2. Upload new cover
+      const timestamp = Date.now();
+      const coverFileName = `covers/${timestamp}-${newCover.name}`;
 
-    const { error: uploadError } = await supabase.storage
-      .from(STORAGE_BUCKETS.MUSIC_FILES)
-      .upload(coverFileName, newCoverFile);
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKETS.MUSIC_FILES)
+        .upload(coverFileName, newCover);
 
-    if (uploadError) throw uploadError;
+      if (uploadError) throw uploadError;
 
-    // 3. Get new public URL
-    const { data: urlData } = supabase.storage
-      .from(STORAGE_BUCKETS.MUSIC_FILES)
-      .getPublicUrl(coverFileName);
+      // 3. Get new public URL
+      const { data: urlData } = supabase.storage
+        .from(STORAGE_BUCKETS.MUSIC_FILES)
+        .getPublicUrl(coverFileName);
 
-    // Add to updates
-    (finalUpdates as any).cover_url = urlData.publicUrl;
+      // Add to updates
+      (finalUpdates as any).cover_url = urlData.publicUrl;
 
-    // 4. Delete old cover file if it exists
-    if (song?.cover_url) {
-      try {
-        const urlObj = new URL(song.cover_url);
-        const urlPath = urlObj.pathname;
-        const bucketPathIndex = urlPath.indexOf(`/${STORAGE_BUCKETS.MUSIC_FILES}/`);
-        if (bucketPathIndex !== -1) {
-            const oldPath = urlPath.substring(bucketPathIndex + `/${STORAGE_BUCKETS.MUSIC_FILES}/`.length);
-            if (oldPath) {
-              const { error: deleteErr }  = await supabase.storage.from(STORAGE_BUCKETS.MUSIC_FILES).remove([oldPath]);
-              if (deleteErr) console.error('Failed to delete old cover internally:', deleteErr, oldPath);
-            }
+      // 4. Delete old cover file if it exists in our storage
+      if (song?.cover_url) {
+        try {
+          const urlObj = new URL(song.cover_url);
+          const urlPath = urlObj.pathname;
+          const bucketPathIndex = urlPath.indexOf(`/${STORAGE_BUCKETS.MUSIC_FILES}/`);
+          if (bucketPathIndex !== -1) {
+              const oldPath = urlPath.substring(bucketPathIndex + `/${STORAGE_BUCKETS.MUSIC_FILES}/`.length);
+              if (oldPath) {
+                const { error: deleteErr } = await supabase.storage.from(STORAGE_BUCKETS.MUSIC_FILES).remove([oldPath]);
+                if (deleteErr) console.error('Failed to delete old cover internally:', deleteErr, oldPath);
+              }
+          }
+        } catch (err) {
+          console.warn('Failed to parse and delete old cover:', err);
         }
-      } catch (err) {
-        console.warn('Failed to parse and delete old cover:', err);
       }
+    } else if (typeof newCover === 'string' && newCover.trim()) {
+      (finalUpdates as any).cover_url = newCover.trim();
     }
   }
 

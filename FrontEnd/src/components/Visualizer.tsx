@@ -719,6 +719,410 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
       animateStars();
     }
 
+    // HEX MODE (Canvas)
+    if (visualizerMode === 'hex') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      const hexRadius = 35;
+      const hexWidth = Math.sqrt(3) * hexRadius;
+      const hexHeight = 2 * hexRadius;
+      const xOffset = hexWidth;
+      const yOffset = hexHeight * 0.75;
+
+      const drawHexagon = (x: number, y: number, radius: number, fillOpacity: number, strokeOpacity: number, glowIntensity: number) => {
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 180) * (60 * i - 30);
+          const px = x + radius * Math.cos(angle);
+          const py = y + radius * Math.sin(angle);
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        
+        const [r, g, b] = accentRgbRef.current.split(',').map(Number);
+        
+        // Add glow only for active hexes to save performance
+        if (glowIntensity > 0.1) {
+          ctx.shadowBlur = 20 * glowIntensity;
+          ctx.shadowColor = `rgba(${r}, ${g}, ${b}, ${glowIntensity})`;
+        } else {
+          ctx.shadowBlur = 0;
+        }
+
+        if (fillOpacity > 0) {
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${fillOpacity})`;
+          ctx.fill();
+        }
+        if (strokeOpacity > 0) {
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${strokeOpacity})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        
+        // Reset shadow to avoid leaking
+        ctx.shadowBlur = 0;
+      };
+
+      const animateHex = () => {
+        if (document.hidden) {
+          if (playing) animationRef.current = requestAnimationFrame(animateHex);
+          return;
+        }
+
+        if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+          canvas.width = canvas.clientWidth;
+          canvas.height = canvas.clientHeight;
+        }
+
+        const width = canvas.width;
+        const height = canvas.height;
+        ctx.clearRect(0, 0, width, height);
+
+        if (!playing || !analyser) {
+          const cols = Math.ceil(width / xOffset) + 1;
+          const rows = Math.ceil(height / yOffset) + 1;
+          for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+              const x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
+              const y = row * yOffset;
+              
+              drawHexagon(x, y, hexRadius - 2, 0, 0.1, 0);
+            }
+          }
+          return;
+        }
+
+        analyser.getByteFrequencyData(dataArray);
+
+        const cols = Math.ceil(width / xOffset) + 1;
+        const rows = Math.ceil(height / yOffset) + 1;
+        const centerX = width / 2;
+        const centerY = height / 2;
+        const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+        const time = performance.now() / 1000;
+
+        for (let row = 0; row < rows; row++) {
+          for (let col = 0; col < cols; col++) {
+            const x = col * xOffset + (row % 2 === 1 ? hexWidth / 2 : 0);
+            const y = row * yOffset;
+
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const normDist = Math.min(1, dist / maxDist);
+            
+            // Map 0-1 distance to frequency array index (only using lower 60% of frequencies)
+            const freqIdx = Math.floor(Math.pow(normDist, 1.2) * (bufferLength * 0.6));
+            const val = dataArray[freqIdx] / 255;
+
+            // Ripple effect moving outwards
+            const ripple = (Math.sin(dist / 40 - time * 4) * 0.5 + 0.5) * 0.4;
+            const intensity = val * 0.7 + ripple * val;
+
+            const radiusScale = 0.7 + intensity * 0.3;
+            drawHexagon(
+              x, y, 
+              (hexRadius - 3) * radiusScale, 
+              intensity * 0.7, 
+              0.1 + intensity * 0.9,
+              intensity // glow intensity
+            );
+          }
+        }
+
+        if (playing) {
+          animationRef.current = requestAnimationFrame(animateHex);
+        }
+      };
+      
+      animateHex();
+    }
+
+    // SONAR RADAR MODE (Canvas)
+    if (visualizerMode === 'sonar') {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      let sweepAngle = 0;
+      // Fixed tactical contacts (radar blips) with polar coordinates
+      const blips = [
+        { angle: 0.52, distRatio: 0.38, label: 'TRK-01', intensity: 0 },
+        { angle: 1.15, distRatio: 0.65, label: 'TRK-02', intensity: 0 },
+        { angle: 1.88, distRatio: 0.45, label: 'TRK-03', intensity: 0 },
+        { angle: 2.62, distRatio: 0.78, label: 'TRK-04', intensity: 0 },
+        { angle: 3.35, distRatio: 0.30, label: 'TRK-05', intensity: 0 },
+        { angle: 3.92, distRatio: 0.55, label: 'TRK-06', intensity: 0 },
+        { angle: 4.61, distRatio: 0.72, label: 'TRK-07', intensity: 0 },
+        { angle: 5.24, distRatio: 0.42, label: 'TRK-08', intensity: 0 },
+        { angle: 5.85, distRatio: 0.85, label: 'TRK-09', intensity: 0 },
+        { angle: 0.12, distRatio: 0.60, label: 'TRK-10', intensity: 0 },
+      ];
+
+      const animateSonar = () => {
+        if (document.hidden) {
+          if (playing) animationRef.current = requestAnimationFrame(animateSonar);
+          return;
+        }
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const cx = width / 2;
+        const cy = height / 2;
+        const maxR = Math.min(width, height) * 0.44;
+
+        const [r, g, b] = accentRgbRef.current.split(',').map(Number);
+
+        let bass = 0;
+        let mid = 0;
+        if (playing && analyser) {
+          analyser.getByteFrequencyData(dataArray);
+          let bassSum = 0;
+          for (let i = 0; i < 8; i++) bassSum += dataArray[i];
+          bass = bassSum / (8 * 255);
+
+          let midSum = 0;
+          for (let i = 8; i < 32; i++) midSum += dataArray[i];
+          mid = midSum / (24 * 255);
+        } else {
+          dataArray.fill(0);
+        }
+
+        ctx.clearRect(0, 0, width, height);
+
+        // 1. Concentric Range Rings (4 range rings)
+        const ringSteps = [0.25, 0.5, 0.75, 1.0];
+        ringSteps.forEach((step, idx) => {
+          const radius = maxR * step;
+          ctx.beginPath();
+          ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+          ctx.strokeStyle = idx === 3
+            ? `rgba(${r}, ${g}, ${b}, ${0.4 + bass * 0.3})`
+            : `rgba(${r}, ${g}, ${b}, 0.12)`;
+          ctx.lineWidth = idx === 3 ? 1.5 : 1;
+          if (idx === 1) {
+            ctx.setLineDash([4, 6]);
+          } else {
+            ctx.setLineDash([]);
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Range markings
+          ctx.font = '8px monospace';
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.35)`;
+          ctx.fillText(`${Math.round(step * 100)}NM`, cx + 4, cy - radius + 10);
+        });
+
+        // 2. Crosshair Grid Lines
+        ctx.beginPath();
+        // Horizontal
+        ctx.moveTo(cx - maxR, cy);
+        ctx.lineTo(cx + maxR, cy);
+        // Vertical
+        ctx.moveTo(cx, cy - maxR);
+        ctx.lineTo(cx, cy + maxR);
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.15)`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Diagonal dashed lines (45 deg)
+        ctx.beginPath();
+        ctx.setLineDash([2, 8]);
+        const diagR = maxR * 0.95;
+        const cos45 = Math.cos(Math.PI / 4) * diagR;
+        const sin45 = Math.sin(Math.PI / 4) * diagR;
+        ctx.moveTo(cx - cos45, cy - sin45);
+        ctx.lineTo(cx + cos45, cy + sin45);
+        ctx.moveTo(cx - cos45, cy + sin45);
+        ctx.lineTo(cx + cos45, cy - sin45);
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.08)`;
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Degree Tick Marks around outer rim
+        for (let deg = 0; deg < 360; deg += 30) {
+          const rad = (deg * Math.PI) / 180;
+          const innerTick = maxR - (deg % 90 === 0 ? 8 : 4);
+          const outerTick = maxR;
+          const x1 = cx + Math.cos(rad) * innerTick;
+          const y1 = cy + Math.sin(rad) * innerTick;
+          const x2 = cx + Math.cos(rad) * outerTick;
+          const y2 = cy + Math.sin(rad) * outerTick;
+
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${deg % 90 === 0 ? 0.6 : 0.25})`;
+          ctx.lineWidth = deg % 90 === 0 ? 1.5 : 1;
+          ctx.stroke();
+
+          if (deg % 90 === 0) {
+            const labelDist = maxR + 12;
+            const lx = cx + Math.cos(rad) * labelDist;
+            const ly = cy + Math.sin(rad) * labelDist;
+            const cardinals: Record<number, string> = { 0: '090°', 90: '180°', 180: '270°', 270: '000°' };
+            ctx.font = '8px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.6)`;
+            ctx.fillText(cardinals[deg] || `${deg}°`, lx, ly);
+          }
+        }
+
+        // 3. Circular Audio Waveform (Oscilloscope Ring at 62% radius)
+        if (playing) {
+          ctx.beginPath();
+          const wavePoints = Math.min(bufferLength, 128);
+          for (let i = 0; i <= wavePoints; i++) {
+            const angle = (i / wavePoints) * Math.PI * 2 - Math.PI / 2;
+            const sample = (dataArray[i % wavePoints] / 255);
+            const waveR = maxR * 0.62 + (sample - 0.4) * 32 * (0.6 + bass * 0.8);
+            const wx = cx + Math.cos(angle) * waveR;
+            const wy = cy + Math.sin(angle) * waveR;
+            if (i === 0) ctx.moveTo(wx, wy);
+            else ctx.lineTo(wx, wy);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.3 + mid * 0.5})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        // 4. Perimeter Audio Spectrum Ticks (64 radial bars on outer ring)
+        const barCount = 64;
+        for (let i = 0; i < barCount; i++) {
+          const angle = (i / barCount) * Math.PI * 2;
+          const dataIdx = Math.floor((i / barCount) * (bufferLength / 2));
+          const val = dataArray[dataIdx] / 255;
+          const barLen = val * 22 * (0.8 + bass * 0.5);
+
+          if (barLen > 2) {
+            const bx1 = cx + Math.cos(angle) * (maxR + 2);
+            const by1 = cy + Math.sin(angle) * (maxR + 2);
+            const bx2 = cx + Math.cos(angle) * (maxR + 2 + barLen);
+            const by2 = cy + Math.sin(angle) * (maxR + 2 + barLen);
+
+            ctx.beginPath();
+            ctx.moveTo(bx1, by1);
+            ctx.lineTo(bx2, by2);
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.3 + val * 0.7})`;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
+        }
+
+        // 5. Rotating Radar Sweep Beam & Phosphor Fading Wedge
+        const sweepSpeed = playing ? 0.024 + bass * 0.015 : 0.016;
+        sweepAngle = (sweepAngle + sweepSpeed) % (Math.PI * 2);
+
+        // Phosphor Trailing Wedge (Afterglow)
+        const trailSlices = 24;
+        const trailSpan = Math.PI / 3.2; // ~56 degrees of phosphor tail
+        for (let s = 0; s < trailSlices; s++) {
+          const aStart = sweepAngle - (s / trailSlices) * trailSpan;
+          const aEnd = sweepAngle - ((s + 1) / trailSlices) * trailSpan;
+          const alpha = (1 - s / trailSlices) * 0.22 * (0.7 + bass * 0.5);
+
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.arc(cx, cy, maxR, aEnd, aStart);
+          ctx.closePath();
+          ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+          ctx.fill();
+        }
+
+        // The Laser Sweep Beam Line
+        const sx = cx + Math.cos(sweepAngle) * maxR;
+        const sy = cy + Math.sin(sweepAngle) * maxR;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(sx, sy);
+        ctx.shadowBlur = 12 + bass * 12;
+        ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.9)`;
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.95)`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        // 6. Target Contacts (Radar Blips)
+        blips.forEach(blip => {
+          // Check if sweep line just passed over blip
+          const diff = (sweepAngle - blip.angle + Math.PI * 2) % (Math.PI * 2);
+          if (diff < 0.08) {
+            blip.intensity = 1.0;
+          } else {
+            blip.intensity *= 0.965; // smooth phosphor decay
+          }
+
+          if (blip.intensity > 0.03) {
+            const bx = cx + Math.cos(blip.angle) * (maxR * blip.distRatio);
+            const by = cy + Math.sin(blip.angle) * (maxR * blip.distRatio);
+
+            // Blip core dot
+            ctx.beginPath();
+            ctx.arc(bx, by, 2.5 + blip.intensity * 2, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${blip.intensity})`;
+            ctx.fill();
+
+            // Expanding ripple ping ring
+            const pingR = 4 + (1 - blip.intensity) * 18;
+            ctx.beginPath();
+            ctx.arc(bx, by, pingR, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${blip.intensity * 0.6})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Tactical callout text
+            if (blip.intensity > 0.25) {
+              ctx.font = '7px monospace';
+              ctx.textAlign = 'left';
+              ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${blip.intensity * 0.8})`;
+              ctx.fillText(`${blip.label} [${Math.round(blip.distRatio * 100)}NM]`, bx + 7, by - 4);
+            }
+          }
+        });
+
+        // 7. Center Pulsing Bullseye Core
+        const coreRadius = 4 + bass * 8;
+        ctx.beginPath();
+        ctx.arc(cx, cy, coreRadius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${0.6 + bass * 0.4})`;
+        ctx.shadowBlur = 10 * bass;
+        ctx.shadowColor = `rgba(${r}, ${g}, ${b}, 0.8)`;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, coreRadius + 4, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, 0.4)`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 8. Tactical Telemetry Overlay in corners
+        ctx.font = '8px monospace';
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, 0.45)`;
+        ctx.textAlign = 'left';
+        ctx.fillText('SYS.RADAR // ACTIVE_360°', 14, 20);
+        ctx.fillText(`BEARING: ${Math.round((sweepAngle * 180 / Math.PI) % 360).toString().padStart(3, '0')}°`, 14, 32);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(`CONTACTS: ${blips.filter(b => b.intensity > 0.2).length} ACQ`, width - 14, 20);
+        ctx.fillText(`FREQ: ${(44.1 + bass * 5).toFixed(1)}KHZ`, width - 14, 32);
+
+        if (playing) {
+          animationRef.current = requestAnimationFrame(animateSonar);
+        }
+      };
+
+      animateSonar();
+    }
+
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
@@ -726,8 +1130,17 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
 
   if (visualizerMode === 'off' || visualizerMode === 'fade' || visualizerMode === 'scale') return null;
 
-  if (visualizerMode === 'wave' || visualizerMode === 'multiwave' || visualizerMode === 'aurora' || visualizerMode === 'stars') {
-    return <canvas ref={canvasRef} className="w-full h-full" />;
+  if (visualizerMode === 'wave' || visualizerMode === 'multiwave' || visualizerMode === 'aurora' || visualizerMode === 'stars' || visualizerMode === 'hex' || visualizerMode === 'sonar') {
+    return (
+      <canvas 
+        ref={canvasRef} 
+        className="w-full h-full" 
+        style={['hex', 'sonar'].includes(visualizerMode) ? {
+          WebkitMaskImage: 'radial-gradient(ellipse at center, black 35%, transparent 96%)',
+          maskImage: 'radial-gradient(ellipse at center, black 35%, transparent 96%)'
+        } : undefined}
+      />
+    );
   }
 
   return (

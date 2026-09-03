@@ -20,6 +20,7 @@ import { Terminal } from "./components/Terminal";
 import { MatrixBackground } from "./components/MatrixBackground";
 import { SystemCrash } from "./components/SystemCrash";
 import { MiniPlayer } from "./components/MiniPlayer";
+import { useRecentlyPlayed } from "./hooks/useRecentlyPlayed";
 
 function MusicApp() {
   const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist } = usePlaylist();
@@ -31,6 +32,7 @@ function MusicApp() {
   const player = useAudioPlayer(combinedSongs);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showBoot, setShowBoot] = useState(true);
+  const { recentlyPlayed, addRecentlyPlayed, clearRecentlyPlayed } = useRecentlyPlayed();
   
   // Terminal state
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
@@ -74,6 +76,15 @@ function MusicApp() {
       return () => clearTimeout(timer);
     }
   }, [loading]);
+
+  // Track recently played when song changes and is playing
+  useEffect(() => {
+    const song = combinedSongs[player.index];
+    if (song && player.playing) {
+      addRecentlyPlayed(song);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player.index, player.playing]);
 
   const handleRemoveFromPlaylist = (id: number) => {
     if (id < 0) {
@@ -122,7 +133,9 @@ function MusicApp() {
             onPlay={player.play} 
             onPause={player.pause} 
             onNext={player.next} 
-            onPrev={player.prev} 
+            onPrev={player.prev}
+            audioRef={player.audioRef}
+            duration={player.duration}
           />
           <Routes>
             <Route path="/" element={
@@ -136,6 +149,8 @@ function MusicApp() {
                 onRemoveFromPlaylist={handleRemoveFromPlaylist}
                 onBulkRemove={handleBulkRemove}
                 onReorderPlaylist={reorderPlaylist}
+                recentlyPlayed={recentlyPlayed}
+                onClearRecentlyPlayed={clearRecentlyPlayed}
                 localFilesInfo={{
                   requestAccess,
                   restoreAccess,

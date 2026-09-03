@@ -4,9 +4,10 @@ interface PaginationProps {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
+  className?: string;
 }
 
-export function Pagination({ currentPage, totalPages, onPageChange }: PaginationProps) {
+export function Pagination({ currentPage, totalPages, onPageChange, className }: PaginationProps) {
   if (totalPages <= 1) return null;
 
   const getPageNumbers = () => {
@@ -36,22 +37,22 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
   };
 
   return (
-    <div className="flex items-center justify-center space-x-2 mt-6 mb-4">
+    <div className={`flex items-center justify-center space-x-1.5 sm:space-x-2 ${className ?? 'mt-6 mb-4'}`}>
       <button
         onClick={handlePrev}
         disabled={currentPage === 1}
-        className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+        className="p-1.5 sm:p-2 rounded bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
         aria-label="Previous Page"
       >
-        <ChevronLeft className="w-5 h-5" />
+        <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
       </button>
 
-      <div className="flex items-center space-x-1 sm:space-x-2">
+      <div className="flex items-center space-x-1 sm:space-x-1.5">
         {getPageNumbers().map((page, index) => {
           if (page === '...') {
             return (
-              <div key={`ellipsis-${index}`} className="px-2 text-white/50">
-                <MoreHorizontal className="w-4 h-4" />
+              <div key={`ellipsis-${index}`} className="px-1.5 text-white/50">
+                <MoreHorizontal className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </div>
             );
           }
@@ -61,8 +62,8 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
             <button
               key={page}
               onClick={() => onPageChange(page as number)}
-              className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-medium transition-all ${isCurrent
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 shadow-[0_0_15px_rgba(34,211,238,0.2)]'
+              className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded text-xs font-mono font-medium transition-all shrink-0 ${isCurrent
+                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
                 : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:text-white'
                 }`}
             >
@@ -75,10 +76,10 @@ export function Pagination({ currentPage, totalPages, onPageChange }: Pagination
       <button
         onClick={handleNext}
         disabled={currentPage === totalPages}
-        className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+        className="p-1.5 sm:p-2 rounded bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
         aria-label="Next Page"
       >
-        <ChevronRight className="w-5 h-5" />
+        <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
       </button>
     </div>
   );

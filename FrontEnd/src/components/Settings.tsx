@@ -56,6 +56,10 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   useScrollLock(isOpen);
 
   const handleResetAll = () => {
+    // Clear all settings keys from localStorage so defaults persist on reload
+    const settingsKeys = ['theme','language','soundEnabled','visualizerMode','autoplay','scanlines','grid','matrixBg','zenMode','crossfade','progressBarMode'];
+    settingsKeys.forEach(k => localStorage.removeItem(k));
+
     setTheme("aqua");
     setLanguage("en");
     setSoundEnabled(true);
@@ -212,14 +216,14 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                     <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-[0.2em]">VISUAL_ENGINE:</span>
                     <span className="text-[8px] text-[var(--text-secondary)]/40 tracking-wider">Audio vizualizatsiya rejimi</span>
                   </div>
-                  <div className="grid grid-cols-4 border border-[var(--text-secondary)]/20 divide-x divide-y divide-[var(--text-secondary)]/20">
-                    {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale', 'aurora', 'stars']).map((mode) => (
+                  <div className="grid grid-cols-2 sm:grid-cols-5 border border-[var(--text-secondary)]/20 divide-x divide-y divide-[var(--text-secondary)]/20 font-mono">
+                    {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale', 'aurora', 'stars', 'hex', 'sonar']).map((mode) => (
                       <button
                         key={mode}
                         onClick={() => setVisualizerMode(mode as any)}
                         className={`px-1 py-2 text-[8px] sm:text-[9px] font-bold tracking-tighter uppercase transition-colors ${visualizerMode === mode ? 'bg-[var(--text-primary)] text-black' : 'text-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/5'}`}
                       >
-                        {t(mode)}
+                        {mode === 'hex' ? 'HEX GRID' : mode === 'sonar' ? 'SONAR RADAR' : t(mode)}
                       </button>
                     ))}
                   </div>

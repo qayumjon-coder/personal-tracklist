@@ -5,6 +5,10 @@ export function LoadingScreen() {
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const { playClick, playStartup, playScan } = useSoundEffects();
+  const playScanRef = useRef(playScan);
+  const playStartupRef = useRef(playStartup);
+  useEffect(() => { playScanRef.current = playScan; }, [playScan]);
+  useEffect(() => { playStartupRef.current = playStartup; }, [playStartup]);
   
   // Track if interaction has happened so we can play sounds
   const [hasInteracted, setHasInteracted] = useState(false);
@@ -28,23 +32,28 @@ export function LoadingScreen() {
         setLogs(prev => [...prev.slice(-3), `> ${bootLogs[currentLog]}`]);
         setProgress(Math.min(100, (currentLog + 1) * 15));
         
-        // Play scan sound if we have interacted
+        // Use refs so sound functions are never stale
         if (interactedRef.current && currentLog < bootLogs.length - 1) {
-           playScan();
+           playScanRef.current();
         } else if (interactedRef.current && currentLog === bootLogs.length - 1) {
-           playStartup(); // Play final boot sound
+           playStartupRef.current();
         }
 
         currentLog++;
       } else {
         setProgress(100);
         bootFinishedRef.current = true;
+        // If user already interacted but boot finished before their tap, play now
+        if (interactedRef.current) {
+          playStartupRef.current();
+        }
         clearInterval(interval);
       }
     }, 400);
 
     return () => clearInterval(interval);
-  }, [playScan, playStartup]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleInteraction = () => {
     if (!hasInteracted) {
@@ -52,10 +61,10 @@ export function LoadingScreen() {
       interactedRef.current = true;
       
       if (bootFinishedRef.current) {
-        // If boot is already done, just play the startup sound immediately
-        playStartup();
+        // Boot already done — play startup immediately
+        playStartupRef.current();
       } else {
-        // Try to initialize audio context on first click
+        // Wake up AudioContext on first gesture
         playClick(); 
       }
     }

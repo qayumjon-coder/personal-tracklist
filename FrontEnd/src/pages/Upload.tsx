@@ -61,12 +61,53 @@ async function fetchGenreFromMusicBrainz(title: string, artist: string): Promise
 
 /** Download a remote image URL and return it as a File (so it can be uploaded to Supabase) */
 async function urlToFile(imageUrl: string, filename: string): Promise<File> {
-  // Use a CORS proxy for cross-origin images
-  const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
-  const res = await fetch(proxyUrl);
-  if (!res.ok) throw new Error("Image fetch failed");
-  const blob = await res.blob();
-  return new File([blob], filename, { type: blob.type || "image/jpeg" });
+  // 1. Direct fetch (fastest if CORS is enabled on source CDN)
+  try {
+    const res = await fetch(imageUrl, { mode: 'cors' });
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.size > 0) return new File([blob], filename, { type: blob.type || "image/jpeg" });
+    }
+  } catch {
+    // Ignore
+  }
+
+  // 2. wsrv.nl image proxy (very fast and reliable)
+  try {
+    const res = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(imageUrl)}&output=jpg`);
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.size > 0) return new File([blob], filename, { type: blob.type || "image/jpeg" });
+    }
+  } catch {
+    // Ignore
+  }
+
+  // 3. corsproxy.io
+  try {
+    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
+    const res = await fetch(proxyUrl);
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.size > 0) return new File([blob], filename, { type: blob.type || "image/jpeg" });
+    }
+  } catch {
+    // Ignore
+  }
+
+  // 4. allorigins.win
+  try {
+    const allOriginsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
+    const res = await fetch(allOriginsUrl);
+    if (res.ok) {
+      const blob = await res.blob();
+      if (blob.size > 0) return new File([blob], filename, { type: blob.type || "image/jpeg" });
+    }
+  } catch {
+    // Ignore
+  }
+
+  throw new Error("Image fetch failed");
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -123,6 +164,8 @@ export function Upload() {
   const categories = ["General", ...Array.from(new Set(songs.map(s => s.category || "General")))];
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string>("");
+  const [coverTab, setCoverTab] = useState<"file" | "url">("file");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -168,14 +211,21 @@ export function Upload() {
         throw new Error("Iltimos, Spotify yoki SoundCloud havolasini kiriting.");
       }
 
-      // Fetch thumbnail and convert to File
-      let fetchedCoverFile: File | null = null;
-      try {
-        fetchedCoverFile = await urlToFile(thumbnailUrl, "imported_cover.jpg");
-        setCoverFile(fetchedCoverFile);
-        setPreviewUrl(URL.createObjectURL(fetchedCoverFile));
-      } catch {
+      // Immediately set URL preview and coverUrl so submit works even if image download is slow or blocked
+      if (thumbnailUrl) {
+        setCoverUrl(thumbnailUrl);
         setPreviewUrl(thumbnailUrl);
+        setCoverFile(null);
+
+        // Best effort: download thumbnail as File in background
+        urlToFile(thumbnailUrl, "imported_cover.jpg")
+          .then(fetchedFile => {
+            setCoverFile(fetchedFile);
+            setPreviewUrl(URL.createObjectURL(fetchedFile));
+          })
+          .catch(err => {
+            console.warn("Could not convert imported cover URL to File, using direct URL:", err);
+          });
       }
 
       // Genre lookup via MusicBrainz (runs in parallel, non-blocking)
@@ -247,6 +297,7 @@ export function Upload() {
             const extractedFile = new File([blob], `extracted_cover.${picture.format.split('/')[1] || 'jpg'}`, { type: picture.format });
             
             setCoverFile(extractedFile);
+            setCoverUrl("");
             setPreviewUrl(URL.createObjectURL(blob));
           }
 
@@ -305,6 +356,7 @@ export function Upload() {
           return;
         }
         setCoverFile(file);
+        setCoverUrl("");
         setPreviewUrl(URL.createObjectURL(file));
       }
     }
@@ -313,7 +365,14 @@ export function Upload() {
   // ── Submit ──────────────────────────────────────────────────────────────────
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!audioFile || !coverFile || !formData.title || !formData.artist) {
+    
+    // Determine effective cover (File or URL string)
+    const effectiveCover: File | string | null = 
+      coverFile || 
+      (coverUrl.trim() ? coverUrl.trim() : null) || 
+      (previewUrl && !previewUrl.startsWith("blob:") ? previewUrl.trim() : null);
+
+    if (!audioFile || !effectiveCover || !formData.title.trim() || !formData.artist.trim()) {
       toast.error("All fields are required!");
       return;
     }
@@ -348,7 +407,7 @@ export function Upload() {
         formData.category,
         finalDuration,
         audioFile,
-        coverFile,
+        effectiveCover,
         formData.lyrics,
         uploaderName,
         uploaderFp
@@ -660,27 +719,112 @@ export function Upload() {
           </div>
 
           {/* Cover Upload */}
-          <div className="relative group">
-            <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest mb-2">
-              Cover Art
-              {previewUrl && !coverFile && (
-                <span className="ml-2 text-[var(--accent)] normal-case text-[9px]">(import'dan olindi — qo'lda almashtirish mumkin)</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest">
+                Cover Art
+              </label>
+              <div className="flex items-center gap-1 border border-[var(--text-secondary)]/40 p-0.5 bg-black/40 text-[10px]">
+                <button
+                  type="button"
+                  onClick={() => setCoverTab("file")}
+                  className={`px-2 py-1 font-mono uppercase tracking-wider transition-colors ${coverTab === 'file' ? 'bg-[var(--accent)] text-[var(--bg-main)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                >
+                  Fayl
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCoverTab("url")}
+                  className={`px-2 py-1 font-mono uppercase tracking-wider transition-colors ${coverTab === 'url' ? 'bg-[var(--accent)] text-[var(--bg-main)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                >
+                  Havola (URL)
+                </button>
+              </div>
+            </div>
+
+            {/* URL input mode */}
+            {coverTab === "url" && (
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={coverUrl}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCoverUrl(val);
+                    setPreviewUrl(val.trim() || null);
+                    setCoverFile(null);
+                  }}
+                  placeholder="https://example.com/cover.jpg"
+                  className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-2.5 text-xs font-mono focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_var(--accent)] transition-all placeholder:text-[var(--text-secondary)]/40"
+                />
+                {coverUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCoverUrl("");
+                      setPreviewUrl(null);
+                    }}
+                    className="px-3 border border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs font-mono"
+                    title="Tozalash"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Preview & File Box */}
+            <div className={`relative h-60 border-2 border-dashed border-[var(--text-secondary)] flex flex-col items-center justify-center transition-colors group hover:border-[var(--accent)] overflow-hidden ${coverFile || previewUrl ? 'border-solid' : ''}`}>
+              {coverTab === "file" && (
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  onChange={(e) => handleFileChange(e, 'cover')}
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                />
               )}
-            </label>
-            <div className={`relative h-64 border-2 border-dashed border-[var(--text-secondary)] flex flex-col items-center justify-center cursor-pointer transition-colors group-hover:border-[var(--accent)] overflow-hidden ${coverFile || previewUrl ? 'border-solid' : ''}`}>
-               <input 
-                type="file" 
-                accept="image/*" 
-                onChange={(e) => handleFileChange(e, 'cover')}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-              />
+
               {previewUrl ? (
-                <img src={previewUrl} alt="Cover Preview" className="absolute inset-0 w-full h-full object-cover z-10" />
+                <div className="absolute inset-0 w-full h-full">
+                  <img src={previewUrl} alt="Cover Preview" className="w-full h-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none" />
+                  
+                  {/* Badge & actions on preview */}
+                  <div className="absolute top-2 left-2 z-30">
+                    <span className="px-2 py-0.5 bg-black/80 border border-[var(--accent)]/60 text-[var(--accent)] text-[9px] font-mono uppercase tracking-wider">
+                      {coverFile ? "Fayldan yuklandi" : (coverUrl ? "Havoladan (URL)" : "Import qilingan")}
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCoverFile(null);
+                      setCoverUrl("");
+                      setPreviewUrl(null);
+                    }}
+                    className="absolute top-2 right-2 z-30 p-1.5 bg-black/80 border border-red-500/60 text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-md"
+                    title="Muqovani olib tashlash"
+                  >
+                    <X size={13} />
+                  </button>
+
+                  {coverTab === "file" && (
+                    <div className="absolute bottom-2 inset-x-2 text-center z-10 pointer-events-none">
+                      <span className="text-[10px] text-white/80 bg-black/60 px-2 py-1 border border-white/10 backdrop-blur-sm">
+                        O'zgartirish uchun bosing yoki yangi rasm tashlang
+                      </span>
+                    </div>
+                  )}
+                </div>
               ) : (
-                <>
-                  <ImageIcon className="mb-2 text-[var(--text-secondary)]" />
-                  <span className="text-xs text-[var(--text-secondary)]">UPLOAD COVER IMAGE (JPG/PNG)</span>
-                </>
+                <div className="p-4 text-center">
+                  <ImageIcon className="mb-2 mx-auto text-[var(--text-secondary)]" size={24} />
+                  <span className="text-xs text-[var(--text-secondary)] block">
+                    {coverTab === "file" ? "UPLOAD COVER IMAGE (JPG/PNG)" : "Yuqoridagi maydonga rasm havolasini kiriting"}
+                  </span>
+                </div>
               )}
             </div>
           </div>

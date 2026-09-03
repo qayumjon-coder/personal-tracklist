@@ -4,7 +4,7 @@ import type { Song } from "../types/Song";
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import type { DropResult } from "@hello-pangea/dnd";
-import { Trash2, MoreVertical, Check, Square, CheckSquare2, X, LayoutGrid, List, FolderPlus, Disc, GripVertical, Download } from "lucide-react";
+import { Trash2, MoreVertical, Check, Square, CheckSquare2, X, LayoutGrid, List, FolderPlus, Disc, GripVertical, Download, WifiOff, ListPlus } from "lucide-react";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Pagination } from "./Pagination";
 import { updateSong } from "../services/musicApi";
@@ -16,6 +16,8 @@ interface PlaylistProps {
   onRemove?: (id: number) => void;
   onBulkRemove?: (ids: number[]) => void;
   onReorder?: (startIndex: number, endIndex: number) => void;
+  isCached?: (id: number) => boolean;
+  onAddToQueue?: (song: Song) => void;
   localFilesInfo?: {
     requestAccess: () => void;
     restoreAccess: () => void;
@@ -26,7 +28,7 @@ interface PlaylistProps {
   }
 }
 
-export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRemove, onReorder, localFilesInfo }: PlaylistProps) {
+export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRemove, onReorder, localFilesInfo, isCached, onAddToQueue }: PlaylistProps) {
   const { playClick, playHover } = useSoundEffects();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [activeMenuId, setActiveMenuId] = useState<number | null>(null);
@@ -440,6 +442,11 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                                       ▶ {song.play_count}
                                     </div>
                                   )}
+                                  {isCached && isCached(song.id) && (
+                                    <div title="Offline mavjud" className="text-[var(--accent)]/40">
+                                      <WifiOff size={8} />
+                                    </div>
+                                  )}
                                   <div className={`text-[8px] font-mono opacity-40 ${isActive ? 'text-[var(--accent)] opacity-80' : ''}`}>
                                     {formatDuration(song.duration || dynamicDurations[song.id])}
                                   </div>
@@ -468,7 +475,16 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
 
                               {/* Dropdown Menu */}
                               {isMenuOpen && (
-                                <div className="absolute right-0 top-full mt-1 w-32 bg-[var(--bg-main)] border border-[var(--text-secondary)]/30 z-50 shadow-2xl animate-in fade-in zoom-in-95 duration-200 backdrop-blur-xl">
+                                <div className="absolute right-0 top-full mt-1 w-36 bg-[var(--bg-main)] border border-[var(--text-secondary)]/30 z-50 shadow-2xl animate-in fade-in zoom-in-95 duration-200 backdrop-blur-xl">
+                                  {onAddToQueue && (
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); onAddToQueue(song); setActiveMenuId(null); }}
+                                      className="w-full flex items-center gap-3 px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors border-b border-[var(--text-secondary)]/10"
+                                    >
+                                      <ListPlus size={12} />
+                                      <span>Add to Queue</span>
+                                    </button>
+                                  )}
                                   <button
                                     onClick={(e) => { e.stopPropagation(); toggleSelect(song.id); }}
                                     className="w-full flex items-center gap-3 px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors border-b border-[var(--text-secondary)]/10"

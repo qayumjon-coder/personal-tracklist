@@ -132,10 +132,20 @@ export function LyricsView({ song, audioRef, onClose }: LyricsViewProps) {
               );
             })
           ) : (
-            <div className="flex flex-col items-center justify-center h-full gap-4 opacity-50 py-20">
-               <Mic2 size={48} className="text-[var(--accent)]/50" />
-               <p className="text-2xl font-mono uppercase tracking-[0.3em] text-center">No lyrics available for this track</p>
-               <div className="w-20 h-0.5 bg-[var(--accent)]/30" />
+            <div className="flex flex-col items-center justify-center h-full gap-6 py-20">
+               <div className="relative">
+                 <Mic2 size={52} className="text-[var(--accent)]/20" />
+                 <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-[var(--accent)]/40 animate-ping" />
+               </div>
+               <div className="text-center">
+                 <p className="text-xl font-black uppercase tracking-[0.3em] text-white/50 mb-2">No Lyrics Found</p>
+                 <p className="text-[10px] font-mono text-[var(--accent)]/30 tracking-[0.25em] uppercase">This track has no synchronized lyrics data</p>
+               </div>
+               <div className="flex gap-2 items-center opacity-30">
+                 <div className="w-8 h-px bg-[var(--accent)]" />
+                 <span className="text-[9px] font-mono text-[var(--accent)] tracking-widest">LYRICS_NULL</span>
+                 <div className="w-8 h-px bg-[var(--accent)]" />
+               </div>
             </div>
           )}
         </div>

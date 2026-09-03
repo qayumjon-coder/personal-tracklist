@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { incrementPlayCount } from "../services/musicApi";
+import type { Song } from "../types/Song";
 
 export type RepeatMode = "off" | "one" | "all";
 export type AudioEffect = "none" | "underwater" | "radio" | "8d" | "bass-boost" | "echo";
@@ -19,6 +20,8 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     const saved = localStorage.getItem('fronto_playback_rate');
     return saved ? parseFloat(saved) : 1;
   });
+  // Queue: songs to play next (session-only, not persisted)
+  const [queue, setQueue] = useState<Song[]>([]);
 
   const { autoplay, crossfade } = useSettings();
 
@@ -409,6 +412,21 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
 
   const next = () => {
     if (songs.length === 0) return;
+    // If there's something in the queue, play that first
+    if (queue.length > 0) {
+      const [nextSong, ...rest] = queue;
+      setQueue(rest);
+      // Find the song in the main songs array and jump to it
+      const idx = songs.findIndex(s => s.id === nextSong.id);
+      if (idx !== -1) {
+        setIndex(idx);
+      } else {
+        // Song not in current playlist — just advance normally
+        setIndex(prev => (prev + 1) % songs.length);
+      }
+      setPlaying(true);
+      return;
+    }
     setIndex(prev => (prev + 1) % songs.length);
     setPlaying(true);
   };
@@ -514,6 +532,16 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     }
   };
 
+  const addToQueue = useCallback((song: Song) => {
+    setQueue(prev => [...prev, song]);
+  }, []);
+
+  const removeFromQueue = useCallback((index: number) => {
+    setQueue(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const clearQueue = useCallback(() => setQueue([]), []);
+
   return {
     index, playing, volume, isMuted, duration,
     shuffle, repeat, audioError, play, pause, next, prev, setVolume, toggleMute,
@@ -531,6 +559,10 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     activeEffect,
     setEffect,
     playbackRate,
-    setPlaybackRate
+    setPlaybackRate,
+    queue,
+    addToQueue,
+    removeFromQueue,
+    clearQueue,
   };
 }

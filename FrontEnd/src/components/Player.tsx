@@ -2,10 +2,10 @@ import type { Song } from "../types/Song";
 import SEO from "./SEO";
 
 import { useSettings } from "../contexts/SettingsContext";
-import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, ChevronDown, Share2, Moon, Clock, Minus, QrCode } from "lucide-react";
+import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, ChevronDown, Share2, Moon, Clock, Minus, QrCode, History, ListPlus, Trash2 } from "lucide-react";
 import { Pagination } from "./Pagination";
 import { Link, useLocation } from "react-router-dom";
-import { searchSongs, getTrendingSongs, incrementPlayCount } from "../services/musicApi";
+import { searchSongs, getTrendingSongs } from "../services/musicApi";
 import { toast } from "sonner";
 
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
@@ -25,6 +25,7 @@ import { HotkeysMap } from './HotkeysMap';
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useUploadPermission } from "../hooks/useUploadPermission";
 import { UploadRequestModal } from "./UploadRequestModal";
+import { useCachedSongs } from "../hooks/useCachedSongs";
 
 interface PlayerProps {
   songs: Song[];
@@ -39,6 +40,8 @@ interface PlayerProps {
   loadingMore?: boolean;
   hasMore?: boolean;
   onLoadMore?: () => void;
+  recentlyPlayed?: Song[];
+  onClearRecentlyPlayed?: () => void;
   localFilesInfo?: {
     requestAccess: () => void;
     restoreAccess: () => void;
@@ -50,7 +53,7 @@ interface PlayerProps {
   };
 }
 
-export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, onReorderPlaylist, loadingMore, hasMore, onLoadMore, localFilesInfo }: PlayerProps) {
+export function Player({ songs, loading, error, player, onOpenSettings, onAddToPlaylist, onRemoveFromPlaylist, onBulkRemove, onReorderPlaylist, loadingMore, hasMore, onLoadMore, localFilesInfo, recentlyPlayed = [], onClearRecentlyPlayed }: PlayerProps) {
   const { playClick, playHover, playStartup } = useSoundEffects();
   const { visualizerMode, zenMode, setZenMode } = useSettings();
   const location = useLocation();
@@ -82,6 +85,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [isKaraokeOpen, setIsKaraokeOpen] = useState(false);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
   const [isSleepTimerMenuOpen, setIsSleepTimerMenuOpen] = useState(false);
+  // Right panel tab: 'playlist' | 'queue' | 'recent'
+  const [rightTab, setRightTab] = useState<'playlist' | 'queue' | 'recent'>('playlist');
+  // Search filter state
+  const [searchFilterArtist, setSearchFilterArtist] = useState('');
+  const [searchFilterDuration, setSearchFilterDuration] = useState<'all' | 'short' | 'medium' | 'long'>('all');
   // Upload permission
   const uploadPerm = useUploadPermission();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -95,6 +103,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [showVolumeHUD, setShowVolumeHUD] = useState(false);
   const volumeTimerRef = useRef<any>(null);
   const safeIndex = Math.min(Math.max(0, player.index), Math.max(0, songs.length - 1));
+  // Offline cache indicator
+  const { isCached } = useCachedSongs(songs);
   const current: Song | undefined = songs[safeIndex];
 
   // Trending songs from full DB
@@ -104,12 +114,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     getTrendingSongs(10).then(setTrendingSongs).catch(console.error);
   }, []);
 
-  // Increment play count when song starts playing
-  useEffect(() => {
-    if (player.playing && current) {
-      incrementPlayCount(current.id).catch(console.error);
-    }
-  }, [player.playing, current?.id]);
+  // Play count is tracked in useAudioPlayer (after 15s of listening) — no duplicate here
 
   // C3: Now Playing Toast Notification on track change
   const prevTrackIdRef = useRef<number | null>(null);
@@ -214,8 +219,13 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
   const drawerDragDistance = (drawerTouchStartY !== null && drawerTouchCurrentY !== null) ? drawerTouchCurrentY - drawerTouchStartY : 0;
 
-  // Show volume HUD when volume changes
+  // Show volume HUD when volume changes — skip initial mount
+  const volumeMountedRef = useRef(false);
   useEffect(() => {
+    if (!volumeMountedRef.current) {
+      volumeMountedRef.current = true;
+      return;
+    }
     setShowVolumeHUD(true);
     if (volumeTimerRef.current) clearTimeout(volumeTimerRef.current);
     volumeTimerRef.current = setTimeout(() => setShowVolumeHUD(false), 2000);
@@ -323,9 +333,13 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     e.preventDefault();
   };
 
-  // Populate search results with suggestions from DB on open/clear
+  // Populate search results with suggestions from DB on open
+  // Only fetch when newly opened and query is empty — not on every re-render
+  const searchOpenedRef = useRef(false);
   useEffect(() => {
     if (isSearchOpen && !searchQuery.trim()) {
+      if (searchOpenedRef.current && searchResults.length > 0) return; // already loaded
+      searchOpenedRef.current = true;
       setIsSearching(true);
       searchSongs('').then(results => {
         setSearchResults(results);
@@ -335,8 +349,10 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       }).finally(() => {
         setIsSearching(false);
       });
+    } else if (!isSearchOpen) {
+      searchOpenedRef.current = false; // reset so next open re-fetches
     }
-  }, [isSearchOpen, searchQuery]);
+  }, [isSearchOpen]);
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -381,9 +397,10 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           }
           break;
         case 'Escape':
-          if (isSearchOpen) setIsSearchOpen(false);
-          if (isKaraokeOpen) setIsKaraokeOpen(false);
-          if (isHotkeysOpen) setIsHotkeysOpen(false);
+          // Priority order: search > karaoke > hotkeys
+          if (isSearchOpen) { setIsSearchOpen(false); }
+          else if (isKaraokeOpen) { setIsKaraokeOpen(false); }
+          else if (isHotkeysOpen) { setIsHotkeysOpen(false); }
           break;
         case 'KeyH':
         case 'Slash': // '?' is often 'Slash' with shift
@@ -445,6 +462,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     "All",
     "Trending",
     ...(likedCount > 0 ? ["Favorites"] : []),
+    ...(recentlyPlayed.length > 0 ? ["Recently Played"] : []),
+    ...(player.queue.length > 0 ? ["Queue"] : []),
     ...categoriesList,
   ];
 
@@ -452,7 +471,9 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     selectedCategory === "All" ? songs :
       selectedCategory === "Trending" ? trendingSongs :
         selectedCategory === "Favorites" ? songs.filter(s => likedIds.has(s.id)) :
-          songs.filter(s => (s.category || "General") === selectedCategory);
+          selectedCategory === "Recently Played" ? recentlyPlayed :
+            selectedCategory === "Queue" ? player.queue :
+              songs.filter(s => (s.category || "General") === selectedCategory);
 
   if (loading) {
     return (
@@ -539,7 +560,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         {/* Search Modal */}
         {isSearchOpen && (
           <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[80vh] flex flex-col">
+            <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-4 sm:p-6 relative max-h-[85vh] sm:max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
               <button
                 onClick={() => setIsSearchOpen(false)}
                 className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
@@ -547,12 +568,12 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 <X size={20} />
               </button>
 
-              <h2 className="text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-6 uppercase">
+              <h2 className="text-lg sm:text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-3 sm:mb-4 uppercase">
                 Search Database
               </h2>
 
               {lastSearchQuery && (
-                <div className="mb-4 flex items-center justify-between p-2 bg-black/30 border border-[var(--text-secondary)]/20">
+                <div className="mb-3 flex items-center justify-between p-2 bg-black/30 border border-[var(--text-secondary)]/20">
                   <div className="flex items-center gap-2 flex-1 overflow-hidden">
                     <span className="text-[9px] text-[var(--text-secondary)]/60 uppercase tracking-wider shrink-0">Last:</span>
                     <span className="text-[10px] text-[var(--accent)]/80 font-mono truncate">{lastSearchQuery}</span>
@@ -567,13 +588,13 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 </div>
               )}
 
-              <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+              <form onSubmit={handleSearch} className="flex gap-2 mb-3">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="SEARCH ARTIST OR TITLE..."
-                  className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-3 text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
+                  className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-2.5 sm:p-3 text-xs sm:text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
                   autoFocus
                 />
                 <button
@@ -585,14 +606,50 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 </button>
               </form>
 
-              <div ref={searchScrollRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
+              {/* Filter Chips */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                <span className="text-[8px] sm:text-[9px] font-mono text-[var(--text-secondary)]/50 uppercase tracking-widest self-center shrink-0">Filter:</span>
+                {/* Duration chips */}
+                {(['all', 'short', 'medium', 'long'] as const).map(d => (
+                  <button
+                    key={d}
+                    onClick={() => setSearchFilterDuration(d)}
+                    className={`px-2 py-1 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider border transition-all ${
+                      searchFilterDuration === d
+                        ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10 font-bold shadow-[0_0_8px_rgba(var(--accent-rgb),0.2)]'
+                        : 'border-[var(--text-secondary)]/20 text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:text-white'
+                    }`}
+                  >
+                    {d === 'all' ? 'Any' : d === 'short' ? '< 2m' : d === 'medium' ? '2-5m' : '> 5m'}
+                  </button>
+                ))}
+                {searchFilterArtist && (
+                  <button
+                    onClick={() => setSearchFilterArtist('')}
+                    className="px-2 py-1 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/15 flex items-center gap-1 shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]"
+                  >
+                    <span className="truncate max-w-[120px] sm:max-w-[160px]">🎤 {searchFilterArtist}</span> <X size={10} />
+                  </button>
+                )}
+              </div>
+
+              <div ref={searchScrollRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-2 pr-0.5">
                 {searchResults.length === 0 && !isSearching && searchQuery && (
                   <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
                     NO DATA FOUND IN SECTOR
                   </div>
                 )}
 
-                {searchResults.map((song) => {
+                {searchResults
+                  .filter(song => {
+                    if (searchFilterArtist && !(song.artist || '').toLowerCase().includes(searchFilterArtist.toLowerCase())) return false;
+                    const dur = song.duration || 0;
+                    if (searchFilterDuration === 'short' && dur >= 120) return false;
+                    if (searchFilterDuration === 'medium' && (dur < 120 || dur >= 300)) return false;
+                    if (searchFilterDuration === 'long' && dur < 300) return false;
+                    return true;
+                  })
+                  .map((song) => {
                   const inPlaylist = songs.some(s => s.id === song.id);
                   return (
                     <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
@@ -600,7 +657,13 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                         <img src={song.coverUrl} alt={`${song.title} cover`} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
                         <div className="min-w-0">
                           <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
-                          <div className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider">{song.artist}</div>
+                          <button
+                            onClick={() => setSearchFilterArtist(song.artist || '')}
+                            className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider hover:text-[var(--accent)] transition-colors"
+                            title="Filter by this artist"
+                          >
+                            {song.artist}
+                          </button>
                         </div>
                       </div>
 
@@ -874,7 +937,9 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
                   {/* Dynamic Visualizer Background */}
-                  <div className={`absolute inset-0 pointer-events-none mix-blend-screen transition-all duration-500 ${['orbit', 'grid', 'matrix'].includes(visualizerMode)
+                  <div className={`absolute inset-0 pointer-events-none mix-blend-screen transition-all duration-500 ${['hex', 'sonar'].includes(visualizerMode)
+                      ? 'opacity-60'
+                      : ['orbit', 'grid', 'matrix'].includes(visualizerMode)
                       ? 'opacity-35'
                       : 'opacity-30'
                     }`}>
@@ -929,6 +994,13 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                         alt={current?.title || 'Unknown Track'}
                         className={`w-full h-full object-cover transition-all duration-500 ease-out ${coverFading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
                       />
+                      {/* Sleep Timer Badge */}
+                      {player.sleepTimer !== null && (
+                        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/70 border border-[var(--accent)]/50 px-2 py-1 text-[8px] font-mono text-[var(--accent)] backdrop-blur-sm animate-pulse z-10">
+                          <Moon size={8} fill="currentColor" />
+                          <span>{player.sleepTimer}M</span>
+                        </div>
+                      )}
                     </div>
 
                     {/* Cover Art Reflection */}
@@ -1104,65 +1176,174 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                     <ChevronDown className="absolute right-4 text-[var(--text-secondary)]/50" size={16} />
                   </div>
                 </div>
-                {/* Playlist Header */}
-                <div className="p-3 md:p-4 border-b border-[var(--text-secondary)]/30 bg-[var(--text-secondary)]/5 flex justify-between items-center">
-                  <div>
-                    <h3 className="text-sm font-bold text-[var(--text-primary)] tracking-widest font-mono uppercase">Tracklist</h3>
-                    <p className="text-[10px] text-[var(--text-secondary)] mt-0.5 font-mono">{filteredSongs.length} SONGS_LOADED</p>
-                  </div>
-
-                  {/* Category Dropdown (Mini) */}
-                  <div className="relative">
+                {/* Right Panel Tabs */}
+                <div className="flex items-stretch border-b border-[var(--text-secondary)]/30 bg-[var(--text-secondary)]/5 shrink-0">
+                  {[
+                    { id: 'playlist', label: 'Tracklist', icon: <ListMusic size={11} /> },
+                    { id: 'queue',    label: `Queue${player.queue.length > 0 ? ` (${player.queue.length})` : ''}`, icon: <ListPlus size={11} /> },
+                    { id: 'recent',   label: 'Recent', icon: <History size={11} /> },
+                  ].map(tab => (
                     <button
-                      onClick={() => { playClick(); setIsConfigMenuOpen(!isConfigMenuOpen); }}
-                      onMouseEnter={playHover}
-                      className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-[10px] border border-[var(--text-secondary)]/30 px-2 py-1 bg-black/50 flex items-center gap-2 w-32 justify-between"
+                      key={tab.id}
+                      onClick={() => setRightTab(tab.id as any)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[8px] font-mono uppercase tracking-wider transition-all border-b-2 ${
+                        rightTab === tab.id
+                          ? 'border-[var(--accent)] text-[var(--accent)]'
+                          : 'border-transparent text-[var(--text-secondary)] hover:text-white'
+                      }`}
                     >
-                      <span className="truncate">{selectedCategory.toUpperCase()}</span>
-                      <span>{isConfigMenuOpen ? '▴' : '▾'}</span>
+                      {tab.icon} {tab.label}
                     </button>
-
-                    {isConfigMenuOpen && (
-                      <div className="absolute right-0 top-full mt-1 w-32 bg-[var(--bg-main)] border border-[var(--text-secondary)] z-50 shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                        {categories.map(cat => (
-                          <button
-                            key={cat}
-                            onClick={() => { playClick(); setSelectedCategory(cat); setIsConfigMenuOpen(false); }}
-                            className={`w-full text-left px-3 py-2 text-[10px] font-mono uppercase tracking-wider border-b border-[var(--text-secondary)]/10 hover:bg-[var(--text-secondary)]/10 ${selectedCategory === cat ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'}`}
-                          >
-                            {cat}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  ))}
                 </div>
+
+                {/* Category filter row — only in playlist tab */}
+                {rightTab === 'playlist' && (
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--text-secondary)]/10 bg-black/20">
+                    <span className="text-[8px] font-mono text-[var(--text-secondary)]/40 tracking-widest">{filteredSongs.length} SONGS</span>
+                    <div className="relative">
+                      <button
+                        onClick={() => { playClick(); setIsConfigMenuOpen(!isConfigMenuOpen); }}
+                        onMouseEnter={playHover}
+                        className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-[9px] border border-[var(--text-secondary)]/30 px-2 py-1 bg-black/50 flex items-center gap-2 w-28 justify-between"
+                      >
+                        <span className="truncate">{selectedCategory.toUpperCase()}</span>
+                        <span>{isConfigMenuOpen ? '▴' : '▾'}</span>
+                      </button>
+                      {isConfigMenuOpen && (
+                        <div className="absolute right-0 top-full mt-1 w-36 bg-[var(--bg-main)] border border-[var(--text-secondary)] z-50 shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                          {categories.map(cat => (
+                            <button
+                              key={cat}
+                              onClick={() => { playClick(); setSelectedCategory(cat); setIsConfigMenuOpen(false); }}
+                              className={`w-full text-left px-3 py-2 text-[10px] font-mono uppercase tracking-wider border-b border-[var(--text-secondary)]/10 hover:bg-[var(--text-secondary)]/10 ${selectedCategory === cat ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'}`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 {/* List */}
                 <div className="flex-1 overflow-hidden p-0 flex flex-col">
-                  <Playlist
-                    songs={filteredSongs}
-                    currentSong={songs[player.index]}
-                    onSelectSong={(song) => {
-                      const idx = songs.findIndex(s => s.id === song.id);
-                      if (idx !== -1) player.selectSong(idx);
-                      setIsMobilePlaylistOpen(false);
-                    }}
-                    onRemove={onRemoveFromPlaylist}
-                    onBulkRemove={onBulkRemove}
-                    onReorder={onReorderPlaylist}
-                    localFilesInfo={localFilesInfo}
-                  />
-                  {/* Load More */}
-                  {hasMore && onLoadMore && (
-                    <div className="p-3 flex justify-center">
-                      <button
-                        onClick={onLoadMore}
-                        disabled={loadingMore}
-                        className="text-[9px] font-mono uppercase tracking-widest border border-[var(--text-secondary)]/30 px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/50 transition-all disabled:opacity-40 flex items-center gap-2"
-                      >
-                        {loadingMore ? <Loader2 size={10} className="animate-spin" /> : null}
-                        {loadingMore ? 'Loading...' : 'Load More'}
-                      </button>
+                  {rightTab === 'playlist' && (
+                    <>
+                      <Playlist
+                        songs={filteredSongs}
+                        currentSong={songs[player.index]}
+                        onSelectSong={(song) => {
+                          const idx = songs.findIndex(s => s.id === song.id);
+                          if (idx !== -1) player.selectSong(idx);
+                          setIsMobilePlaylistOpen(false);
+                        }}
+                        onRemove={onRemoveFromPlaylist}
+                        onBulkRemove={onBulkRemove}
+                        onReorder={onReorderPlaylist}
+                        localFilesInfo={localFilesInfo}
+                        isCached={isCached}
+                        onAddToQueue={player.addToQueue}
+                      />
+                      {hasMore && onLoadMore && (
+                        <div className="p-3 flex justify-center">
+                          <button
+                            onClick={onLoadMore}
+                            disabled={loadingMore}
+                            className="text-[9px] font-mono uppercase tracking-widest border border-[var(--text-secondary)]/30 px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/50 transition-all disabled:opacity-40 flex items-center gap-2"
+                          >
+                            {loadingMore ? <Loader2 size={10} className="animate-spin" /> : null}
+                            {loadingMore ? 'Loading...' : 'Load More'}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {rightTab === 'queue' && (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                      {player.queue.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full gap-3 p-8 opacity-50">
+                          <ListPlus size={36} className="text-[var(--text-secondary)]" strokeWidth={1} />
+                          <p className="text-[9px] font-mono text-[var(--text-secondary)] uppercase tracking-[0.2em] text-center">Queue is empty.<br/>Right-click a song to add.</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--text-secondary)]/10">
+                            <span className="text-[8px] font-mono text-[var(--text-secondary)]/50 tracking-widest">{player.queue.length} IN QUEUE</span>
+                            <button
+                              onClick={() => player.clearQueue()}
+                              className="text-[8px] font-mono text-[var(--danger)] hover:opacity-70 uppercase tracking-wider flex items-center gap-1"
+                            >
+                              <Trash2 size={9} /> Clear
+                            </button>
+                          </div>
+                          <div className="flex flex-col gap-0.5 p-1">
+                            {player.queue.map((song, i) => (
+                              <div key={`${song.id}-${i}`} className="flex items-center gap-2 px-2 py-2 hover:bg-white/5 group/q transition-colors">
+                                <span className="text-[8px] font-mono text-[var(--accent)]/30 w-4 shrink-0">{i + 1}</span>
+                                <img src={song.coverUrl || '/default-cover.png'} alt="" className="w-7 h-7 object-cover border border-[var(--text-secondary)]/20 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[9px] font-bold font-mono truncate uppercase text-[var(--text-secondary)]">{song.title}</div>
+                                  <div className="text-[7px] font-mono truncate opacity-40 uppercase">{song.artist}</div>
+                                </div>
+                                <button
+                                  onClick={() => player.removeFromQueue(i)}
+                                  className="shrink-0 text-[var(--text-secondary)]/20 hover:text-[var(--danger)] opacity-0 group-hover/q:opacity-100 transition-all"
+                                >
+                                  <X size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  {rightTab === 'recent' && (
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                      {recentlyPlayed.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full gap-3 p-8 opacity-50">
+                          <History size={36} className="text-[var(--text-secondary)]" strokeWidth={1} />
+                          <p className="text-[9px] font-mono text-[var(--text-secondary)] uppercase tracking-[0.2em] text-center">No history yet.<br/>Play some tracks!</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--text-secondary)]/10">
+                            <span className="text-[8px] font-mono text-[var(--text-secondary)]/50 tracking-widest">{recentlyPlayed.length} TRACKS</span>
+                            <button
+                              onClick={onClearRecentlyPlayed}
+                              className="text-[8px] font-mono text-[var(--danger)] hover:opacity-70 uppercase tracking-wider flex items-center gap-1"
+                            >
+                              <Trash2 size={9} /> Clear
+                            </button>
+                          </div>
+                          <div className="flex flex-col gap-0.5 p-1">
+                            {recentlyPlayed.map((song, i) => {
+                              const isActive = song.id === songs[player.index]?.id;
+                              return (
+                                <button
+                                  key={`${song.id}-${i}`}
+                                  onClick={() => {
+                                    const idx = songs.findIndex(s => s.id === song.id);
+                                    if (idx !== -1) { playClick(); player.selectSong(idx); }
+                                  }}
+                                  className={`flex items-center gap-2 px-2 py-2 hover:bg-white/5 w-full text-left transition-colors ${isActive ? 'playlist-active-bg' : ''}`}
+                                >
+                                  <span className="text-[8px] font-mono text-[var(--accent)]/30 w-4 shrink-0">{i + 1}</span>
+                                  <img src={song.coverUrl || '/default-cover.png'} alt="" className="w-7 h-7 object-cover border border-[var(--text-secondary)]/20 shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className={`text-[9px] font-bold font-mono truncate uppercase ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}>{song.title}</div>
+                                    <div className="text-[7px] font-mono truncate opacity-40 uppercase">{song.artist}</div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1292,8 +1473,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
       {/* Search Modal */}
       {isSearchOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-start pt-16 sm:pt-4 sm:justify-center p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-6 relative max-h-[85vh] sm:max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-start pt-12 sm:pt-4 sm:justify-center p-3 sm:p-4 animate-in fade-in duration-300">
+          <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-4 sm:p-6 relative max-h-[85vh] sm:max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
             <button
               onClick={() => setIsSearchOpen(false)}
               className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
@@ -1301,19 +1482,19 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               <X size={20} />
             </button>
 
-            <h2 className="text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-6 uppercase">
+            <h2 className="text-lg sm:text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-3 sm:mb-4 uppercase">
               Search Database
             </h2>
 
             {/* Search Form */}
-            <form onSubmit={handleSearch} className="flex gap-2 mb-6">
+            <form onSubmit={handleSearch} className="flex gap-2 mb-3">
               <div className="relative flex-1">
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="SEARCH ARTIST OR TITLE..."
-                  className="w-full h-full bg-black/50 border border-[var(--text-secondary)] p-3 pr-10 text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
+                  className="w-full h-full bg-black/50 border border-[var(--text-secondary)] p-2.5 sm:p-3 pr-10 text-xs sm:text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
                   autoFocus
                 />
                 {searchQuery && (
@@ -1335,29 +1516,75 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               </button>
             </form>
 
+            {/* Filter Chips - Fully responsive for mobile & desktop */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              <span className="text-[8px] sm:text-[9px] font-mono text-[var(--text-secondary)]/50 uppercase tracking-widest self-center shrink-0">
+                Filter:
+              </span>
+              {/* Duration chips */}
+              {(['all', 'short', 'medium', 'long'] as const).map(d => (
+                <button
+                  key={d}
+                  onClick={() => setSearchFilterDuration(d)}
+                  className={`px-2 py-1 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider border transition-all touch-manipulation ${
+                    searchFilterDuration === d
+                      ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10 font-bold shadow-[0_0_8px_rgba(var(--accent-rgb),0.2)]'
+                      : 'border-[var(--text-secondary)]/20 text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:text-white'
+                  }`}
+                >
+                  {d === 'all' ? 'Any' : d === 'short' ? '< 2m' : d === 'medium' ? '2-5m' : '> 5m'}
+                </button>
+              ))}
+              {searchFilterArtist && (
+                <button
+                  onClick={() => setSearchFilterArtist('')}
+                  className="px-2 py-1 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/15 flex items-center gap-1.5 shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)] animate-in fade-in"
+                  title="Clear artist filter"
+                >
+                  <span className="truncate max-w-[120px] sm:max-w-[160px]">🎤 {searchFilterArtist}</span>
+                  <X size={10} className="shrink-0" />
+                </button>
+              )}
+            </div>
+
             {/* Search Results */}
-            <div ref={searchScrollRef} className="flex-1 overflow-y-auto custom-scrollbar space-y-2 min-h-[300px]">
+            <div ref={searchScrollRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-2 pr-0.5">
               {searchResults.length === 0 && !isSearching && searchQuery && (
                 <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
                   NO DATA FOUND IN SECTOR
                 </div>
               )}
 
-              {searchResults.slice((searchPage - 1) * itemsPerSearchPage, searchPage * itemsPerSearchPage).map((song) => {
+              {searchResults
+                .filter(song => {
+                  if (searchFilterArtist && !(song.artist || '').toLowerCase().includes(searchFilterArtist.toLowerCase())) return false;
+                  const dur = song.duration || 0;
+                  if (searchFilterDuration === 'short' && dur >= 120) return false;
+                  if (searchFilterDuration === 'medium' && (dur < 120 || dur >= 300)) return false;
+                  if (searchFilterDuration === 'long' && dur < 300) return false;
+                  return true;
+                })
+                .slice((searchPage - 1) * itemsPerSearchPage, searchPage * itemsPerSearchPage).map((song) => {
                 const inPlaylist = songs.some(s => s.id === song.id);
                 return (
-                  <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <img src={song.coverUrl} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
-                      <div className="min-w-0">
+                  <div key={song.id} className="flex items-center justify-between p-2.5 sm:p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
+                    <div className="flex items-center gap-2.5 sm:gap-3 overflow-hidden min-w-0 flex-1 mr-2">
+                      <img src={song.coverUrl || '/default-cover.png'} className="w-9 h-9 sm:w-10 sm:h-10 object-cover border border-[var(--text-secondary)]/30 shrink-0" alt="" />
+                      <div className="min-w-0 flex-1">
                         <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
-                        <div className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider">{song.artist}</div>
+                        <button
+                          onClick={() => setSearchFilterArtist(song.artist || '')}
+                          className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider hover:text-[var(--accent)] transition-colors text-left block max-w-full"
+                          title="Filter by this artist"
+                        >
+                          {song.artist || 'Unknown Artist'}
+                        </button>
                       </div>
                     </div>
 
                     <button
                       onClick={() => inPlaylist ? handleRemoveSong(song) : handleAddSong(song)}
-                      className={`p-2 transition-all border border-transparent ${inPlaylist ? 'text-[var(--accent)] hover:text-[var(--danger)] hover:border-[var(--danger)]' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]'}`}
+                      className={`p-2 transition-all border border-transparent shrink-0 ${inPlaylist ? 'text-[var(--accent)] hover:text-[var(--danger)] hover:border-[var(--danger)]' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]'}`}
                       title={inPlaylist ? "Remove from playlist" : "Add to playlist"}
                     >
                       {inPlaylist ? <Minus size={18} /> : <Plus size={18} />}
@@ -1369,11 +1596,12 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
             {/* Pagination */}
             {Math.ceil(searchResults.length / itemsPerSearchPage) > 1 && (
-              <div className="shrink-0 pt-4 mt-2 border-t border-[var(--text-secondary)]/20">
+              <div className="shrink-0 pt-3 mt-2 border-t border-[var(--text-secondary)]/20">
                 <Pagination
                   currentPage={searchPage}
                   totalPages={Math.ceil(searchResults.length / itemsPerSearchPage)}
                   onPageChange={setSearchPage}
+                  className="my-0"
                 />
               </div>
             )}
