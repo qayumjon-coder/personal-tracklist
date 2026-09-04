@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import type { Song } from "../types/Song";
 
 const STORAGE_KEY = "fronto_recently_played";

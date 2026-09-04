@@ -937,7 +937,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
                 <div className="absolute inset-0 pointer-events-none overflow-hidden">
                   {/* Dynamic Visualizer Background */}
-                  <div className={`absolute inset-0 pointer-events-none mix-blend-screen transition-all duration-500 ${['hex', 'sonar'].includes(visualizerMode)
+                  <div className={`absolute inset-0 pointer-events-none mix-blend-screen transition-all duration-500 ${visualizerMode === 'hex'
                       ? 'opacity-60'
                       : ['orbit', 'grid', 'matrix'].includes(visualizerMode)
                       ? 'opacity-35'
