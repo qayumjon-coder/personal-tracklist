@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useMemo, useCallback } from "react";
 import type { ReactNode } from "react";
 
 type Theme = "aqua" | "green" | "amber" | "pink" | "red" | "neon" | "toxic" | "sunset" | "matrix";
@@ -154,26 +154,31 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   // Grid and scanlines are now conditionally rendered in App.tsx
 
   // Translate helper
-  const t = (key: string) => {
+  const t = useCallback((key: string) => {
     // @ts-ignore
     return translations[language][key] || key;
-  };
+  }, [language]);
+
+  const value = useMemo(() => ({
+    theme, setTheme,
+    language, setLanguage,
+    soundEnabled, setSoundEnabled,
+    visualizerMode, setVisualizerMode,
+    autoplay, setAutoplay,
+    scanlines, setScanlines,
+    grid, setGrid,
+    matrixBg, setMatrixBg,
+    zenMode, setZenMode,
+    crossfade, setCrossfade,
+    progressBarMode, setProgressBarMode,
+    t
+  }), [
+    theme, language, soundEnabled, visualizerMode, autoplay,
+    scanlines, grid, matrixBg, zenMode, crossfade, progressBarMode, t
+  ]);
 
   return (
-    <SettingsContext.Provider value={{
-      theme, setTheme,
-      language, setLanguage,
-      soundEnabled, setSoundEnabled,
-      visualizerMode, setVisualizerMode,
-      autoplay, setAutoplay,
-      scanlines, setScanlines,
-      grid, setGrid,
-      matrixBg, setMatrixBg,
-      zenMode, setZenMode,
-      crossfade, setCrossfade,
-      progressBarMode, setProgressBarMode,
-      t
-    }}>
+    <SettingsContext.Provider value={value}>
       {children}
     </SettingsContext.Provider>
   );

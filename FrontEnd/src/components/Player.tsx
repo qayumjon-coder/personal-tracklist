@@ -2,14 +2,13 @@ import type { Song } from "../types/Song";
 import SEO from "./SEO";
 
 import { useSettings } from "../contexts/SettingsContext";
-import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, ChevronDown, Share2, Moon, Clock, Minus, QrCode, History, ListPlus, Trash2 } from "lucide-react";
+import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, Share2, Moon, Clock, Minus, QrCode } from "lucide-react";
 import { Pagination } from "./Pagination";
 import { Link, useLocation } from "react-router-dom";
 import { searchSongs, getTrendingSongs } from "../services/musicApi";
 import { toast } from "sonner";
 
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
-import { Playlist } from "./Playlist";
 import { SkeletonPlaylist } from "./SkeletonPlaylist";
 import { TrackProgress } from "./TrackProgress";
 import { PlaybackControls } from "./PlaybackControls";
@@ -26,6 +25,8 @@ import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useUploadPermission } from "../hooks/useUploadPermission";
 import { UploadRequestModal } from "./UploadRequestModal";
 import { useCachedSongs } from "../hooks/useCachedSongs";
+import { PlayerToolbar } from "./PlayerToolbar";
+import { PlayerRightPanel } from "./PlayerRightPanel";
 
 interface PlayerProps {
   songs: Song[];
@@ -84,7 +85,6 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [isKaraokeOpen, setIsKaraokeOpen] = useState(false);
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
-  const [isSleepTimerMenuOpen, setIsSleepTimerMenuOpen] = useState(false);
   // Right panel tab: 'playlist' | 'queue' | 'recent'
   const [rightTab, setRightTab] = useState<'playlist' | 'queue' | 'recent'>('playlist');
   // Search filter state
@@ -285,7 +285,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [isSearching, setIsSearching] = useState(false);
   const [lastSearchQuery, setLastSearchQuery] = useState<string>("");
   const [isEqOpen, setIsEqOpen] = useState(false);
-  const [isSpeedMenuOpen, setIsSpeedMenuOpen] = useState(false);
+
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Lock body scroll when modals are open
@@ -767,156 +767,15 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
             <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-[var(--accent)] z-20"></div>
 
             {/* Top Toolbar - Global */}
-            <div className="absolute top-0 left-0 right-0 h-10 flex items-center justify-between px-4 bg-[var(--bg-main)]/80 backdrop-blur-md z-30" style={{ borderBottom: '1px solid transparent', borderImage: `linear-gradient(90deg, transparent, var(--accent), transparent) 1` }}>
-              {/* Status Indicator */}
-              <div className="flex items-center gap-3">
-                <div className={`w-1.5 h-1.5 rounded-full ${player.playing ? 'bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)]' : 'bg-[var(--text-secondary)]/30'}`}></div>
-                <span className="text-[9px] font-mono text-[var(--accent)] tracking-[0.2em] font-bold uppercase">
-                  {player.playing ? 'SYS.PLAYING' : current ? 'SYS.PAUSED' : 'SYS.IDLE'}
-                </span>
-                <div className="hidden sm:block h-3 w-px bg-[var(--text-secondary)]/20 mx-1"></div>
-                <span className="hidden sm:inline text-[9px] font-mono text-[var(--text-secondary)]/50 tracking-widest uppercase">
-                  TRK: {songs.length > 0 ? `${safeIndex + 1}/${songs.length}` : '0/0'}
-                </span>
-                <span className="hidden sm:inline left-[50px] text-[12px] font-mono font-bold text-[var(--accent)] tracking-widest uppercase">Personal Tracklist</span>
-              </div>
-
-              {/* Tech Labels - Real Data */}
-              <div className="hidden lg:flex gap-6 text-[9px] text-[var(--text-secondary)]/40 font-mono tracking-[0.3em] uppercase">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[var(--accent)]/30">BUFR:</span>
-                  <span>{(() => {
-                    const audio = player.audioRef?.current;
-                    if (!audio || !audio.duration || audio.buffered.length === 0) return '0%';
-                    const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
-                    return `${Math.round((bufferedEnd / audio.duration) * 100)}%`;
-                  })()}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[var(--accent)]/30">RATE:</span>
-                  <span>{(() => {
-                    try {
-                      const ctx = player.analyser?.context;
-                      if (ctx) return `${(ctx.sampleRate / 1000).toFixed(1)}KHZ`;
-                    } catch {}
-                    return '—';
-                  })()}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[var(--accent)]/30">FMT:</span>
-                  <span>{(() => {
-                    if (!current?.url) return '—';
-                    const ext = current.url.split('.').pop()?.split('?')[0]?.toUpperCase();
-                    return ext || '—';
-                  })()}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[var(--accent)]/30">SPD:</span>
-                  <span>{player.playbackRate}X</span>
-                </div>
-              </div>
-
-              {/* Controls */}
-              <div className="flex items-center gap-1 sm:gap-2">
-                {/* Sleep Timer */}
-                <div className="relative">
-                  <button
-                    onClick={() => { playClick(); setIsSleepTimerMenuOpen(!isSleepTimerMenuOpen); }}
-                    onMouseEnter={playHover}
-                    className={`cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center gap-2 ${player.sleepTimer ? 'border-[var(--accent)] text-[var(--accent)] shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]' : ''}`}
-                    title="Sleep Timer"
-                  >
-                    <Moon size={14} className="sm:w-2.5 sm:h-2.5" fill={player.sleepTimer ? "currentColor" : "none"} />
-                    <span className="mx-1 hidden sm:inline">{player.sleepTimer ? `${player.sleepTimer}M` : 'Sleep'}</span>
-                  </button>
-
-                  {isSleepTimerMenuOpen && (
-                    <div className="absolute top-full mt-1 right-0 w-36 bg-black/95 backdrop-blur-xl border border-[var(--accent)]/30 z-50 shadow-2xl animate-in fade-in zoom-in duration-200">
-                      <div className="px-3 py-1.5 border-b border-white/5 text-[7px] font-mono text-[var(--accent)] uppercase tracking-[0.2em] opacity-60">Set Timer</div>
-                      {[15, 30, 45, 60].map(mins => (
-                        <button
-                          key={mins}
-                          onClick={() => { playClick(); player.setSleepTimer(mins); setIsSleepTimerMenuOpen(false); }}
-                          className="w-full text-left px-3 py-2 text-[9px] font-mono uppercase tracking-wider hover:bg-[var(--accent)]/10 text-[var(--text-secondary)] hover:text-white transition-colors flex justify-between items-center"
-                        >
-                          <span>{mins} Minutes</span>
-                          {player.sleepTimer === mins && <div className="w-1 h-1 bg-[var(--accent)] rounded-full animate-pulse shadow-[0_0_5px_var(--accent)]" />}
-                        </button>
-                      ))}
-                      {player.sleepTimer && (
-                        <button
-                          onClick={() => { playClick(); player.setSleepTimer(null); setIsSleepTimerMenuOpen(false); }}
-                          className="w-full text-left px-3 py-2 text-[9px] font-mono uppercase tracking-wider bg-red-500/5 hover:bg-red-500/20 text-red-500/70 hover:text-red-400 border-t border-white/5 transition-colors"
-                        >
-                          Cancel Timer
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => { playClick(); onOpenSettings(); }}
-                  onMouseEnter={playHover}
-                  className="cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center"
-                  title="Config"
-                >
-                  <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">[</span>
-                  <span className="mx-1 hidden sm:inline">Config</span>
-                  <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">]</span>
-                  <span className="sm:hidden font-mono tracking-widest text-xs">⚙</span>
-                </button>
-
-                {/* Playback Speed */}
-                <div className="relative">
-                  <button
-                    onClick={() => { playClick(); setIsSpeedMenuOpen(!isSpeedMenuOpen); }}
-                    onMouseEnter={playHover}
-                    className={`cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center gap-1 font-mono ${player.playbackRate !== 1 ? 'border-[var(--accent)] text-[var(--accent)]' : ''}`}
-                    title="Playback Speed"
-                  >
-                    <span>{player.playbackRate}x</span>
-                  </button>
-
-                  {isSpeedMenuOpen && (
-                    <div className="absolute top-full mt-1 right-0 w-24 bg-black/95 backdrop-blur-xl border border-[var(--accent)]/30 z-50 shadow-2xl animate-in fade-in zoom-in duration-200">
-                      <div className="px-3 py-1.5 border-b border-white/5 text-[7px] font-mono text-[var(--accent)] uppercase tracking-[0.2em] opacity-60">Speed</div>
-                      {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map(rate => (
-                        <button
-                          key={rate}
-                          onClick={() => { playClick(); player.setPlaybackRate(rate); setIsSpeedMenuOpen(false); }}
-                          className={`w-full text-left px-3 py-2 text-[9px] font-mono tracking-wider hover:bg-[var(--accent)]/10 transition-colors flex justify-between items-center ${player.playbackRate === rate ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'}`}
-                        >
-                          <span>{rate}x</span>
-                          {player.playbackRate === rate && <div className="w-1 h-1 bg-[var(--accent)] rounded-full shadow-[0_0_5px_var(--accent)]" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  onClick={() => { playClick(); setIsEqOpen(true); }}
-                  onMouseEnter={playHover}
-                  className="hidden sm:flex cyber-btn px-2 sm:px-3 py-1 text-[9px] group items-center justify-center"
-                  title="Neural Audio (EQ / FX)"
-                >
-                  <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">[</span>
-                  <span className="mx-1 hidden sm:inline">EQ/FX</span>
-                  <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">]</span>
-                </button>
-
-                <button
-                  onClick={() => { playClick(); setIsSearchOpen(true); }}
-                  onMouseEnter={playHover}
-                  className="cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center gap-2"
-                  title="Search"
-                >
-                  <Search size={14} className="sm:w-2.5 sm:h-2.5" />
-                  <span className="hidden sm:inline">Search</span>
-                </button>
-              </div>
-            </div>
+            <PlayerToolbar
+              player={player}
+              songs={songs}
+              safeIndex={safeIndex}
+              current={current}
+              onOpenSettings={onOpenSettings}
+              onOpenEq={() => setIsEqOpen(true)}
+              onOpenSearch={() => setIsSearchOpen(true)}
+            />
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col md:flex-row mt-6 md:mt-10 min-h-0 relative">
@@ -1137,217 +996,37 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               </div>
 
               {/* RIGHT COLUMN: Playlist (Fixed-width on Desktop, BottomSheet on Mobile) */}
-              {/* Mobile Cover Overlay (Darkens background when drawer open) */}
-              {isMobilePlaylistOpen && (
-                <div
-                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[40] md:hidden transition-opacity duration-300"
-                  onClick={() => setIsMobilePlaylistOpen(false)}
-                />
-              )}
-
-              <div className={`
-              fixed inset-x-0 bottom-0 z-[50] md:relative md:z-10
-              w-full md:w-64 lg:w-96 xl:w-[400px] flex flex-col 
-              bg-[var(--bg-main)]/95 md:bg-[var(--bg-main)]/50 
-              border-t md:border-t-0 border-[var(--accent)]/30 md:border-transparent
-              backdrop-blur-xl md:backdrop-blur-sm 
-              transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]
-              ${isMobilePlaylistOpen ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}
-              h-[80vh] md:h-full min-h-0 overflow-hidden
-              shadow-[0_-10px_40px_rgba(0,0,0,0.8)] md:shadow-none
-            `}
-            style={{
-              transform: drawerDragDistance > 0 ? `translateY(${drawerDragDistance}px)` : undefined,
-              transition: drawerTouchStartY !== null ? 'none' : ''
-            }}
-            >
-
-                {/* Mobile Swipe Handle to Close */}
-                <div
-                  className="w-full flex justify-center py-3 md:hidden cursor-pointer active:bg-white/5 border-b border-[var(--text-secondary)]/10"
-                  onClick={() => setIsMobilePlaylistOpen(false)}
-                  onTouchStart={onDrawerTouchStart}
-                  onTouchMove={onDrawerTouchMove}
-                  onTouchEnd={onDrawerTouchEnd}
-                >
-                  <div className="flex items-center justify-center w-full pointer-events-none">
-                    <div className="w-12 h-1 bg-[var(--text-secondary)]/40 rounded-full" />
-                    {/* Fallback chevron */}
-                    <ChevronDown className="absolute right-4 text-[var(--text-secondary)]/50" size={16} />
-                  </div>
-                </div>
-                {/* Right Panel Tabs */}
-                <div className="flex items-stretch border-b border-[var(--text-secondary)]/30 bg-[var(--text-secondary)]/5 shrink-0">
-                  {[
-                    { id: 'playlist', label: 'Tracklist', icon: <ListMusic size={11} /> },
-                    { id: 'queue',    label: `Queue${player.queue.length > 0 ? ` (${player.queue.length})` : ''}`, icon: <ListPlus size={11} /> },
-                    { id: 'recent',   label: 'Recent', icon: <History size={11} /> },
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setRightTab(tab.id as any)}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[8px] font-mono uppercase tracking-wider transition-all border-b-2 ${
-                        rightTab === tab.id
-                          ? 'border-[var(--accent)] text-[var(--accent)]'
-                          : 'border-transparent text-[var(--text-secondary)] hover:text-white'
-                      }`}
-                    >
-                      {tab.icon} {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Category filter row — only in playlist tab */}
-                {rightTab === 'playlist' && (
-                  <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--text-secondary)]/10 bg-black/20">
-                    <span className="text-[8px] font-mono text-[var(--text-secondary)]/40 tracking-widest">{filteredSongs.length} SONGS</span>
-                    <div className="relative">
-                      <button
-                        onClick={() => { playClick(); setIsConfigMenuOpen(!isConfigMenuOpen); }}
-                        onMouseEnter={playHover}
-                        className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-[9px] border border-[var(--text-secondary)]/30 px-2 py-1 bg-black/50 flex items-center gap-2 w-28 justify-between"
-                      >
-                        <span className="truncate">{selectedCategory.toUpperCase()}</span>
-                        <span>{isConfigMenuOpen ? '▴' : '▾'}</span>
-                      </button>
-                      {isConfigMenuOpen && (
-                        <div className="absolute right-0 top-full mt-1 w-36 bg-[var(--bg-main)] border border-[var(--text-secondary)] z-50 shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
-                          {categories.map(cat => (
-                            <button
-                              key={cat}
-                              onClick={() => { playClick(); setSelectedCategory(cat); setIsConfigMenuOpen(false); }}
-                              className={`w-full text-left px-3 py-2 text-[10px] font-mono uppercase tracking-wider border-b border-[var(--text-secondary)]/10 hover:bg-[var(--text-secondary)]/10 ${selectedCategory === cat ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'}`}
-                            >
-                              {cat}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* List */}
-                <div className="flex-1 overflow-hidden p-0 flex flex-col">
-                  {rightTab === 'playlist' && (
-                    <>
-                      <Playlist
-                        songs={filteredSongs}
-                        currentSong={songs[player.index]}
-                        onSelectSong={(song) => {
-                          const idx = songs.findIndex(s => s.id === song.id);
-                          if (idx !== -1) player.selectSong(idx);
-                          setIsMobilePlaylistOpen(false);
-                        }}
-                        onRemove={onRemoveFromPlaylist}
-                        onBulkRemove={onBulkRemove}
-                        onReorder={onReorderPlaylist}
-                        localFilesInfo={localFilesInfo}
-                        isCached={isCached}
-                        onAddToQueue={player.addToQueue}
-                      />
-                      {hasMore && onLoadMore && (
-                        <div className="p-3 flex justify-center">
-                          <button
-                            onClick={onLoadMore}
-                            disabled={loadingMore}
-                            className="text-[9px] font-mono uppercase tracking-widest border border-[var(--text-secondary)]/30 px-4 py-2 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]/50 transition-all disabled:opacity-40 flex items-center gap-2"
-                          >
-                            {loadingMore ? <Loader2 size={10} className="animate-spin" /> : null}
-                            {loadingMore ? 'Loading...' : 'Load More'}
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {rightTab === 'queue' && (
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
-                      {player.queue.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-3 p-8 opacity-50">
-                          <ListPlus size={36} className="text-[var(--text-secondary)]" strokeWidth={1} />
-                          <p className="text-[9px] font-mono text-[var(--text-secondary)] uppercase tracking-[0.2em] text-center">Queue is empty.<br/>Right-click a song to add.</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--text-secondary)]/10">
-                            <span className="text-[8px] font-mono text-[var(--text-secondary)]/50 tracking-widest">{player.queue.length} IN QUEUE</span>
-                            <button
-                              onClick={() => player.clearQueue()}
-                              className="text-[8px] font-mono text-[var(--danger)] hover:opacity-70 uppercase tracking-wider flex items-center gap-1"
-                            >
-                              <Trash2 size={9} /> Clear
-                            </button>
-                          </div>
-                          <div className="flex flex-col gap-0.5 p-1">
-                            {player.queue.map((song, i) => (
-                              <div key={`${song.id}-${i}`} className="flex items-center gap-2 px-2 py-2 hover:bg-white/5 group/q transition-colors">
-                                <span className="text-[8px] font-mono text-[var(--accent)]/30 w-4 shrink-0">{i + 1}</span>
-                                <img src={song.coverUrl || '/default-cover.png'} alt="" className="w-7 h-7 object-cover border border-[var(--text-secondary)]/20 shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-[9px] font-bold font-mono truncate uppercase text-[var(--text-secondary)]">{song.title}</div>
-                                  <div className="text-[7px] font-mono truncate opacity-40 uppercase">{song.artist}</div>
-                                </div>
-                                <button
-                                  onClick={() => player.removeFromQueue(i)}
-                                  className="shrink-0 text-[var(--text-secondary)]/20 hover:text-[var(--danger)] opacity-0 group-hover/q:opacity-100 transition-all"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {rightTab === 'recent' && (
-                    <div className="flex-1 overflow-y-auto custom-scrollbar">
-                      {recentlyPlayed.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center h-full gap-3 p-8 opacity-50">
-                          <History size={36} className="text-[var(--text-secondary)]" strokeWidth={1} />
-                          <p className="text-[9px] font-mono text-[var(--text-secondary)] uppercase tracking-[0.2em] text-center">No history yet.<br/>Play some tracks!</p>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--text-secondary)]/10">
-                            <span className="text-[8px] font-mono text-[var(--text-secondary)]/50 tracking-widest">{recentlyPlayed.length} TRACKS</span>
-                            <button
-                              onClick={onClearRecentlyPlayed}
-                              className="text-[8px] font-mono text-[var(--danger)] hover:opacity-70 uppercase tracking-wider flex items-center gap-1"
-                            >
-                              <Trash2 size={9} /> Clear
-                            </button>
-                          </div>
-                          <div className="flex flex-col gap-0.5 p-1">
-                            {recentlyPlayed.map((song, i) => {
-                              const isActive = song.id === songs[player.index]?.id;
-                              return (
-                                <button
-                                  key={`${song.id}-${i}`}
-                                  onClick={() => {
-                                    const idx = songs.findIndex(s => s.id === song.id);
-                                    if (idx !== -1) { playClick(); player.selectSong(idx); }
-                                  }}
-                                  className={`flex items-center gap-2 px-2 py-2 hover:bg-white/5 w-full text-left transition-colors ${isActive ? 'playlist-active-bg' : ''}`}
-                                >
-                                  <span className="text-[8px] font-mono text-[var(--accent)]/30 w-4 shrink-0">{i + 1}</span>
-                                  <img src={song.coverUrl || '/default-cover.png'} alt="" className="w-7 h-7 object-cover border border-[var(--text-secondary)]/20 shrink-0" />
-                                  <div className="flex-1 min-w-0">
-                                    <div className={`text-[9px] font-bold font-mono truncate uppercase ${isActive ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`}>{song.title}</div>
-                                    <div className="text-[7px] font-mono truncate opacity-40 uppercase">{song.artist}</div>
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <PlayerRightPanel
+                player={player}
+                songs={songs}
+                filteredSongs={filteredSongs}
+                recentlyPlayed={recentlyPlayed}
+                onClearRecentlyPlayed={onClearRecentlyPlayed}
+                categories={categories}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                rightTab={rightTab}
+                setRightTab={setRightTab}
+                isMobilePlaylistOpen={isMobilePlaylistOpen}
+                setIsMobilePlaylistOpen={setIsMobilePlaylistOpen}
+                drawerDragDistance={drawerDragDistance}
+                onDrawerTouchStart={onDrawerTouchStart}
+                onDrawerTouchMove={onDrawerTouchMove}
+                onDrawerTouchEnd={onDrawerTouchEnd}
+                drawerTouchStartY={drawerTouchStartY}
+                isConfigMenuOpen={isConfigMenuOpen}
+                setIsConfigMenuOpen={setIsConfigMenuOpen}
+                onRemoveFromPlaylist={onRemoveFromPlaylist}
+                onBulkRemove={onBulkRemove}
+                onReorderPlaylist={onReorderPlaylist}
+                localFilesInfo={localFilesInfo}
+                isCached={isCached}
+                hasMore={hasMore}
+                loadingMore={loadingMore}
+                onLoadMore={onLoadMore}
+                playClick={playClick}
+                playHover={playHover}
+              />
             </div>
           </div>
         </div>
