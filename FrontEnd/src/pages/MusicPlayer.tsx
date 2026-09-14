@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { getMusicList } from "../services/musicApi";
 import type { Song } from "../types/Song";
 import { useSettings } from "../contexts/SettingsContext"; 
@@ -31,6 +32,12 @@ export default function MusicPlayer() {
 
   return (
     <div className="min-h-screen w-full bg-[var(--bg-main)] p-4 md:p-8 relative overflow-hidden">
+      <Helmet>
+        <title>DataGrid — Music Library | Fronto</title>
+        <meta name="description" content="Browse the full Fronto music library. Stream and explore your personal cyberpunk tracklist." />
+        <meta name="robots" content="index, follow" />
+        <link rel="canonical" href="https://fronto-music.vercel.app/" />
+      </Helmet>
       {/* Background Effects */}
       <div className="retro-grid" />
       <div className="scanline" />

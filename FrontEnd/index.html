@@ -2,28 +2,66 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/PTracklist.png" />
+    <link rel="icon" type="image/png" href="/PTracklist.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary SEO -->
     <title>Fronto - Cyber Music Player</title>
     <meta name="description" content="Experience music in a futuristic cyberpunk interface with Fronto. Your personal high-fidelity tracklist and library." />
-    <meta name="keywords" content="music player, cyberpunk, audio, playlist, react, typescript, Personal playlist, personal tracklist, cyber music player, cyberpunk music player, best music player" />
+    <meta name="keywords" content="music player, cyberpunk, audio, playlist, personal tracklist, cyber music player, online music player, free music player" />
+    <meta name="author" content="Fronto" />
+    <meta name="robots" content="index, follow" />
     <meta name="theme-color" content="#000000" />
     <meta name="google-site-verification" content="7q3JOQk3aYS8jMFwK-SZ5_JON0KWEEs3xX8hoiKW7pg" />
     <link rel="canonical" href="https://fronto-music.vercel.app/" />
-    
+
+    <!-- Preconnect for performance -->
+    <link rel="preconnect" href="https://fronto-music.vercel.app" />
+    <link rel="dns-prefetch" href="https://fronto-music.vercel.app" />
+
     <!-- Open Graph tags for social media previews -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Fronto - Cyber Music Player" />
     <meta property="og:description" content="Experience music in a futuristic cyberpunk interface with Fronto. Your personal high-fidelity tracklist and library." />
-    <meta property="og:image" content="https://fronto-music.vercel.app/PTracklist.png" />
+    <meta property="og:image" content="https://fronto-music.vercel.app/pwa-512.png" />
+    <meta property="og:image:width" content="512" />
+    <meta property="og:image:height" content="512" />
+    <meta property="og:image:alt" content="Fronto - Cyber Music Player" />
     <meta property="og:url" content="https://fronto-music.vercel.app/" />
     <meta property="og:site_name" content="Fronto" />
+    <meta property="og:locale" content="en_US" />
 
     <!-- Twitter Card tags -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Fronto - Cyber Music Player" />
-    <meta name="twitter:description" content="Experience music in a futuristic cyberpunk interface with Fronto." />
-    <meta name="twitter:image" content="https://fronto-music.vercel.app/PTracklist.png" />
+    <meta name="twitter:description" content="Experience music in a futuristic cyberpunk interface with Fronto. Your personal high-fidelity tracklist and library." />
+    <meta name="twitter:image" content="https://fronto-music.vercel.app/pwa-512.png" />
+    <meta name="twitter:image:alt" content="Fronto - Cyber Music Player" />
+
+    <!-- JSON-LD Structured Data: SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Fronto",
+      "applicationCategory": "MusicApplication",
+      "operatingSystem": "Web",
+      "description": "A cyberpunk-themed personal music player for your tracklist and library.",
+      "url": "https://fronto-music.vercel.app/",
+      "image": "https://fronto-music.vercel.app/pwa-512.png",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "featureList": [
+        "Personal music playlist",
+        "Cyberpunk UI theme",
+        "Local file support",
+        "PWA — installable app"
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

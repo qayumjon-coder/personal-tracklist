@@ -28,6 +28,19 @@ export default defineConfig({
         background_color: '#000000',
         display: 'standalone',
         start_url: '/',
+        categories: ['music', 'entertainment', 'lifestyle'],
+        shortcuts: [
+          {
+            name: 'Open Player',
+            url: '/',
+            description: 'Go to the music player',
+          },
+          {
+            name: 'Upload Music',
+            url: '/upload',
+            description: 'Upload a new track',
+          },
+        ],
         icons: [
           {
             src: '/pwa-512.png',

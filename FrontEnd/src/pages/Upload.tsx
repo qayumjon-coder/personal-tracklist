@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type ChangeEvent, type FormEvent, type ClipboardEvent } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { useFetchSongs } from "../hooks/useFetchSongs";
 import { ArrowLeft, Music, Image as ImageIcon, AlertCircle, LogOut, Sparkles, Link2, Loader2, X } from "lucide-react";
@@ -455,6 +456,11 @@ export function Upload() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 md:p-12 relative z-10 flex flex-col gap-8 text-[var(--text-primary)] font-mono" onPaste={handlePaste}>
+      <Helmet>
+        <title>Upload Music — Add Tracks | Fronto</title>
+        <meta name="description" content="Upload and add new music tracks to the Fronto cyberpunk playlist. Supports MP3 and audio files." />
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       {/* Header */}
       <div className="relative border border-[var(--text-secondary)] bg-black/60 backdrop-blur-sm">
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-50"></div>

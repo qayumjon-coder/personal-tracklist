@@ -1,9 +1,14 @@
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Home, Music, Radio } from 'lucide-react';
 
 export function NotFound() {
   return (
     <div className="w-full min-h-screen flex items-center justify-center p-4 relative overflow-hidden font-mono">
+      <Helmet>
+        <title>404 — Signal Lost | Fronto</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <div className="retro-grid" />
       <div className="scanline" />
 

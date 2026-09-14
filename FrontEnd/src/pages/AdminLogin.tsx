@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Lock, AlertCircle, ArrowLeft, Loader2, Mail } from 'lucide-react';
@@ -34,6 +35,10 @@ export function AdminLogin() {
 
   return (
     <div className="w-full min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      <Helmet>
+        <title>Admin Login | Fronto</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       <div className="retro-grid" />
       <div className="scanline" />
       

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useMemo } from "react";
+import { Helmet } from "react-helmet-async";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { getMusicList, updateSong, deleteSong } from "../services/musicApi";
@@ -462,6 +463,10 @@ export default function Admin() {
 
   return (
     <div className="w-full max-w-6xl mx-auto p-8 md:p-12 pt-48 md:pt-60 relative z-10 font-mono text-[var(--text-primary)] min-h-screen scale-[0.95] origin-top">
+      <Helmet>
+        <title>Admin Panel | Fronto</title>
+        <meta name="robots" content="noindex, nofollow" />
+      </Helmet>
       
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-[var(--text-secondary)] pb-6">
