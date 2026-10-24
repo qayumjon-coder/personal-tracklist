@@ -129,24 +129,24 @@ export function PlayerRightPanel({
 
         {/* Category filter */}
         {rightTab === 'playlist' && (
-          <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--text-secondary)]/10 bg-black/20">
-            <span className="text-[8px] font-mono text-[var(--text-secondary)]/40 tracking-widest">{filteredSongs.length} SONGS</span>
+          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40">
+            <span className="text-[9px] font-mono text-white/70 font-bold tracking-widest">{filteredSongs.length} SONGS</span>
             <div className="relative">
               <button
                 onClick={() => { playClick(); setIsConfigMenuOpen(!isConfigMenuOpen); }}
                 onMouseEnter={playHover}
-                className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-[9px] border border-[var(--text-secondary)]/30 px-2 py-1 bg-black/50 flex items-center gap-2 w-28 justify-between"
+                className="text-white/90 hover:text-white font-mono text-[9px] font-bold border border-[var(--accent)]/40 hover:border-[var(--accent)] px-2.5 py-1 bg-black/70 flex items-center gap-2 w-32 justify-between transition-colors shadow-sm"
               >
                 <span className="truncate">{selectedCategory.toUpperCase()}</span>
-                <span>{isConfigMenuOpen ? '▴' : '▾'}</span>
+                <span className="text-[var(--accent)] font-bold">{isConfigMenuOpen ? '▴' : '▾'}</span>
               </button>
               {isConfigMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-36 bg-[var(--bg-main)] border border-[var(--text-secondary)] z-50 shadow-xl max-h-48 overflow-y-auto custom-scrollbar">
+                <div className="absolute right-0 top-full mt-1 w-36 bg-black/95 backdrop-blur-md border border-[var(--accent)]/50 z-50 shadow-2xl max-h-48 overflow-y-auto custom-scrollbar">
                   {categories.map(cat => (
                     <button
                       key={cat}
                       onClick={() => { playClick(); setSelectedCategory(cat); setIsConfigMenuOpen(false); }}
-                      className={`w-full text-left px-3 py-2 text-[10px] font-mono uppercase tracking-wider border-b border-[var(--text-secondary)]/10 hover:bg-[var(--text-secondary)]/10 ${selectedCategory === cat ? 'text-[var(--accent)] font-bold' : 'text-[var(--text-secondary)]'}`}
+                      className={`w-full text-left px-3 py-2 text-[10px] font-mono uppercase tracking-wider border-b border-white/5 hover:bg-[var(--accent)]/20 transition-colors ${selectedCategory === cat ? 'text-[var(--accent)] font-bold bg-[var(--accent)]/10' : 'text-white/80 hover:text-white'}`}
                     >
                       {cat}
                     </button>

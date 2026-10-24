@@ -473,7 +473,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         selectedCategory === "Favorites" ? songs.filter(s => likedIds.has(s.id)) :
           selectedCategory === "Recently Played" ? recentlyPlayed :
             selectedCategory === "Queue" ? player.queue :
-              songs.filter(s => (s.category || "General") === selectedCategory);
+              songs.filter(s => (s.category || "General").toLowerCase().includes(selectedCategory.toLowerCase()));
 
   if (loading) {
     return (
@@ -759,7 +759,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               </div>
             </div>
           )}
-          <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[420px] md:h-[600px] lg:h-[650px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(var(--accent-rgb),0.1)] text-base md:text-lg">
+          <div className="relative w-full flex flex-col md:flex-row overflow-hidden min-h-[460px] md:h-[640px] lg:h-[690px] border border-[var(--text-secondary)] bg-[var(--bg-main)] shadow-[0_0_40px_rgba(var(--accent-rgb),0.1)] text-base md:text-lg">
             {/* Decorative Corners */}
             <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-[var(--accent)] z-20"></div>
             <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-[var(--accent)] z-20"></div>
@@ -777,8 +777,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
               onOpenSearch={() => setIsSearchOpen(true)}
             />
 
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col md:flex-row mt-6 md:mt-10 min-h-0 relative">
+            {/* Main Content Area - Full toolbar clearance */}
+            <div className="flex-1 flex flex-col md:flex-row mt-10 md:mt-11 min-h-0 relative">
 
               {/* Atmospheric Mobile Background - Appears behind the player only on mobile */}
               <div className="md:hidden absolute inset-0 pointer-events-none overflow-hidden opacity-40 mix-blend-screen z-0">
@@ -786,8 +786,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 <div className="absolute inset-0 bg-gradient-to-b from-[var(--bg-main)]/50 via-black/50 to-black/90" />
               </div>
 
-              {/* LEFT COLUMN: Player (Flexible) */}
-              <div className="flex-1 relative flex flex-col p-2 sm:p-3 md:p-5 lg:p-6 border-b md:border-b-0 md:border-r border-transparent md:border-[var(--text-secondary)]/30 overflow-hidden z-10">
+              {/* LEFT COLUMN: Player (Flexible & Proportional) */}
+              <div className="flex-1 relative flex flex-col px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 border-b md:border-b-0 md:border-r border-transparent md:border-[var(--text-secondary)]/30 overflow-hidden z-10 justify-between">
 
                 {/* Fade Visualizer Overlay (Player Box Only) */}
                 {visualizerMode === 'fade' && (
@@ -806,8 +806,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   </div>
                 </div>
 
-                {/* Cover Art Section - Flexible height */}
-                <div className="flex-1 flex flex-col items-center justify-center relative z-10 py-2 md:py-4 min-h-0">
+                {/* Cover Art Section - Beautifully Centered with breathing room */}
+                <div className="flex-1 flex flex-col items-center justify-center relative z-10 py-1 md:py-3 min-h-0">
                   {/* Glow */}
                   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-[var(--accent)] opacity-10 blur-[80px] rounded-full pointer-events-none" />
 
@@ -838,7 +838,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
                     {/* Album art with neon glow + fade animation */}
                     <div 
-                      className="relative w-48 h-48 sm:w-56 sm:h-56 md:w-60 md:h-60 lg:w-64 lg:h-64 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm shrink-0"
+                      className="relative w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56 lg:w-60 lg:h-60 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm shrink-0"
                       style={{ boxShadow: `0 0 25px rgba(var(--accent-rgb), 0.25), 0 0 60px rgba(var(--accent-rgb), 0.1), inset 0 0 15px rgba(var(--accent-rgb), 0.05)` }}
                     >
                       {/* Decorative corner accents for cover */}
@@ -869,11 +869,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                     </div>
 
                     {/* Cover Art Reflection */}
-                    <div className="relative w-48 sm:w-56 md:w-60 lg:w-64 h-12 overflow-hidden pointer-events-none -mt-0.5 hidden md:block">
+                    <div className="relative w-44 sm:w-52 md:w-56 lg:w-60 h-8 overflow-hidden pointer-events-none -mt-0.5 hidden md:block">
                       <img
                         src={current?.coverUrl || '/default-cover.png'}
                         alt=""
-                        className="w-full h-48 sm:h-56 md:h-60 lg:h-64 object-cover transform scale-y-[-1] opacity-20"
+                        className="w-full h-44 sm:h-52 md:h-56 lg:h-60 object-cover transform scale-y-[-1] opacity-20"
                         style={{ 
                           maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 100%)',
                           WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.4) 0%, transparent 100%)',
@@ -884,8 +884,8 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                   </div>
                 </div>
 
-                {/* Track Info & Controls Section - Compact */}
-                <div className="w-full max-w-lg mx-auto space-y-3 md:space-y-5 relative z-10 pt-1 sm:pt-3 md:pt-4 pb-1 md:pb-2">
+                {/* Track Info & Controls Section - Compact & Balanced */}
+                <div className="w-full max-w-lg mx-auto space-y-2.5 md:space-y-3.5 relative z-10 pt-1 pb-1">
                   {/* Title & Artist & Actions Combined */}
                   <div className="text-center space-y-0.5 md:space-y-1">
                     <div className="flex items-start justify-center gap-2 md:gap-3">
@@ -917,22 +917,61 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                           {current?.artist || 'UNKNOWN'}
                         </p>
                         {/* Genre Tags */}
-                        {current?.category && (
-                          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1.5 max-w-full">
-                            {current.category
-                              .split(/[,&/|+]+/)
-                              .map(g => g.trim().replace(/^#+/, ''))
-                              .filter(Boolean)
-                              .map((genre, idx) => (
-                                <span
+                        {current?.category && (() => {
+                          const allGenres = current.category
+                            .split(/[,&/|+]+/)
+                            .map(g => g.trim().replace(/^#+/, ''))
+                            .filter(Boolean);
+                          const visibleGenres = allGenres.slice(0, 3);
+                          const extraGenres = allGenres.slice(3);
+
+                          return (
+                            <div className="flex items-center justify-center gap-1.5 mt-1.5 max-w-full">
+                              {visibleGenres.map((genre, idx) => (
+                                <button
                                   key={idx}
-                                  className="text-[8px] sm:text-[9px] font-mono px-2 py-0.5 bg-black/50 backdrop-blur-sm border border-[var(--accent)]/40 text-[var(--accent)] uppercase tracking-wider shadow-[0_2px_6px_rgba(0,0,0,0.6)] transition-all hover:bg-[var(--accent)]/20"
+                                  onClick={() => { playClick(); setSelectedCategory(genre); }}
+                                  className="text-[8px] sm:text-[9px] font-mono px-2 py-0.5 bg-black/50 backdrop-blur-sm border border-[var(--accent)]/40 text-[var(--accent)] uppercase tracking-wider shadow-[0_2px_6px_rgba(0,0,0,0.6)] transition-all hover:bg-[var(--accent)]/20 active:scale-95 opacity-80 hover:opacity-100 max-w-[110px] truncate"
+                                  title={`Filter playlist by #${genre}`}
                                 >
                                   #{genre}
-                                </span>
+                                </button>
                               ))}
-                          </div>
-                        )}
+
+                              {/* Extra genres overflow badge */}
+                              {extraGenres.length > 0 && (
+                                <div className="relative group/moregenres">
+                                  <button
+                                    type="button"
+                                    className="text-[8px] sm:text-[9px] font-mono px-1.5 py-0.5 bg-black/60 backdrop-blur-sm border border-[var(--accent)]/40 text-[var(--accent)] uppercase font-bold tracking-wider shadow-[0_2px_6px_rgba(0,0,0,0.6)] transition-all hover:bg-[var(--accent)]/20 active:scale-95 opacity-80 hover:opacity-100"
+                                    title={`+${extraGenres.length} more genres: ${extraGenres.join(', ')}`}
+                                  >
+                                    +{extraGenres.length}
+                                  </button>
+
+                                  {/* Popover on hover/focus */}
+                                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1.5 hidden group-hover/moregenres:flex flex-col gap-1 p-2 bg-black/95 border border-[var(--accent)]/50 backdrop-blur-md shadow-2xl z-50 min-w-[130px] max-w-[220px] animate-in fade-in zoom-in-95 duration-150">
+                                    <div className="text-[7.5px] font-mono text-white/50 tracking-wider uppercase border-b border-white/10 pb-1 mb-0.5 text-center">
+                                      More Genres ({extraGenres.length})
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 justify-center max-h-36 overflow-y-auto custom-scrollbar p-0.5">
+                                      {extraGenres.map((extra, eIdx) => (
+                                        <button
+                                          key={eIdx}
+                                          onClick={() => { playClick(); setSelectedCategory(extra); }}
+                                          className="text-[8px] font-mono px-1.5 py-0.5 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/30 text-[var(--accent)] border border-[var(--accent)]/30 uppercase tracking-wider transition-colors max-w-[150px] truncate"
+                                          title={`Filter by #${extra}`}
+                                        >
+                                          #{extra}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Karaoke Button */}

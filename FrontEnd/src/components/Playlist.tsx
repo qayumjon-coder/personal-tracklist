@@ -207,14 +207,14 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
             </button>
           ) : (
             <div className="flex items-center gap-2 pl-1 truncate">
-              <div className="w-1 h-1 bg-[var(--accent)] animate-pulse shrink-0"></div>
-              <span className="text-[9px] text-[var(--accent)]/60 tracking-widest uppercase truncate flex items-center gap-3">
+              <div className="w-1.5 h-1.5 bg-[var(--accent)] animate-pulse shadow-[0_0_8px_var(--accent)] shrink-0"></div>
+              <span className="text-[9px] text-white/80 font-bold tracking-widest uppercase truncate flex items-center gap-3">
                 {songs.length} TRACKS
               </span>
-              <div className="flex bg-black/50 rounded-none border border-[var(--text-secondary)]/20 ml-2 shrink-0">
-                <button onClick={() => { playClick(); setViewMode('list'); }} className={`cyber-icon-btn w-6 h-6 rounded-none ${viewMode === 'list' ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : ''}`} title="List View"><List size={12} /></button>
-                <button onClick={() => { playClick(); setViewMode('grid'); }} className={`cyber-icon-btn w-6 h-6 rounded-none ${viewMode === 'grid' ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : ''}`} title="Grid View"><LayoutGrid size={12} /></button>
-                <button onClick={() => { playClick(); exportPlaylist('m3u'); }} className="cyber-icon-btn w-6 h-6 rounded-none hover:bg-[var(--accent)]/20 text-[var(--text-secondary)] hover:text-[var(--accent)]" title="Export Playlist (M3U)"><Download size={12} /></button>
+              <div className="flex bg-black/60 rounded-none border border-white/20 ml-2 shrink-0">
+                <button onClick={() => { playClick(); setViewMode('list'); }} className={`cyber-icon-btn w-6 h-6 rounded-none ${viewMode === 'list' ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : 'text-white/80 hover:text-white hover:bg-white/10'}`} title="List View"><List size={12} /></button>
+                <button onClick={() => { playClick(); setViewMode('grid'); }} className={`cyber-icon-btn w-6 h-6 rounded-none ${viewMode === 'grid' ? 'bg-[var(--accent)] text-black border-[var(--accent)]' : 'text-white/80 hover:text-white hover:bg-white/10'}`} title="Grid View"><LayoutGrid size={12} /></button>
+                <button onClick={() => { playClick(); exportPlaylist('m3u'); }} className="cyber-icon-btn w-6 h-6 rounded-none hover:bg-white/10 text-white/80 hover:text-[var(--accent)]" title="Export Playlist (M3U)"><Download size={12} /></button>
               </div>
 
               {localFilesInfo && (
@@ -397,7 +397,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                             data-active={isActive}
                             className={`relative group/item flex items-center w-full ${snapshot.isDragging ? 'z-50 shadow-2xl bg-black/90 border border-[var(--accent)] scale-[1.02]' : 'transition-all duration-300'} ${isActive ? 'playlist-active-bg' : 'hover:bg-white/5'} ${isSelected ? 'bg-[var(--accent)]/10' : ''}`}
                           >
-                            <div {...provided.dragHandleProps} className="text-[var(--text-secondary)] hover:text-[var(--accent)] cursor-grab active:cursor-grabbing p-2 pl-3">
+                            <div {...provided.dragHandleProps} className="text-white/40 hover:text-[var(--accent)] cursor-grab active:cursor-grabbing p-2 pl-3">
                               <GripVertical size={14} />
                             </div>
                             {/* Active Indicator Bar */}
@@ -409,7 +409,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                             {(isSelectionMode || isSelected) && (
                               <button
                                 onClick={() => { playClick(); toggleSelect(song.id); }}
-                                className={`pl-2 pr-1 py-4 transition-colors shrink-0 ${isSelected ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]/30 hover:text-[var(--accent)]'}`}
+                                className={`pl-2 pr-1 py-4 transition-colors shrink-0 ${isSelected ? 'text-[var(--accent)]' : 'text-white/40 hover:text-[var(--accent)]'}`}
                               >
                                 {isSelected ? <CheckSquare2 size={16} /> : <Square size={16} />}
                               </button>
@@ -427,23 +427,40 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                               className={`flex-1 flex flex-col items-start gap-0.5 py-3 pr-8 pl-3 transition-all duration-300 overflow-hidden text-left ${isActive ? 'pl-4' : ''}`}
                             >
                               {/* Title Row */}
-                              <div className={`w-full truncate text-[10px] font-bold font-mono tracking-tight uppercase ${isActive ? 'text-[var(--accent)] text-glow' : 'text-[var(--text-secondary)] group-hover/item:text-[var(--text-primary)]'}`}>
+                              <div className={`w-full truncate text-[10px] font-bold font-mono tracking-tight uppercase ${isActive ? 'text-[var(--accent)] text-glow' : 'text-white/90 group-hover/item:text-white'}`}>
                                 {song.title}
                               </div>
 
                               {/* Artist & Info Row */}
                               <div className="flex items-center justify-between w-full gap-2">
-                                <div className={`text-[8px] truncate font-mono uppercase tracking-wider flex items-center gap-1.5 flex-1 min-w-0 ${isActive ? 'opacity-80' : 'opacity-30 group-hover/item:opacity-60'}`}>
+                                <div className={`text-[8px] truncate font-mono uppercase tracking-wider flex items-center gap-1.5 flex-1 min-w-0 ${isActive ? 'text-white/90' : 'text-white/60 group-hover/item:text-white/80'}`}>
                                   <span className="truncate">{song.artist}</span>
-                                  {song.category && song.category !== 'General' && (
-                                    <span className="hidden sm:inline-flex items-center gap-1 shrink-0">
-                                      {song.category.split(/[,&/|+]+/).map(c => c.trim().replace(/^#+/, '')).filter(Boolean).slice(0, 2).map((cat, i) => (
-                                        <span key={i} className="text-[6.5px] px-1 py-0.2 border border-[var(--text-secondary)]/30 text-[var(--text-secondary)]">
-                                          #{cat}
-                                        </span>
-                                      ))}
-                                    </span>
-                                  )}
+                                  {song.category && song.category !== 'General' && (() => {
+                                    const cats = song.category.split(/[,&/|+]+/).map(c => c.trim().replace(/^#+/, '')).filter(Boolean);
+                                    const visible = cats.slice(0, 2);
+                                    const extraCount = cats.length - 2;
+                                    return (
+                                      <span className="hidden sm:inline-flex items-center gap-1 shrink-0">
+                                        {visible.map((cat, i) => (
+                                          <span
+                                            key={i}
+                                            className="text-[7px] px-1.5 py-0.5 bg-black/60 border border-[var(--accent)]/40 text-[var(--accent)] font-semibold uppercase tracking-wider shadow-sm opacity-50 max-w-[80px] truncate"
+                                            title={`#${cat}`}
+                                          >
+                                            #{cat}
+                                          </span>
+                                        ))}
+                                        {extraCount > 0 && (
+                                          <span
+                                            className="text-[6.5px] px-1 py-0.5 bg-black/60 border border-white/20 text-white/60 font-mono font-bold tracking-wider opacity-60"
+                                            title={cats.slice(2).map(c => `#${c}`).join(', ')}
+                                          >
+                                            +{extraCount}
+                                          </span>
+                                        )}
+                                      </span>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
                                   {/* Animated EQ bars for active track */}
@@ -455,16 +472,16 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                                     </div>
                                   )}
                                   {(song.play_count !== undefined && song.play_count > 0) && (
-                                    <div className={`text-[7px] font-mono opacity-30 group-hover/item:opacity-60 ${isActive ? 'text-[var(--accent)] opacity-70' : ''}`} title={`${song.play_count} marta tinglangan`}>
+                                    <div className={`text-[7px] font-mono ${isActive ? 'text-[var(--accent)]' : 'text-white/50 group-hover/item:text-white/70'}`} title={`${song.play_count} marta tinglangan`}>
                                       ▶ {song.play_count}
                                     </div>
                                   )}
                                   {isCached && isCached(song.id) && (
-                                    <div title="Offline mavjud" className="text-[var(--accent)]/40">
+                                    <div title="Offline mavjud" className="text-[var(--accent)]">
                                       <WifiOff size={8} />
                                     </div>
                                   )}
-                                  <div className={`text-[8px] font-mono opacity-40 ${isActive ? 'text-[var(--accent)] opacity-80' : ''}`}>
+                                  <div className={`text-[8px] font-mono ${isActive ? 'text-[var(--accent)] font-bold' : 'text-white/60 group-hover/item:text-white/80'}`}>
                                     {formatDuration(song.duration || dynamicDurations[song.id])}
                                   </div>
                                 </div>
@@ -484,7 +501,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                                 }}
                                 className={`p-1.5 transition-colors ${isMenuOpen
                                   ? 'text-[var(--accent)]'
-                                  : 'text-[var(--text-secondary)]/20 hover:text-[var(--accent)]'
+                                  : 'text-white/40 hover:text-white'
                                   }`}
                               >
                                 <MoreVertical size={14} />

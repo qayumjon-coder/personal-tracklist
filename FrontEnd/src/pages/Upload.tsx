@@ -138,7 +138,7 @@ export function Upload() {
   const [formData, setFormData] = useState({
     title: "",
     artist: "",
-    category: "General",
+    category: "",
     duration: 0,
     lyrics: "",
   });
@@ -174,7 +174,7 @@ export function Upload() {
   const removeGenre = (tag: string) => {
     const clean = tag.trim().replace(/^#+/, '').toLowerCase();
     const updated = selectedGenres.filter(g => g.toLowerCase() !== clean);
-    setFormData(prev => ({ ...prev, category: updated.length > 0 ? updated.join(', ') : 'General' }));
+    setFormData(prev => ({ ...prev, category: updated.join(', ') }));
   };
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -451,7 +451,7 @@ export function Upload() {
       await uploadSong(
         formData.title,
         formData.artist,
-        formData.category,
+        formData.category.trim() || 'General',
         finalDuration,
         audioFile,
         effectiveCover,
@@ -482,18 +482,18 @@ export function Upload() {
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
       {/* Header */}
-      <div className="relative border border-[var(--text-secondary)] bg-black/60 backdrop-blur-sm">
-        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-50"></div>
+      <div className="relative border border-[var(--accent)]/40 bg-black/80 backdrop-blur-md shadow-[0_0_30px_rgba(0,0,0,0.8),0_0_15px_rgba(var(--accent-rgb),0.1)]">
+        <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-75"></div>
         
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-6">
           <div className="flex items-center gap-3">
-            <div className="w-1 h-12 bg-[var(--accent)] shadow-[0_0_10px_var(--accent)]"></div>
+            <div className="w-1.5 h-12 bg-[var(--accent)] shadow-[0_0_12px_var(--accent)]"></div>
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold tracking-wider uppercase">
+              <h1 className="text-2xl md:text-3xl font-black tracking-wider uppercase text-white">
                 Upload Zone
               </h1>
-              <p className="text-xs text-[var(--text-secondary)] tracking-widest mt-1">
-                ADMIN UPLOAD SYSTEM
+              <p className="text-xs text-[var(--accent)] tracking-widest mt-1 font-bold">
+                SYSTEM AUDIO INGESTION
               </p>
             </div>
           </div>
@@ -536,9 +536,9 @@ export function Upload() {
             <Link 
               to="/" 
               className="group flex items-center gap-2 px-4 py-2 text-xs uppercase tracking-wider font-bold
-                       border border-[var(--text-secondary)] text-[var(--text-secondary)] bg-black/50
-                       hover:border-[var(--text-primary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-secondary)]/10
-                       transition-all duration-300 shadow-[0_0_10px_rgba(255,255,255,0.05)]"
+                       border border-white/30 text-white bg-white/5
+                       hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/15
+                       transition-all duration-300 shadow-sm"
             >
               <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform duration-300" />
               <span>Back to Player</span>
@@ -546,19 +546,19 @@ export function Upload() {
           </div>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-30"></div>
+        <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-40"></div>
       </div>
 
       {/* ── Quick Import Panel ─────────────────────────────────────────────── */}
-      <div className="border border-[var(--text-secondary)] bg-black/40 backdrop-blur-sm p-6 space-y-4">
+      <div className="border border-[var(--accent)]/30 bg-black/75 backdrop-blur-md p-6 space-y-4 shadow-[0_0_25px_rgba(0,0,0,0.6)]">
         <div className="flex items-center gap-2 mb-1">
-          <Link2 size={16} className="text-[var(--accent)]" />
-          <span className="text-xs uppercase tracking-widest text-[var(--text-secondary)]">
+          <Link2 size={18} className="text-[var(--accent)] animate-pulse" />
+          <span className="text-xs uppercase tracking-widest text-white font-bold">
             Quick Import — Spotify / SoundCloud
           </span>
         </div>
 
-        <p className="text-[10px] text-[var(--text-secondary)] leading-relaxed">
+        <p className="text-xs text-white/80 leading-relaxed font-mono">
           Qo'shiq havolasini kiriting → nom, artist va muqova avtomatik to'ldiriladi. So'ng faqat audio faylni yuklang.
         </p>
 
@@ -570,13 +570,13 @@ export function Upload() {
               onChange={e => { setImportUrl(e.target.value); setImportError(null); }}
               onKeyDown={e => e.key === 'Enter' && handleImport()}
               placeholder="https://open.spotify.com/track/... yoki https://soundcloud.com/..."
-              className="w-full bg-black/50 border border-[var(--text-secondary)] p-3 pr-8 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_var(--accent)] transition-all text-sm placeholder:text-[var(--text-secondary)]/40"
+              className="w-full bg-black/70 border border-white/25 text-white p-3 pr-8 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_12px_rgba(var(--accent-rgb),0.4)] transition-all text-sm placeholder:text-white/40 font-mono"
             />
             {importUrl && (
               <button
                 type="button"
                 onClick={() => { setImportUrl(""); setImportError(null); }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-white/60 hover:text-white transition-colors"
               >
                 <X size={14} />
               </button>
@@ -586,11 +586,11 @@ export function Upload() {
             type="button"
             onClick={handleImport}
             disabled={importing || !importUrl.trim()}
-            className="px-5 py-3 text-xs uppercase tracking-widest font-bold border transition-all duration-300
-                       border-[var(--accent)] text-[var(--accent)]
+            className="px-5 py-3 text-xs uppercase tracking-widest font-black border transition-all duration-300
+                       border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10
                        hover:bg-[var(--accent)] hover:text-black
                        disabled:opacity-40 disabled:cursor-not-allowed
-                       shadow-[0_0_8px_rgba(var(--accent-rgb),0.1)] hover:shadow-[0_0_15px_rgba(var(--accent-rgb),0.4)]
+                       shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.6)]
                        flex items-center gap-2 whitespace-nowrap"
           >
             {importing ? (
@@ -602,85 +602,85 @@ export function Upload() {
         </div>
 
         {importError && (
-          <div className="flex items-center gap-2 text-red-400 text-xs border border-red-500/30 bg-red-900/10 px-3 py-2">
-            <AlertCircle size={14} />
+          <div className="flex items-center gap-2 text-red-300 text-xs border border-red-500/50 bg-red-950/40 px-3 py-2 font-mono">
+            <AlertCircle size={14} className="text-red-400 shrink-0" />
             <span>{importError}</span>
           </div>
         )}
 
         {/* Platform hints */}
-        <div className="flex gap-4 text-[9px] text-[var(--text-secondary)]/50 uppercase tracking-widest">
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
+        <div className="flex gap-4 text-[10px] uppercase tracking-wider font-bold">
+          <span className="flex items-center gap-1.5 text-green-400">
+            <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_6px_#22c55e] inline-block"></span>
             Spotify
           </span>
-          <span className="flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-orange-500 inline-block"></span>
+          <span className="flex items-center gap-1.5 text-orange-400">
+            <span className="w-2 h-2 rounded-full bg-orange-500 shadow-[0_0_6px_#f97316] inline-block"></span>
             SoundCloud
           </span>
         </div>
       </div>
 
       {/* ── Upload Form ─────────────────────────────────────────────────────── */}
-      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-black/40 p-8 border border-[var(--text-secondary)] shadow-[0_0_30px_rgba(var(--accent-rgb),0.05)] backdrop-blur-sm">
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-black/80 p-6 md:p-8 border border-[var(--accent)]/40 shadow-[0_0_35px_rgba(0,0,0,0.9),0_0_15px_rgba(var(--accent-rgb),0.12)] backdrop-blur-md">
         
         {/* Left Column: Text Inputs */}
         <div className="space-y-6">
           <div className="space-y-2">
-            <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest">Track Title</label>
+            <label className="block text-xs font-bold text-[var(--accent)] text-glow uppercase tracking-widest font-mono">Track Title *</label>
             <input
               type="text"
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              className="w-full bg-black/50 border border-[var(--text-secondary)] p-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_var(--accent)] transition-all text-lg"
+              className="w-full bg-black/70 border border-white/25 text-white p-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_12px_rgba(var(--accent-rgb),0.4)] transition-all text-base placeholder:text-white/40 font-mono"
               placeholder="Enter song title..."
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest">Artist Name</label>
+            <label className="block text-xs font-bold text-[var(--accent)] text-glow uppercase tracking-widest font-mono">Artist Name *</label>
             <input
               type="text"
               value={formData.artist}
               onChange={(e) => setFormData({ ...formData, artist: e.target.value })}
-              className="w-full bg-black/50 border border-[var(--text-secondary)] p-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_var(--accent)] transition-all text-lg"
+              className="w-full bg-black/70 border border-white/25 text-white p-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_12px_rgba(var(--accent-rgb),0.4)] transition-all text-base placeholder:text-white/40 font-mono"
               placeholder="Enter artist name..."
+              required
             />
           </div>
 
           {/* Multi-Genre & Tags Section */}
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             <div className="flex items-center justify-between">
-              <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest font-mono">
+              <label className="block text-xs font-bold text-[var(--accent)] text-glow uppercase tracking-widest font-mono">
                 Genres & Tags
               </label>
-              <span className="text-[10px] text-[var(--accent)]/60 font-mono">
-                {selectedGenres.length} {selectedGenres.length === 1 ? 'genre' : 'genres'} selected
-              </span>
+              {selectedGenres.length > 0 && (
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 bg-[var(--accent)]/15 border border-[var(--accent)]/40 text-[var(--accent)] tracking-wider">
+                  {selectedGenres.length} {selectedGenres.length === 1 ? 'TAG' : 'TAGS'}
+                </span>
+              )}
             </div>
 
             {/* Selected Genre Chips */}
-            <div className="flex flex-wrap gap-2 p-3 bg-black/50 border border-[var(--text-secondary)] min-h-[48px] items-center">
+            <div className="flex flex-wrap gap-2 p-3 bg-black/70 border border-white/25 min-h-[50px] items-center">
               {selectedGenres.length === 0 ? (
-                <span className="text-xs text-[var(--text-secondary)]/40 font-mono">
-                  No genres selected (Defaults to General)
+                <span className="text-xs text-white/40 font-mono italic">
+                  Hech qanday janr tanlanmagan (bo'sh qolsa #General saqlanadi)
                 </span>
               ) : (
                 selectedGenres.map((g, idx) => (
-                  <span
+                  <button
                     key={idx}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-bold uppercase tracking-wider bg-[var(--accent)]/15 border border-[var(--accent)] text-[var(--accent)] shadow-[0_0_8px_rgba(var(--accent-rgb),0.2)] animate-in fade-in zoom-in-95 duration-150"
+                    type="button"
+                    onClick={() => removeGenre(g)}
+                    className="group inline-flex items-center gap-1.5 px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider bg-[var(--accent)]/20 border border-[var(--accent)] text-[var(--accent)] shadow-[0_0_10px_rgba(var(--accent-rgb),0.25)] hover:bg-red-500/20 hover:border-red-500 hover:text-red-400 hover:shadow-[0_0_12px_rgba(239,68,68,0.3)] active:scale-95 transition-all cursor-pointer select-none"
+                    title={`O'chirish uchun bosing (#${g})`}
                   >
                     <span>#{g}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeGenre(g)}
-                      className="hover:text-white p-0.5 transition-colors"
-                      title={`Remove ${g}`}
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
+                    <X size={12} className="opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-transform" />
+                  </button>
                 ))
               )}
             </div>
@@ -697,14 +697,14 @@ export function Upload() {
                     addGenre(genreInput);
                   }
                 }}
-                className="flex-1 bg-black/50 border border-[var(--text-secondary)]/40 p-2.5 px-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_8px_var(--accent)] text-xs font-mono text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+                className="flex-1 bg-black/70 border border-white/25 p-2.5 px-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_8px_var(--accent)] text-xs font-mono text-white placeholder:text-white/40"
                 placeholder="Type genre & press Enter or comma (e.g. Synthwave, Cyberpunk)..."
               />
               <button
                 type="button"
                 onClick={() => addGenre(genreInput)}
                 disabled={!genreInput.trim()}
-                className="cyber-btn px-4 text-xs font-mono disabled:opacity-30 disabled:pointer-events-none"
+                className="px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)] hover:text-black transition-all shadow-[0_0_8px_rgba(var(--accent-rgb),0.2)] disabled:opacity-30 disabled:pointer-events-none"
               >
                 + ADD
               </button>
@@ -712,7 +712,7 @@ export function Upload() {
 
             {/* Quick Suggestions / Popular Pills */}
             <div className="pt-1">
-              <div className="text-[9px] text-[var(--text-secondary)]/60 uppercase tracking-widest font-mono mb-1.5">
+              <div className="text-[10px] text-white/80 uppercase tracking-widest font-mono mb-2 font-bold">
                 Suggested Tags:
               </div>
               <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar">
@@ -724,7 +724,7 @@ export function Upload() {
                       key={cat}
                       type="button"
                       onClick={() => addGenre(cat)}
-                      className="px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider border border-[var(--text-secondary)]/20 text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all bg-black/30"
+                      className="px-2.5 py-1 text-[10px] font-mono font-medium uppercase tracking-wider border border-white/25 text-white/90 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/15 transition-all bg-white/5 shadow-sm"
                     >
                       + {cat}
                     </button>
@@ -734,24 +734,23 @@ export function Upload() {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest">Lyrics (Optional)</label>
+            <label className="block text-xs font-bold text-[var(--accent)] text-glow uppercase tracking-widest font-mono">Lyrics (Optional)</label>
             <textarea
               value={formData.lyrics}
               onChange={(e) => setFormData({ ...formData, lyrics: e.target.value })}
-              className="w-full h-32 bg-black/50 border border-[var(--text-secondary)] p-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_var(--accent)] transition-all text-sm font-mono resize-none custom-scrollbar"
+              className="w-full h-32 bg-black/70 border border-white/25 text-white p-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_12px_rgba(var(--accent-rgb),0.4)] transition-all text-sm font-mono resize-none custom-scrollbar placeholder:text-white/40"
               placeholder="Paste the song lyrics here..."
             />
           </div>
 
           <div className="pt-4">
-            
             <button
               type="submit"
               disabled={loading}
-              className={`w-full relative overflow-hidden mt-4 py-4 font-bold text-xl uppercase tracking-widest border transition-all duration-300
+              className={`w-full relative overflow-hidden py-4 font-black text-lg uppercase tracking-widest border transition-all duration-300
                 ${loading 
                   ? 'border-[var(--accent)] text-[var(--accent)] bg-black cursor-not-allowed' 
-                  : 'border-[var(--accent)] text-[var(--bg-main)] bg-[var(--accent)] hover:bg-transparent hover:text-[var(--accent)] hover:shadow-[0_0_20px_var(--accent)]'
+                  : 'border-[var(--accent)] text-black bg-[var(--accent)] hover:bg-transparent hover:text-[var(--accent)] hover:shadow-[0_0_25px_var(--accent)]'
                 }
               `}
             >
@@ -778,17 +777,24 @@ export function Upload() {
           
           {/* Audio Upload */}
           <div className="relative group">
-            <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest mb-2">Audio File</label>
-            <div className={`relative h-24 border-2 border-dashed border-[var(--text-secondary)] flex flex-col items-center justify-center cursor-pointer transition-colors group-hover:border-[var(--accent)] ${audioFile ? 'bg-[var(--text-secondary)]/10' : ''}`}>
+            <label className="block text-xs font-bold text-[var(--accent)] text-glow uppercase tracking-widest mb-2 font-mono">Audio File *</label>
+            <div className={`relative h-28 border-2 border-dashed flex flex-col items-center justify-center cursor-pointer transition-all ${
+              audioFile 
+                ? 'border-[var(--accent)] bg-[var(--accent)]/15 shadow-[0_0_15px_rgba(var(--accent-rgb),0.25)]' 
+                : 'border-white/30 bg-black/60 hover:border-[var(--accent)] hover:bg-[var(--accent)]/5'
+            }`}>
               <input 
                 type="file" 
                 accept="audio/*" 
                 onChange={(e) => handleFileChange(e, 'audio')}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              <Music className={`mb-2 ${audioFile ? 'text-[var(--accent)]' : 'text-[var(--text-secondary)]'}`} />
-              <span className="text-xs text-[var(--text-secondary)] truncate max-w-[80%]">
+              <Music className={`mb-2 transition-transform duration-300 group-hover:scale-110 ${audioFile ? 'text-[var(--accent)] scale-110' : 'text-white/70 group-hover:text-[var(--accent)]'}`} size={26} />
+              <span className={`text-xs font-bold font-mono tracking-wider truncate max-w-[85%] px-2 text-center ${audioFile ? 'text-[var(--accent)]' : 'text-white/80 group-hover:text-white'}`}>
                 {audioFile ? audioFile.name : "DRAG & DROP OR CLICK TO UPLOAD MP3"}
+              </span>
+              <span className="text-[10px] text-white/50 font-mono mt-0.5">
+                {audioFile ? `${(audioFile.size / (1024 * 1024)).toFixed(2)} MB` : "Supports MP3, WAV, FLAC, OGG, AAC"}
               </span>
             </div>
           </div>
@@ -796,21 +802,21 @@ export function Upload() {
           {/* Cover Upload */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest">
-                Cover Art
+              <label className="block text-xs font-bold text-[var(--accent)] text-glow uppercase tracking-widest font-mono">
+                Cover Art *
               </label>
-              <div className="flex items-center gap-1 border border-[var(--text-secondary)]/40 p-0.5 bg-black/40 text-[10px]">
+              <div className="flex items-center gap-1 border border-white/20 p-0.5 bg-black/60 text-[10px]">
                 <button
                   type="button"
                   onClick={() => setCoverTab("file")}
-                  className={`px-2 py-1 font-mono uppercase tracking-wider transition-colors ${coverTab === 'file' ? 'bg-[var(--accent)] text-[var(--bg-main)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                  className={`px-2.5 py-1 font-mono uppercase tracking-wider transition-colors ${coverTab === 'file' ? 'bg-[var(--accent)] text-black font-black shadow-sm' : 'text-white/70 hover:text-white font-bold'}`}
                 >
                   Fayl
                 </button>
                 <button
                   type="button"
                   onClick={() => setCoverTab("url")}
-                  className={`px-2 py-1 font-mono uppercase tracking-wider transition-colors ${coverTab === 'url' ? 'bg-[var(--accent)] text-[var(--bg-main)] font-bold' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'}`}
+                  className={`px-2.5 py-1 font-mono uppercase tracking-wider transition-colors ${coverTab === 'url' ? 'bg-[var(--accent)] text-black font-black shadow-sm' : 'text-white/70 hover:text-white font-bold'}`}
                 >
                   Havola (URL)
                 </button>
@@ -830,7 +836,7 @@ export function Upload() {
                     setCoverFile(null);
                   }}
                   placeholder="https://example.com/cover.jpg"
-                  className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-2.5 text-xs font-mono focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_var(--accent)] transition-all placeholder:text-[var(--text-secondary)]/40"
+                  className="flex-1 bg-black/70 border border-white/25 text-white p-2.5 text-xs font-mono focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_var(--accent)] transition-all placeholder:text-white/40"
                 />
                 {coverUrl && (
                   <button
@@ -839,7 +845,7 @@ export function Upload() {
                       setCoverUrl("");
                       setPreviewUrl(null);
                     }}
-                    className="px-3 border border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs font-mono"
+                    className="px-3 border border-red-500/60 text-red-400 hover:bg-red-500 hover:text-white text-xs font-mono transition-colors"
                     title="Tozalash"
                   >
                     <X size={14} />
@@ -849,7 +855,11 @@ export function Upload() {
             )}
 
             {/* Preview & File Box */}
-            <div className={`relative h-60 border-2 border-dashed border-[var(--text-secondary)] flex flex-col items-center justify-center transition-colors group hover:border-[var(--accent)] overflow-hidden ${coverFile || previewUrl ? 'border-solid' : ''}`}>
+            <div className={`relative h-64 border-2 border-dashed flex flex-col items-center justify-center transition-all group overflow-hidden ${
+              coverFile || previewUrl 
+                ? 'border-solid border-[var(--accent)] bg-black shadow-[0_0_20px_rgba(var(--accent-rgb),0.2)]' 
+                : 'border-white/30 bg-black/60 hover:border-[var(--accent)] hover:bg-[var(--accent)]/5'
+            }`}>
               {coverTab === "file" && (
                 <input 
                   type="file" 
@@ -862,11 +872,11 @@ export function Upload() {
               {previewUrl ? (
                 <div className="absolute inset-0 w-full h-full">
                   <img src={previewUrl} alt="Cover Preview" className="w-full h-full object-cover" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 pointer-events-none" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/50 pointer-events-none" />
                   
                   {/* Badge & actions on preview */}
-                  <div className="absolute top-2 left-2 z-30">
-                    <span className="px-2 py-0.5 bg-black/80 border border-[var(--accent)]/60 text-[var(--accent)] text-[9px] font-mono uppercase tracking-wider">
+                  <div className="absolute top-2.5 left-2.5 z-30">
+                    <span className="px-2.5 py-1 bg-black/90 border border-[var(--accent)] text-[var(--accent)] text-[10px] font-mono font-bold uppercase tracking-wider shadow-md">
                       {coverFile ? "Fayldan yuklandi" : (coverUrl ? "Havoladan (URL)" : "Import qilingan")}
                     </span>
                   </div>
@@ -879,15 +889,15 @@ export function Upload() {
                       setCoverUrl("");
                       setPreviewUrl(null);
                     }}
-                    className="absolute top-2 right-2 z-30 p-1.5 bg-black/80 border border-red-500/60 text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-md"
+                    className="absolute top-2.5 right-2.5 z-30 p-1.5 bg-black/90 border border-red-500 text-red-400 hover:bg-red-500 hover:text-white transition-all shadow-lg"
                     title="Muqovani olib tashlash"
                   >
-                    <X size={13} />
+                    <X size={14} />
                   </button>
 
                   {coverTab === "file" && (
-                    <div className="absolute bottom-2 inset-x-2 text-center z-10 pointer-events-none">
-                      <span className="text-[10px] text-white/80 bg-black/60 px-2 py-1 border border-white/10 backdrop-blur-sm">
+                    <div className="absolute bottom-2.5 inset-x-2.5 text-center z-10 pointer-events-none">
+                      <span className="text-[10px] text-white font-bold bg-black/80 px-3 py-1.5 border border-white/20 backdrop-blur-md shadow-md inline-block">
                         O'zgartirish uchun bosing yoki yangi rasm tashlang
                       </span>
                     </div>
@@ -895,9 +905,12 @@ export function Upload() {
                 </div>
               ) : (
                 <div className="p-4 text-center">
-                  <ImageIcon className="mb-2 mx-auto text-[var(--text-secondary)]" size={24} />
-                  <span className="text-xs text-[var(--text-secondary)] block">
+                  <ImageIcon className="mb-2 mx-auto text-white/70 group-hover:text-[var(--accent)] transition-colors" size={28} />
+                  <span className="text-xs text-white/80 font-bold font-mono tracking-wider block group-hover:text-white transition-colors">
                     {coverTab === "file" ? "UPLOAD COVER IMAGE (JPG/PNG)" : "Yuqoridagi maydonga rasm havolasini kiriting"}
+                  </span>
+                  <span className="text-[10px] text-white/50 font-mono mt-1 block">
+                    {coverTab === "file" ? "Drag & drop rasm yoki faylni tanlang" : "Direct image URL (Spotify/SoundCloud/CDN)"}
                   </span>
                 </div>
               )}

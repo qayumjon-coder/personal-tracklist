@@ -136,6 +136,15 @@ function MusicApp() {
             onPrev={player.prev}
             audioRef={player.audioRef}
             duration={player.duration}
+            onSeek={player.seek}
+            volume={player.volume}
+            isMuted={player.isMuted}
+            onVolumeChange={player.setVolume}
+            onToggleMute={player.toggleMute}
+            shuffle={player.shuffle}
+            repeat={player.repeat}
+            onToggleShuffle={player.toggleShuffle}
+            onToggleRepeat={player.toggleRepeat}
           />
           <Routes>
             <Route path="/" element={

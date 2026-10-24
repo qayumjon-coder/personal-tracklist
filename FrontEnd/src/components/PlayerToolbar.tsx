@@ -35,18 +35,18 @@ export function PlayerToolbar({
         <span className="text-[9px] font-mono text-[var(--accent)] tracking-[0.2em] font-bold uppercase">
           {player.playing ? 'SYS.PLAYING' : current ? 'SYS.PAUSED' : 'SYS.IDLE'}
         </span>
-        <div className="hidden sm:block h-3 w-px bg-[var(--text-secondary)]/20 mx-1"></div>
-        <span className="hidden sm:inline text-[9px] font-mono text-[var(--text-secondary)]/50 tracking-widest uppercase">
+        <div className="hidden sm:block h-3 w-px bg-white/20 mx-1"></div>
+        <span className="hidden sm:inline text-[9px] font-mono text-white/80 font-bold tracking-widest uppercase">
           TRK: {songs.length > 0 ? `${safeIndex + 1}/${songs.length}` : '0/0'}
         </span>
-        <span className="hidden sm:inline left-[50px] text-[12px] font-mono font-bold text-[var(--accent)] tracking-widest uppercase">Personal Tracklist</span>
+        <span className="hidden sm:inline left-[50px] text-[12px] font-mono font-bold text-[var(--accent)] text-glow tracking-widest uppercase">Personal Tracklist</span>
       </div>
 
       {/* Tech Labels - Real Data */}
-      <div className="hidden lg:flex gap-6 text-[9px] text-[var(--text-secondary)]/40 font-mono tracking-[0.3em] uppercase">
+      <div className="hidden lg:flex gap-6 text-[9px] font-mono tracking-[0.25em] uppercase">
         <div className="flex items-center gap-1.5">
-          <span className="text-[var(--accent)]/30">BUFR:</span>
-          <span>{(() => {
+          <span className="text-[var(--accent)] font-bold">BUFR:</span>
+          <span className="text-white/90 font-bold font-mono tracking-wider">{(() => {
             const audio = player.audioRef?.current;
             if (!audio || !audio.duration || audio.buffered.length === 0) return '0%';
             const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
@@ -54,8 +54,8 @@ export function PlayerToolbar({
           })()}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[var(--accent)]/30">RATE:</span>
-          <span>{(() => {
+          <span className="text-[var(--accent)] font-bold">RATE:</span>
+          <span className="text-white/90 font-bold font-mono tracking-wider">{(() => {
             try {
               const ctx = player.analyser?.context;
               if (ctx) return `${(ctx.sampleRate / 1000).toFixed(1)}KHZ`;
@@ -64,16 +64,16 @@ export function PlayerToolbar({
           })()}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[var(--accent)]/30">FMT:</span>
-          <span>{(() => {
+          <span className="text-[var(--accent)] font-bold">FMT:</span>
+          <span className="text-white/90 font-bold font-mono tracking-wider">{(() => {
             if (!current?.url) return '—';
             const ext = current.url.split('.').pop()?.split('?')[0]?.toUpperCase();
             return ext || '—';
           })()}</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="text-[var(--accent)]/30">SPD:</span>
-          <span>{player.playbackRate}X</span>
+          <span className="text-[var(--accent)] font-bold">SPD:</span>
+          <span className="text-white/90 font-bold font-mono tracking-wider">{player.playbackRate}X</span>
         </div>
       </div>
 
