@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ChangeEvent, type FormEvent, type ClipboardEvent } from "react";
+import { useState, useEffect, type ChangeEvent, type FormEvent, type ClipboardEvent } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { useFetchSongs } from "../hooks/useFetchSongs";
@@ -50,9 +50,12 @@ async function fetchGenreFromMusicBrainz(title: string, artist: string): Promise
       recording?.releases?.[0]?.['release-group']?.tags ??
       [];
     if (tags.length > 0) {
-      // Return the highest-count tag, capitalised
-      const top = [...tags].sort((a, b) => b.count - a.count)[0];
-      return top.name.charAt(0).toUpperCase() + top.name.slice(1);
+      // Return the top 3 highest-count tags, capitalised
+      const topTags = [...tags]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3)
+        .map(t => t.name.charAt(0).toUpperCase() + t.name.slice(1));
+      return topTags.join(", ");
     }
     return null;
   } catch {
@@ -140,29 +143,39 @@ export function Upload() {
     lyrics: "",
   });
   const { songs } = useFetchSongs();
-  const [isCatOpen, setIsCatOpen] = useState(false);
-  const [newCat, setNewCat] = useState("");
-  const [showNewCatInput, setShowNewCatInput] = useState(false);
-  const catRef = useRef<HTMLDivElement | null>(null);
+  const [genreInput, setGenreInput] = useState("");
 
-  useEffect(() => {
-    function onDown(e: MouseEvent) {
-      if (isCatOpen && catRef.current && !catRef.current.contains(e.target as Node)) {
-        setIsCatOpen(false);
-      }
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setIsCatOpen(false);
-    }
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [isCatOpen]);
+  const popularGenres = [
+    "Synthwave", "Cyberpunk", "Electronic", "Rock", "Lo-Fi",
+    "Hip-Hop", "Chillstep", "Ambient", "Phonk", "Pop", "Metal", "Jazz"
+  ];
 
-  const categories = ["General", ...Array.from(new Set(songs.map(s => s.category || "General")))];
+  const existingCategories = Array.from(new Set(
+    songs.flatMap(s => (s.category || "").split(/[,&/|+]+/).map(c => c.trim().replace(/^#+/, ''))).filter(Boolean)
+  ));
+
+  const allSuggestions = Array.from(new Set([...popularGenres, ...existingCategories]));
+
+  const selectedGenres = formData.category
+    ? formData.category.split(/[,&/|+]+/).map(s => s.trim().replace(/^#+/, '')).filter(Boolean)
+    : [];
+
+  const addGenre = (tag: string) => {
+    const rawTags = tag.split(/[,&/|+]+/).map(t => t.trim().replace(/^#+/, '')).filter(Boolean);
+    if (rawTags.length === 0) return;
+    const existingLower = new Set(selectedGenres.map(g => g.toLowerCase()));
+    const toAdd = rawTags.filter(t => !existingLower.has(t.toLowerCase()));
+    if (toAdd.length === 0) return;
+    const updated = [...selectedGenres, ...toAdd];
+    setFormData(prev => ({ ...prev, category: updated.join(', ') }));
+    setGenreInput("");
+  };
+
+  const removeGenre = (tag: string) => {
+    const clean = tag.trim().replace(/^#+/, '').toLowerCase();
+    const updated = selectedGenres.filter(g => g.toLowerCase() !== clean);
+    setFormData(prev => ({ ...prev, category: updated.length > 0 ? updated.join(', ') : 'General' }));
+  };
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverUrl, setCoverUrl] = useState<string>("");
@@ -306,7 +319,14 @@ export function Upload() {
             ...prev,
             title: title || prev.title,
             artist: artist || prev.artist,
-            category: (genre && genre[0]) ? genre[0] : prev.category,
+            category: genre
+              ? (Array.isArray(genre) ? genre : [genre])
+                  .flatMap(g => String(g).split(/[,&/|+]+/))
+                  .map(g => g.trim().replace(/^#+/, ''))
+                  .filter(Boolean)
+                  .map(g => g.charAt(0).toUpperCase() + g.slice(1))
+                  .join(", ") || prev.category
+              : prev.category,
             duration: duration || prev.duration
           }));
 
@@ -628,66 +648,89 @@ export function Upload() {
             />
           </div>
 
+          {/* Multi-Genre & Tags Section */}
           <div className="space-y-2">
-            <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest">Category</label>
-            <div className="relative" ref={catRef}>
-              <button
-                type="button"
-                onClick={() => setIsCatOpen(v => !v)}
-                aria-expanded={isCatOpen}
-                className="w-full text-left bg-black/50 border border-[var(--text-secondary)] p-3 flex items-center justify-between"
-                onMouseDown={(e) => e.preventDefault()}
-              >
-                <span className="text-[var(--text-primary)]">{formData.category || 'General'}</span>
-                <span className="text-[var(--text-secondary)]">▾</span>
-              </button>
-              {isCatOpen && (
-                <div className="absolute left-0 right-0 mt-1 bg-[var(--bg-main)] border border-[var(--text-secondary)] z-40 max-h-[200px] overflow-y-auto custom-scrollbar">
-                  {categories.map(cat => (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => { 
-                        setFormData(prev => ({ ...prev, category: cat })); 
-                        setShowNewCatInput(false);
-                        setIsCatOpen(false); 
-                      }}
-                      className={`w-full text-left px-3 py-2 text-sm font-mono transition-colors ${formData.category === cat && !showNewCatInput ? 'bg-[var(--accent)] text-[var(--bg-main)]' : 'text-[var(--text-primary)] hover:bg-[var(--text-secondary)]/5'}`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => { 
-                      setShowNewCatInput(true);
-                      setFormData(prev => ({ ...prev, category: "" }));
-                      setIsCatOpen(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm font-mono transition-colors border-t border-[var(--text-secondary)]/30 ${showNewCatInput ? 'bg-[var(--accent)] text-[var(--bg-main)]' : 'text-[var(--accent)] hover:bg-[var(--accent)]/10'}`}
+            <div className="flex items-center justify-between">
+              <label className="block text-sm text-[var(--text-secondary)] uppercase tracking-widest font-mono">
+                Genres & Tags
+              </label>
+              <span className="text-[10px] text-[var(--accent)]/60 font-mono">
+                {selectedGenres.length} {selectedGenres.length === 1 ? 'genre' : 'genres'} selected
+              </span>
+            </div>
+
+            {/* Selected Genre Chips */}
+            <div className="flex flex-wrap gap-2 p-3 bg-black/50 border border-[var(--text-secondary)] min-h-[48px] items-center">
+              {selectedGenres.length === 0 ? (
+                <span className="text-xs text-[var(--text-secondary)]/40 font-mono">
+                  No genres selected (Defaults to General)
+                </span>
+              ) : (
+                selectedGenres.map((g, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono font-bold uppercase tracking-wider bg-[var(--accent)]/15 border border-[var(--accent)] text-[var(--accent)] shadow-[0_0_8px_rgba(var(--accent-rgb),0.2)] animate-in fade-in zoom-in-95 duration-150"
                   >
-                    + ADD NEW...
-                  </button>
-                </div>
+                    <span>#{g}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeGenre(g)}
+                      className="hover:text-white p-0.5 transition-colors"
+                      title={`Remove ${g}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
+                ))
               )}
             </div>
 
-            {showNewCatInput && (
-              <div className="mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
-                <input
-                  type="text"
-                  autoFocus
-                  value={newCat}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setNewCat(val);
-                    setFormData(prev => ({ ...prev, category: val }));
-                  }}
-                  className="w-full bg-black/50 border border-[var(--accent)] p-3 focus:outline-none focus:shadow-[0_0_10px_var(--accent)] transition-all text-sm font-mono"
-                  placeholder="ENTER NEW CATEGORY NAME..."
-                />
+            {/* Custom Genre Input */}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={genreInput}
+                onChange={(e) => setGenreInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ',') {
+                    e.preventDefault();
+                    addGenre(genreInput);
+                  }
+                }}
+                className="flex-1 bg-black/50 border border-[var(--text-secondary)]/40 p-2.5 px-3 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_8px_var(--accent)] text-xs font-mono text-[var(--text-primary)] placeholder:text-[var(--text-secondary)]/30"
+                placeholder="Type genre & press Enter or comma (e.g. Synthwave, Cyberpunk)..."
+              />
+              <button
+                type="button"
+                onClick={() => addGenre(genreInput)}
+                disabled={!genreInput.trim()}
+                className="cyber-btn px-4 text-xs font-mono disabled:opacity-30 disabled:pointer-events-none"
+              >
+                + ADD
+              </button>
+            </div>
+
+            {/* Quick Suggestions / Popular Pills */}
+            <div className="pt-1">
+              <div className="text-[9px] text-[var(--text-secondary)]/60 uppercase tracking-widest font-mono mb-1.5">
+                Suggested Tags:
               </div>
-            )}
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto custom-scrollbar">
+                {allSuggestions
+                  .filter(cat => !selectedGenres.some(g => g.toLowerCase() === cat.toLowerCase()))
+                  .slice(0, 14)
+                  .map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() => addGenre(cat)}
+                      className="px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider border border-[var(--text-secondary)]/20 text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all bg-black/30"
+                    >
+                      + {cat}
+                    </button>
+                  ))}
+              </div>
+            </div>
           </div>
 
           <div className="space-y-2">

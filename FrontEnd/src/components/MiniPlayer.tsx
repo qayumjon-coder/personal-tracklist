@@ -47,7 +47,7 @@ export function MiniPlayer({ currentSong, playing, onPlay, onPause, onNext, onPr
 
   return (
     <div className="fixed bottom-4 right-4 z-[90] animate-in slide-in-from-bottom-5 duration-300">
-      <div className="bg-black/90 border border-[var(--accent)] text-white backdrop-blur-xl shadow-[0_0_30px_rgba(var(--accent-rgb),0.2)] font-mono w-80 sm:w-96 group relative overflow-hidden">
+      <div className="bg-black/90 border border-[var(--accent)] text-white backdrop-blur-xl shadow-[0_0_30px_rgba(var(--accent-rgb),0.2)] font-mono w-80 sm:w-96 group relative overflow-hidden hover:shadow-[0_0_40px_rgba(var(--accent-rgb),0.35)] transition-shadow duration-300">
         {/* Progress bar at the very top */}
         <div className="w-full h-[2px] bg-[var(--accent)]/10 relative">
           <div
@@ -58,12 +58,13 @@ export function MiniPlayer({ currentSong, playing, onPlay, onPause, onNext, onPr
 
         <div className="p-2.5 flex items-center gap-3">
           {/* Cover Art */}
-          <div className="w-10 h-10 border border-[var(--accent)]/40 overflow-hidden bg-black shrink-0 relative">
+          <div className="w-10 h-10 border border-[var(--accent)]/40 overflow-hidden bg-black shrink-0 relative group/cover">
             <img
               src={currentSong.coverUrl || '/default-cover.png'}
               alt={currentSong.title}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover/cover:scale-110"
             />
+            <div className="absolute inset-0 bg-[var(--accent)]/0 group-hover/cover:bg-[var(--accent)]/10 transition-colors duration-300" />
           </div>
 
           {/* Track Title & Time */}
@@ -87,29 +88,33 @@ export function MiniPlayer({ currentSong, playing, onPlay, onPause, onNext, onPr
           <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={onPrev}
-              className="p-1.5 text-[var(--text-secondary)] hover:text-white transition-colors"
+              className="p-2 text-[var(--text-secondary)] hover:text-white hover:bg-white/5 transition-colors"
               title="Previous"
+              aria-label="Previous track"
             >
               <SkipBack size={14} />
             </button>
             <button
               onClick={playing ? onPause : onPlay}
-              className="p-2 bg-[var(--accent)] text-black font-bold hover:opacity-90 transition-opacity"
+              className="p-2 bg-[var(--accent)] text-black font-bold hover:opacity-90 hover:shadow-[0_0_12px_var(--accent)] transition-all"
               title={playing ? "Pause" : "Play"}
+              aria-label={playing ? "Pause" : "Play"}
             >
               {playing ? <Pause size={14} /> : <Play size={14} />}
             </button>
             <button
               onClick={onNext}
-              className="p-1.5 text-[var(--text-secondary)] hover:text-white transition-colors"
+              className="p-2 text-[var(--text-secondary)] hover:text-white hover:bg-white/5 transition-colors"
               title="Next"
+              aria-label="Next track"
             >
               <SkipForward size={14} />
             </button>
             <Link
               to="/"
-              className="p-1.5 border border-[var(--accent)]/40 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-all ml-1"
+              className="p-2 border border-[var(--accent)]/40 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-all ml-1"
               title="Open Full Player"
+              aria-label="Open full player"
             >
               <Maximize2 size={12} />
             </Link>

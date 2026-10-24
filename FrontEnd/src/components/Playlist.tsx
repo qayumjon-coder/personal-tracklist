@@ -433,10 +433,27 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
 
                               {/* Artist & Info Row */}
                               <div className="flex items-center justify-between w-full gap-2">
-                                <div className={`text-[8px] truncate font-mono uppercase tracking-wider flex-1 ${isActive ? 'opacity-80' : 'opacity-30 group-hover/item:opacity-60'}`}>
-                                  {song.artist}
+                                <div className={`text-[8px] truncate font-mono uppercase tracking-wider flex items-center gap-1.5 flex-1 min-w-0 ${isActive ? 'opacity-80' : 'opacity-30 group-hover/item:opacity-60'}`}>
+                                  <span className="truncate">{song.artist}</span>
+                                  {song.category && song.category !== 'General' && (
+                                    <span className="hidden sm:inline-flex items-center gap-1 shrink-0">
+                                      {song.category.split(/[,&/|+]+/).map(c => c.trim().replace(/^#+/, '')).filter(Boolean).slice(0, 2).map((cat, i) => (
+                                        <span key={i} className="text-[6.5px] px-1 py-0.2 border border-[var(--text-secondary)]/30 text-[var(--text-secondary)]">
+                                          #{cat}
+                                        </span>
+                                      ))}
+                                    </span>
+                                  )}
                                 </div>
                                 <div className="flex items-center gap-2 shrink-0">
+                                  {/* Animated EQ bars for active track */}
+                                  {isActive && (
+                                    <div className="flex items-end gap-[2px] h-3">
+                                      <span className="eq-bar" style={{ height: '40%' }} />
+                                      <span className="eq-bar" style={{ height: '80%' }} />
+                                      <span className="eq-bar" style={{ height: '60%' }} />
+                                    </div>
+                                  )}
                                   {(song.play_count !== undefined && song.play_count > 0) && (
                                     <div className={`text-[7px] font-mono opacity-30 group-hover/item:opacity-60 ${isActive ? 'text-[var(--accent)] opacity-70' : ''}`} title={`${song.play_count} marta tinglangan`}>
                                       ▶ {song.play_count}

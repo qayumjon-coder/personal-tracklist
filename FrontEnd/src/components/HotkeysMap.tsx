@@ -12,9 +12,9 @@ const hotkeys = [
   { key: '↑ / ↓', action: 'Volume Up / Down' },
   { key: 'M', action: 'Toggle Mute' },
   { key: 'F', action: 'Search Database' },
-  { key: '~ (Tilde)', action: 'Open Terminal' },
+  { key: 'Ctrl + `', action: 'Open Terminal' },
   { key: 'H', action: 'Toggle Hotkeys Map' },
-  { key: 'Esc', action: 'Close Modals / Exit' },
+  { key: 'Esc', action: 'Close Modals / Exit Zen' },
 ];
 
 export function HotkeysMap({ isOpen, onClose }: HotkeysMapProps) {
@@ -47,7 +47,8 @@ export function HotkeysMap({ isOpen, onClose }: HotkeysMapProps) {
           </div>
           <button 
             onClick={onClose}
-            className="p-1 text-[var(--text-secondary)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
+            className="p-2 text-[var(--text-secondary)] hover:text-[var(--danger)] hover:bg-[var(--danger)]/10 transition-colors"
+            aria-label="Close hotkeys map"
           >
             <X size={18} />
           </button>
@@ -55,12 +56,12 @@ export function HotkeysMap({ isOpen, onClose }: HotkeysMapProps) {
 
         {/* Body */}
         <div className="p-6 md:p-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-5">
             {hotkeys.map((hotkey, index) => (
               <div key={index} className="flex items-center justify-between group">
-                <div className="px-3 py-1.5 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded text-[var(--accent)] font-mono text-xs tracking-wider min-w-[80px] text-center shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] group-hover:bg-[var(--accent)]/20 group-hover:border-[var(--accent)]/60 transition-all">
+                <span className="kbd text-[10px] min-w-[80px] text-center group-hover:border-[var(--accent)]/60 group-hover:bg-[var(--accent)]/15 transition-all">
                   {hotkey.key}
-                </div>
+                </span>
                 <div className="h-px flex-1 bg-gradient-to-r from-[var(--text-secondary)]/20 to-transparent mx-4 opacity-50" />
                 <div className="text-[10px] md:text-xs font-mono uppercase tracking-widest text-[var(--text-primary)] group-hover:text-[var(--accent)] transition-colors text-right">
                   {hotkey.action}
@@ -71,7 +72,7 @@ export function HotkeysMap({ isOpen, onClose }: HotkeysMapProps) {
 
           <div className="mt-10 text-center">
             <p className="text-[9px] font-mono uppercase tracking-[0.4em] text-[var(--text-secondary)]/60">
-              Press <span className="text-[var(--accent)] border border-[var(--accent)]/30 px-1 rounded">H</span> anywhere to close
+              Press <span className="kbd">H</span> anywhere to toggle
             </p>
           </div>
         </div>

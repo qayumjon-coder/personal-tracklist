@@ -72,7 +72,7 @@ export function LoadingScreen() {
 
   return (
     <div 
-      className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center font-mono cursor-pointer"
+      className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center font-mono cursor-pointer select-none"
       onClick={handleInteraction}
     >
       {!hasInteracted && (
@@ -80,23 +80,36 @@ export function LoadingScreen() {
           [ Tap anywhere to enable sound ]
         </div>
       )}
+
+      {/* Logo / Brand */}
+      <div className="relative z-10 mb-12 text-center">
+        <div className="text-[40px] font-black tracking-[0.3em] uppercase text-[var(--accent)] text-glow" style={{ fontFamily: 'Fira Code, monospace' }}>
+          FRONTO
+        </div>
+        <div className="text-[9px] text-[var(--text-secondary)]/60 tracking-[0.5em] uppercase mt-1">Neural Music System</div>
+      </div>
       
-      <div className="w-64 space-y-4 relative z-10">
-        <div className="flex justify-between text-[10px] text-[var(--accent)] tracking-widest animate-pulse">
+      <div className="w-72 space-y-4 relative z-10">
+        <div className="flex justify-between text-[10px] text-[var(--accent)] tracking-widest">
             <span>SYS_BOOT_REv.5.0</span>
             <span>{progress}%</span>
         </div>
         
-        <div className="h-1 w-full bg-white/5 relative overflow-hidden">
+        <div className="h-[2px] w-full bg-white/5 relative overflow-hidden">
             <div 
                 className="absolute inset-y-0 left-0 bg-[var(--accent)] transition-all duration-300 shadow-[0_0_10px_var(--accent)]"
                 style={{ width: `${progress}%` }}
             />
+            {/* Shimmer */}
+            <div
+              className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent transition-all duration-300"
+              style={{ left: `calc(${progress}% - 40px)` }}
+            />
         </div>
 
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 min-h-[60px]">
             {logs.map((log, i) => (
-                <div key={i} className="text-[8px] text-[var(--accent)]/60 uppercase tracking-tighter">
+                <div key={i} className={`text-[8px] uppercase tracking-tighter transition-opacity duration-300 ${i === logs.length - 1 ? 'text-[var(--accent)] opacity-100' : 'text-[var(--accent)]/40 opacity-60'}`}>
                     {log}
                 </div>
             ))}

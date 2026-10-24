@@ -47,6 +47,19 @@ html { font-size: 16px; }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
+}
+
+/* Global Focus Ring - Accessibility */
+:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
+}
+
+/* Smooth interactive transitions */
+button, a, [role="button"] {
+  transition: opacity 0.15s ease, color 0.15s ease;
 }
 
 #root {
@@ -186,8 +199,13 @@ html { font-size: 16px; }
 }
 
 /* Remove all border radius across the app as requested */
+/* Exclude scrollbar thumbs, mask-image pseudo-elements from this rule */
 *, *::before, *::after {
-  border-radius: 0;
+  border-radius: 0 !important;
+}
+/* Re-allow border-radius for rounded-full utility (used for dot indicators & avatar) */
+.rounded-full {
+  border-radius: 9999px !important;
 }
 
 /* Cyber-OS Styles */
@@ -206,18 +224,28 @@ html { font-size: 16px; }
 }
 .cyber-icon-btn {
     border: 1px solid rgba(var(--accent-rgb), 0.3);
-    background: rgba(var(--accent-rgb), 0.05);
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(8px);
     color: var(--text-secondary);
     transition: all 0.2s ease-in-out;
     display: flex;
     align-items: center;
     justify-content: center;
+    min-width: 36px;
+    min-height: 36px;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 .cyber-icon-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
-    background: rgba(var(--accent-rgb), 0.15);
-    box-shadow: 0 0 10px var(--accent-glow);
+    background: rgba(var(--accent-rgb), 0.18);
+    box-shadow: 0 0 15px var(--accent-glow);
+}
+.cyber-icon-btn:active {
+    transform: scale(0.95);
+    box-shadow: 0 0 5px var(--accent-glow);
 }
 .cyber-panel {
     background: var(--bg-card);
@@ -276,21 +304,78 @@ html { font-size: 16px; }
 
 /* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.2);
-  border-left: 1px solid rgba(var(--accent-rgb), 0.1);
+  border-left: 1px solid rgba(var(--accent-rgb), 0.05);
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--accent);
-  border-radius: 0px;
+  background: rgba(var(--accent-rgb), 0.4);
+  border-radius: 0px !important;
+  transition: background 0.2s ease;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(var(--accent-rgb), 0.8);
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
 }
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: var(--accent) rgba(0, 0, 0, 0.2);
+  scrollbar-color: rgba(var(--accent-rgb), 0.4) rgba(0, 0, 0, 0.2);
+}
+
+/* Touch-friendly progress/seek areas */
+.touch-seek-area {
+  min-height: 32px;
+  cursor: pointer;
+  position: relative;
+}
+
+/* Smooth page transitions */
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: pageFadeIn 0.4s ease-out;
+}
+
+/* Playlist item hover glow line */
+.playlist-item-hover {
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.playlist-item-hover:hover {
+  background: rgba(var(--accent-rgb), 0.05);
+}
+
+/* Now playing equalizer bars animation */
+@keyframes eq-bar {
+  0%, 100% { height: 30%; }
+  50% { height: 100%; }
+}
+.eq-bar {
+  display: inline-block;
+  width: 3px;
+  background: var(--accent);
+  animation: eq-bar 0.8s ease-in-out infinite;
+  box-shadow: 0 0 4px var(--accent-glow);
+}
+.eq-bar:nth-child(1) { animation-delay: 0s; }
+.eq-bar:nth-child(2) { animation-delay: 0.15s; }
+.eq-bar:nth-child(3) { animation-delay: 0.3s; }
+
+/* Keyboard shortcut badge */
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1px 5px;
+  background: rgba(var(--accent-rgb), 0.08);
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
+  font-family: 'Fira Code', monospace;
+  font-size: 9px;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  min-width: 18px;
 }

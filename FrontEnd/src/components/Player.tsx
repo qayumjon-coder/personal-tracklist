@@ -855,9 +855,15 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       />
                       {/* Sleep Timer Badge */}
                       {player.sleepTimer !== null && (
-                        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/70 border border-[var(--accent)]/50 px-2 py-1 text-[8px] font-mono text-[var(--accent)] backdrop-blur-sm animate-pulse z-10">
-                          <Moon size={8} fill="currentColor" />
-                          <span>{player.sleepTimer}M</span>
+                        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/80 border border-[var(--accent)]/50 px-2 py-1 text-[8px] font-mono text-[var(--accent)] backdrop-blur-sm shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)] z-10">
+                          <Moon size={9} fill="currentColor" className="animate-pulse" />
+                          <span>
+                            {player.sleepTimerMode === 'end-of-track'
+                              ? 'END OF TRACK'
+                              : player.sleepTimerSeconds !== null && player.sleepTimerSeconds !== undefined
+                              ? `${Math.floor(player.sleepTimerSeconds / 60)}:${(player.sleepTimerSeconds % 60).toString().padStart(2, '0')}`
+                              : `${player.sleepTimer}M`}
+                          </span>
                         </div>
                       )}
                     </div>
@@ -886,19 +892,47 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       {/* Like Button - Always visible */}
                       <button
                         onClick={toggleLike}
-                        className={`p-3 md:p-4 rounded-full transition-all duration-300 transform hover:scale-110 active:scale-95 shrink-0 mt-1 ${current && isLiked(current.id) ? 'text-[var(--accent)] drop-shadow-[0_0_10px_var(--accent)] bg-[var(--accent)]/10' : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--text-secondary)]/10'}`}
+                        className={`cyber-icon-btn w-10 h-10 shrink-0 mt-1 ${current && isLiked(current.id) ? 'text-[var(--accent)] drop-shadow-[0_0_10px_var(--accent)] bg-[var(--accent)]/20 border-[var(--accent)]' : ''}`}
+                        title={current && isLiked(current.id) ? "Unlike" : "Like"}
                       >
-                        <Heart size={20} fill={current && isLiked(current.id) ? "currentColor" : "none"} strokeWidth={1.5} />
+                        <Heart size={18} fill={current && isLiked(current.id) ? "currentColor" : "none"} strokeWidth={1.5} />
                       </button>
 
                       {/* Song Title & Artist - Always visible */}
                       <div className="flex flex-col items-center flex-1 min-w-0 px-1">
-                        <h2 className="text-base md:text-xl lg:text-2xl font-black text-[var(--accent)] text-glow tracking-tight drop-shadow-lg truncate font-mono uppercase w-full">
+                        <h2
+                          className="text-base md:text-xl lg:text-2xl font-black text-[var(--accent)] text-glow tracking-tight drop-shadow-lg truncate font-mono uppercase w-full"
+                          style={{
+                            textShadow: '0 0 12px var(--accent-glow), 0 2px 4px rgba(0,0,0,0.95), 0 0 16px rgba(0,0,0,0.85)'
+                          }}
+                        >
                           {current?.title || 'UNKNOWN'}
                         </h2>
-                        <p className="text-[9px] md:text-[10px] lg:text-xs text-[var(--text-secondary)] font-bold tracking-[0.2em] md:tracking-[0.3em] uppercase mt-0.5 md:mt-1 opacity-80 truncate w-full">
+                        <p
+                          className="text-[10px] md:text-xs text-white/90 font-bold tracking-[0.25em] md:tracking-[0.3em] uppercase mt-0.5 md:mt-1 truncate w-full"
+                          style={{
+                            textShadow: '0 2px 4px rgba(0,0,0,0.95), 0 0 8px rgba(0,0,0,0.85)'
+                          }}
+                        >
                           {current?.artist || 'UNKNOWN'}
                         </p>
+                        {/* Genre Tags */}
+                        {current?.category && (
+                          <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1.5 max-w-full">
+                            {current.category
+                              .split(/[,&/|+]+/)
+                              .map(g => g.trim().replace(/^#+/, ''))
+                              .filter(Boolean)
+                              .map((genre, idx) => (
+                                <span
+                                  key={idx}
+                                  className="text-[8px] sm:text-[9px] font-mono px-2 py-0.5 bg-black/50 backdrop-blur-sm border border-[var(--accent)]/40 text-[var(--accent)] uppercase tracking-wider shadow-[0_2px_6px_rgba(0,0,0,0.6)] transition-all hover:bg-[var(--accent)]/20"
+                                >
+                                  #{genre}
+                                </span>
+                              ))}
+                          </div>
+                        )}
                       </div>
 
                       {/* Karaoke Button */}
@@ -1301,11 +1335,39 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
       {/* Sleep Timer countdown HUD */}
       {player.sleepTimer !== null && (
         <div className="fixed bottom-12 md:bottom-24 right-4 md:right-8 z-[100] animate-in slide-in-from-right-10 duration-500">
-          <div className="bg-black/80 backdrop-blur-xl border border-[var(--accent)]/30 px-4 py-2 flex items-center gap-3 shadow-[0_0_20px_rgba(var(--accent-rgb),0.1)]">
-            <Clock size={16} className="text-[var(--accent)] animate-pulse" />
-            <div className="flex flex-col">
-              <span className="text-[8px] font-mono text-[var(--accent)] uppercase tracking-widest leading-none mb-1">Deep Sleep Mode</span>
-              <span className="text-xs font-mono text-white leading-none">{player.sleepTimer}M Remaining</span>
+          <div className="bg-black/90 backdrop-blur-xl border border-[var(--accent)]/40 px-3.5 py-2 flex items-center gap-3 shadow-[0_0_25px_rgba(var(--accent-rgb),0.15)] group font-mono">
+            <Clock size={16} className="text-[var(--accent)] animate-pulse shrink-0" />
+            <div className="flex flex-col min-w-[5.5rem]">
+              <span className="text-[7.5px] text-[var(--accent)] uppercase tracking-widest leading-none mb-1">
+                {player.sleepTimerMode === 'end-of-track' ? 'Track End Mode' : 'Sleep Mode'}
+              </span>
+              <span className="text-xs text-white font-bold leading-none font-mono">
+                {player.sleepTimerMode === 'end-of-track'
+                  ? 'End of Song'
+                  : player.sleepTimerSeconds !== null && player.sleepTimerSeconds !== undefined
+                  ? `${Math.floor(player.sleepTimerSeconds / 60)}:${(player.sleepTimerSeconds % 60).toString().padStart(2, '0')} Left`
+                  : `${player.sleepTimer}M Left`}
+              </span>
+            </div>
+            {/* Quick +5m and Cancel actions right on HUD */}
+            <div className="flex items-center gap-1 pl-2 border-l border-white/10">
+              {player.sleepTimerMode === 'time' && (
+                <button
+                  onClick={() => player.addSleepTime(300)}
+                  className="px-1.5 py-0.5 text-[8px] border border-[var(--accent)]/40 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black transition-colors"
+                  title="Add 5 minutes"
+                >
+                  +5M
+                </button>
+              )}
+              <button
+                onClick={() => player.setSleepTimer(null)}
+                className="px-1.5 py-0.5 text-[10px] text-[var(--text-secondary)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                title="Cancel Timer"
+                aria-label="Cancel timer"
+              >
+                ✕
+              </button>
             </div>
           </div>
         </div>

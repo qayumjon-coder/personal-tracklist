@@ -196,7 +196,7 @@ export function PlayerRightPanel({
               {player.queue.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full gap-3 p-8 opacity-50">
                   <ListPlus size={36} className="text-[var(--text-secondary)]" strokeWidth={1} />
-                  <p className="text-[9px] font-mono text-[var(--text-secondary)] uppercase tracking-[0.2em] text-center">Queue is empty.<br/>Right-click a song to add.</p>
+                  <p className="text-[9px] font-mono text-[var(--text-secondary)] uppercase tracking-[0.2em] text-center">Queue is empty.<br/>Use the ⋮ menu on any track to add to queue.</p>
                 </div>
               ) : (
                 <>

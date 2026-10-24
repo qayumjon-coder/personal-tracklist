@@ -15,7 +15,8 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<RepeatMode>("off");
   const [audioError, setAudioError] = useState<string | null>(null);
-  const [sleepTimer, setSleepTimer] = useState<number | null>(null);
+  const [sleepTimerSeconds, setSleepTimerSeconds] = useState<number | null>(null);
+  const [sleepTimerMode, setSleepTimerMode] = useState<'time' | 'end-of-track' | null>(null);
   const [playbackRate, setPlaybackRateState] = useState(() => {
     const saved = localStorage.getItem('fronto_playback_rate');
     return saved ? parseFloat(saved) : 1;
@@ -328,6 +329,14 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     audio.loop = (repeat === 'one');
 
     const onEnded = () => {
+      // Sleep Timer 'end-of-track' mode
+      if (sleepTimerMode === 'end-of-track') {
+        setPlaying(false);
+        setSleepTimerMode(null);
+        setSleepTimerSeconds(null);
+        return;
+      }
+
       // If repeat is 'one', native loop handles it, but just in case:
       if (repeat === 'one') return;
 
@@ -345,7 +354,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
 
     audio.addEventListener('ended', onEnded);
     return () => audio.removeEventListener('ended', onEnded);
-  }, [repeat, songs.length, autoplay]);
+  }, [repeat, songs.length, autoplay, sleepTimerMode]);
 
   // 5. Volume Sync
   useEffect(() => {
@@ -354,28 +363,37 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     }
   }, [volume]);
 
-  // 6. Sleep Timer countdown
+  // 6. Sleep Timer countdown & soft fade-out
   useEffect(() => {
-    if (sleepTimer === null) return;
-    
-    if (sleepTimer <= 0) {
-      pause();
-      setSleepTimer(null);
+    if (sleepTimerMode !== 'time' || sleepTimerSeconds === null) return;
+
+    if (sleepTimerSeconds <= 0) {
+      setPlaying(false);
+      setSleepTimerSeconds(null);
+      setSleepTimerMode(null);
+      if (audioRef.current) audioRef.current.volume = isMuted ? 0 : volume / 100;
       return;
     }
 
     const timer = setInterval(() => {
-      setSleepTimer(prev => {
+      setSleepTimerSeconds(prev => {
         if (prev === null || prev <= 1) {
-          pause();
+          setPlaying(false);
+          setSleepTimerMode(null);
+          if (audioRef.current) audioRef.current.volume = isMuted ? 0 : volume / 100;
           return null;
         }
-        return prev - 1;
+        const nextSec = prev - 1;
+        // Fade out in last 10 seconds
+        if (nextSec <= 10 && audioRef.current && !isMuted) {
+          audioRef.current.volume = Math.max(0, (volume / 100) * (nextSec / 10));
+        }
+        return nextSec;
       });
-    }, 60000); // Decrement every minute
+    }, 1000); // Decrement every second
 
     return () => clearInterval(timer);
-  }, [sleepTimer]);
+  }, [sleepTimerSeconds, sleepTimerMode, volume, isMuted]);
 
   // Public Methods
   const play = async () => {
@@ -542,6 +560,32 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
 
   const clearQueue = useCallback(() => setQueue([]), []);
 
+  const setSleepTimer = useCallback((val: number | 'end-of-track' | null) => {
+    if (val === null) {
+      setSleepTimerSeconds(null);
+      setSleepTimerMode(null);
+      if (audioRef.current) audioRef.current.volume = isMuted ? 0 : volume / 100;
+      return;
+    }
+    if (val === 'end-of-track') {
+      setSleepTimerMode('end-of-track');
+      setSleepTimerSeconds(null);
+      return;
+    }
+    // val is in minutes
+    setSleepTimerMode('time');
+    setSleepTimerSeconds(val * 60);
+  }, [volume, isMuted]);
+
+  const addSleepTime = useCallback((additionalSeconds: number) => {
+    setSleepTimerMode('time');
+    setSleepTimerSeconds(prev => (prev === null ? additionalSeconds : Math.max(0, prev + additionalSeconds)));
+  }, []);
+
+  const sleepTimer = sleepTimerMode === 'end-of-track'
+    ? 'END'
+    : (sleepTimerSeconds !== null ? Math.ceil(sleepTimerSeconds / 60) : null);
+
   return {
     index, playing, volume, isMuted, duration,
     shuffle, repeat, audioError, play, pause, next, prev, setVolume, toggleMute,
@@ -550,6 +594,9 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     selectSong: (i: number) => { setIndex(i); setPlaying(true); setAudioError(null); },
     setSleepTimer,
     sleepTimer,
+    sleepTimerSeconds,
+    sleepTimerMode,
+    addSleepTime,
     analyser: analyserRef.current,
     audioRef,
     eq,

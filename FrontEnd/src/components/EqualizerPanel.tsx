@@ -129,9 +129,21 @@ export function EqualizerPanel({ eq, setBass, setMid, setTreble, activeEffect, s
     { id: 'echo', label: 'VOID' }
   ];
 
+  const presets = [
+    { id: 'flat', label: 'FLAT', bass: 0, mid: 0, treble: 0 },
+    { id: 'bass', label: 'BASS BOOST', bass: 9, mid: 1, treble: -1 },
+    { id: 'electronic', label: 'ELECTRONIC', bass: 7, mid: 2, treble: 6 },
+    { id: 'vocal', label: 'VOCAL CLEAR', bass: -3, mid: 7, treble: 4 },
+    { id: 'cyber', label: 'CYBER / SCI-FI', bass: 8, mid: -4, treble: 8 },
+  ];
+
+  const currentPreset = presets.find(
+    p => p.bass === eq.bass && p.mid === eq.mid && p.treble === eq.treble
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="cyber-panel p-6 w-full max-w-sm flex flex-col gap-5 shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-[var(--accent)]/30">
+      <div className="cyber-panel p-5 sm:p-6 w-full max-w-md flex flex-col gap-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-[var(--accent)]/30">
 
         {/* Header */}
         <div className="flex items-center justify-between border-b border-[var(--text-secondary)]/20 pb-3">
@@ -153,26 +165,60 @@ export function EqualizerPanel({ eq, setBass, setMid, setTreble, activeEffect, s
           <button
             onClick={() => { playClick(); setActiveTab('eq'); }}
             onMouseEnter={playHover}
-            className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-widest border border-[var(--accent)]/30 transition-all ${activeTab === 'eq' ? 'bg-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]' : 'text-[var(--text-secondary)] hover:border-[var(--accent)]'}`}
+            className={`flex-1 py-1.5 text-[10px] font-mono uppercase tracking-widest border border-[var(--accent)]/30 transition-all ${activeTab === 'eq' ? 'bg-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]' : 'text-[var(--text-secondary)] hover:border-[var(--accent)]'}`}
           >
             Equalizer
           </button>
           <button
             onClick={() => { playClick(); setActiveTab('fx'); }}
             onMouseEnter={playHover}
-            className={`flex-1 py-2 text-[10px] font-mono uppercase tracking-widest border border-[var(--accent)]/30 transition-all ${activeTab === 'fx' ? 'bg-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]' : 'text-[var(--text-secondary)] hover:border-[var(--accent)]'}`}
+            className={`flex-1 py-1.5 text-[10px] font-mono uppercase tracking-widest border border-[var(--accent)]/30 transition-all ${activeTab === 'fx' ? 'bg-[var(--accent)]/20 text-[var(--accent)] shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]' : 'text-[var(--text-secondary)] hover:border-[var(--accent)]'}`}
           >
             Effects
           </button>
         </div>
 
         {/* Content */}
-        <div className="h-52 mt-2">
+        <div className="min-h-[15rem] mt-1 flex flex-col">
           {activeTab === 'eq' ? (
-            <div className="flex justify-around items-stretch h-full px-2 animate-in fade-in zoom-in-95 duration-200">
-              {bands.map((band, i) => (
-                <VerticalSlider key={i} {...band} playClick={playClick} />
-              ))}
+            <div className="flex flex-col flex-1 animate-in fade-in zoom-in-95 duration-200">
+              {/* Presets Chips */}
+              <div className="mb-3">
+                <div className="text-[8px] font-mono text-[var(--text-secondary)] uppercase tracking-[0.2em] mb-1.5 opacity-60 text-center">
+                  PRESETS:
+                </div>
+                <div className="flex flex-wrap gap-1.5 justify-center">
+                  {presets.map(p => {
+                    const isSelected = currentPreset?.id === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          playClick();
+                          setBass(p.bass);
+                          setMid(p.mid);
+                          setTreble(p.treble);
+                        }}
+                        onMouseEnter={playHover}
+                        className={`px-2 py-1 text-[8px] sm:text-[9px] font-mono tracking-wider uppercase border transition-all ${
+                          isSelected
+                            ? 'border-[var(--accent)] bg-[var(--accent)] text-black font-bold shadow-[0_0_10px_var(--accent)]'
+                            : 'border-[var(--text-secondary)]/30 text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-white bg-black/40'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Sliders */}
+              <div className="flex justify-around items-stretch h-44 px-2 mt-1">
+                {bands.map((band, i) => (
+                  <VerticalSlider key={i} {...band} playClick={playClick} />
+                ))}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 h-full px-2 animate-in fade-in zoom-in-95 duration-200">
