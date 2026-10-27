@@ -165,10 +165,10 @@ export default function Admin() {
       const expiresAt = days === 'forever'
         ? null
         : (() => {
-            const d = new Date();
-            d.setDate(d.getDate() + (days === 'custom' ? customDaysVal : days));
-            return d.toISOString();
-          })();
+          const d = new Date();
+          d.setDate(d.getDate() + (days === 'custom' ? customDaysVal : days));
+          return d.toISOString();
+        })();
 
       await supabase.from('upload_permissions').insert([{
         fingerprint: request.fingerprint,
@@ -258,21 +258,21 @@ export default function Admin() {
   // Stats Calculations
   const stats = useMemo(() => {
     if (!list.length) return null;
-    
+
     // Duration
     const withDuration = list.filter(m => m.duration);
     const shortest = withDuration.length ? withDuration.reduce((prev, curr) => (prev.duration! < curr.duration!) ? prev : curr) : null;
     const longest = withDuration.length ? withDuration.reduce((prev, curr) => (prev.duration! > curr.duration!) ? prev : curr) : null;
     const totalDuration = list.reduce((acc, m) => acc + (m.duration || 0), 0);
     const avgDuration = list.length ? totalDuration / list.length : 0;
-    
+
     // Categories
     const cats: Record<string, number> = {};
     list.forEach(m => {
-        const c = m.category || "General";
-        cats[c] = (cats[c] || 0) + 1;
+      const c = m.category || "General";
+      cats[c] = (cats[c] || 0) + 1;
     });
-    const topCat = Object.entries(cats).sort((a,b) => b[1] - a[1])[0];
+    const topCat = Object.entries(cats).sort((a, b) => b[1] - a[1])[0];
 
     // Artists
     const uniqueArtists = new Set(list.map(m => m.artist)).size;
@@ -288,10 +288,10 @@ export default function Admin() {
     // Uploaders
     const uploaders: Record<string, number> = {};
     list.forEach(m => {
-        const u = m.uploaded_by || 'Admin';
-        uploaders[u] = (uploaders[u] || 0) + 1;
+      const u = m.uploaded_by || 'Admin';
+      uploaders[u] = (uploaders[u] || 0) + 1;
     });
-    const topUploader = Object.entries(uploaders).sort((a,b) => b[1] - a[1])[0];
+    const topUploader = Object.entries(uploaders).sort((a, b) => b[1] - a[1])[0];
 
     // Today's Uploads
     const now = new Date();
@@ -304,8 +304,8 @@ export default function Admin() {
     // Storage Size Estimate (assuming ~5MB per audio+cover pair on average)
     const storageEstimateMB = list.length * 5;
 
-    return { 
-      shortest, longest, topCat, totalDuration, avgDuration, 
+    return {
+      shortest, longest, topCat, totalDuration, avgDuration,
       uniqueArtists, totalPlays, mostPlayed, lyricsProgress,
       topUploader, todaysUploads, storageEstimateMB
     };
@@ -439,7 +439,7 @@ export default function Admin() {
 
   async function confirmDelete() {
     if (!deleteConfirmId) return;
-    
+
     setSaving(true);
     try {
       await deleteSong(deleteConfirmId);
@@ -467,26 +467,26 @@ export default function Admin() {
         <title>Admin Panel | Fronto</title>
         <meta name="robots" content="noindex, nofollow" />
       </Helmet>
-      
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-[var(--text-secondary)] pb-6">
         <div>
           <h1 className="text-3xl font-bold tracking-wider mb-2 flex items-center gap-3">
-            <MusicIcon className="w-8 h-8 text-[var(--accent)]" /> 
+            <MusicIcon className="w-8 h-8 text-[var(--accent)]" />
             EDITOR // <span className="text-[var(--text-secondary)]">MANAGE</span>
           </h1>
           <p className="text-[var(--text-secondary)] text-sm uppercase tracking-widest">Library Management Database</p>
         </div>
         <div className="flex items-center gap-4">
-           <Link 
-            to="/upload" 
+          <Link
+            to="/upload"
             className="flex items-center gap-2 px-4 py-2 bg-[var(--text-secondary)]/10 border border-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/20 transition-all text-sm uppercase tracking-wider"
           >
             <Upload size={16} />
             New Upload
           </Link>
-          <Link 
-            to="/" 
+          <Link
+            to="/"
             className="flex items-center gap-2 px-4 py-2 border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--bg-main)] transition-all text-sm uppercase tracking-wider shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.4)]"
           >
             <ArrowLeft size={16} />
@@ -543,7 +543,7 @@ export default function Admin() {
                       {req.requester_message && (
                         <p className="text-xs text-[var(--text-secondary)] font-mono leading-relaxed pl-4 border-l border-[var(--text-secondary)]/30">{req.requester_message}</p>
                       )}
-                      <div className="text-[9px] text-[var(--text-secondary)]/50 font-mono mt-1 pl-4">FP: {req.fingerprint.slice(0,16)}...</div>
+                      <div className="text-[9px] text-[var(--text-secondary)]/50 font-mono mt-1 pl-4">FP: {req.fingerprint.slice(0, 16)}...</div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
@@ -589,7 +589,7 @@ export default function Admin() {
                             {formatExpiresAt(perm.expires_at)}
                           </span>
                         </div>
-                        <div className="text-[9px] text-[var(--text-secondary)]/50 font-mono pl-5">FP: {perm.fingerprint.slice(0,16)}...</div>
+                        <div className="text-[9px] text-[var(--text-secondary)]/50 font-mono pl-5">FP: {perm.fingerprint.slice(0, 16)}...</div>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <button
@@ -646,516 +646,514 @@ export default function Admin() {
       {/* Library Tab */}
       {activeAdminTab === 'library' && (
         <div>
-      {/* Stats & Search */}
-      <div className="space-y-6 mb-8">
-        
-        {/* Search Bar & Actions */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative group flex-1">
-            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-              <Search className="w-5 h-5 text-[var(--text-secondary)] group-focus-within:text-[var(--accent)] transition-colors" />
-            </div>
-            <input
-              value={query}
-              onChange={e => setQuery(e.target.value)}
-              placeholder="SEARCH DATABASE..."
-              className="w-full bg-black/40 border border-[var(--text-secondary)] pl-12 pr-4 py-4 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/50 text-base"
-            />
-          </div>
-          <button
-            onClick={exportCSV}
-            className="px-6 py-4 bg-black/40 border border-[var(--accent)]/50 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black font-mono font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shrink-0 shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)]"
-            title="Export full library as CSV file"
-          >
-            <Database size={16} /> Export CSV
-          </button>
-        </div>
+          {/* Stats & Search */}
+          <div className="space-y-6 mb-8">
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {/* Total */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <MusicIcon size={12} /> Total Tracks
-              </div>
-              <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">{list.length}</div>
-            </div>
-
-            {/* Total Plays */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <PlayCircle size={12} /> Total Plays
-              </div>
-              <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
-                {stats?.totalPlays.toLocaleString() || 0}
-              </div>
-            </div>
-
-            {/* Artists */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <Users size={12} /> Unique Artists
-              </div>
-              <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
-                {stats?.uniqueArtists || 0}
-              </div>
-            </div>
-
-            {/* Top Cat */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <BarChart2 size={12} /> Top Genre
-              </div>
-              <div className="text-lg font-bold truncate group-hover:text-[var(--accent)] transition-colors" title={stats?.topCat?.[0] || 'N/A'}>
-                {stats?.topCat ? stats.topCat[0] : 'N/A'} 
-                <span className="text-xs text-[var(--text-secondary)] ml-2">({stats?.topCat?.[1] || 0})</span>
-              </div>
-            </div>
-
-            {/* Most Played */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <TrendingUp size={12} /> Most Played
-              </div>
-              <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
-                 {stats?.mostPlayed?.title || 'N/A'}
-              </div>
-              <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
-                 {stats?.mostPlayed?.play_count || 0} views
-              </div>
-            </div>
-
-            {/* Total Duration */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <Clock size={12} /> Total Time
-              </div>
-              <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
-                 {Math.floor((stats?.totalDuration || 0) / 3600)}h {Math.floor(((stats?.totalDuration || 0) % 3600) / 60)}m
-              </div>
-              <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
-                 Avg: {formatDuration(stats?.avgDuration)}
-              </div>
-            </div>
-
-            {/* Lyrics Coverage */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <FileText size={12} /> Lyrics Progress
-              </div>
-              <div className="text-lg font-bold group-hover:text-[var(--accent)] transition-colors">
-                 {Math.round(stats?.lyricsProgress || 0)}%
-              </div>
-              {/* Progress bar */}
-              <div className="w-full h-1 bg-[var(--text-secondary)]/20 mt-2 overflow-hidden">
-                <div 
-                  className="h-full bg-[var(--accent)] transition-all duration-1000" 
-                  style={{ width: `${stats?.lyricsProgress || 0}%` }}
+            {/* Search Bar & Actions */}
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="relative group flex-1">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <Search className="w-5 h-5 text-[var(--text-secondary)] group-focus-within:text-[var(--accent)] transition-colors" />
+                </div>
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="SEARCH DATABASE..."
+                  className="w-full bg-black/40 border border-[var(--text-secondary)] pl-12 pr-4 py-4 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/50 text-base"
                 />
               </div>
+              <button
+                onClick={exportCSV}
+                className="px-6 py-4 bg-black/40 border border-[var(--accent)]/50 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black font-mono font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shrink-0 shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)]"
+                title="Export full library as CSV file"
+              >
+                <Database size={16} /> Export CSV
+              </button>
             </div>
 
-            {/* Longest */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <Maximize2 size={12} /> Longest
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {/* Total */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <MusicIcon size={12} /> Total Tracks
+                </div>
+                <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">{list.length}</div>
               </div>
-              <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
-                 {stats?.longest?.title || 'N/A'}
+
+              {/* Total Plays */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <PlayCircle size={12} /> Total Plays
+                </div>
+                <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                  {stats?.totalPlays.toLocaleString() || 0}
+                </div>
               </div>
-              <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
-                 {formatDuration(stats?.longest?.duration)}
+
+              {/* Artists */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <Users size={12} /> Unique Artists
+                </div>
+                <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                  {stats?.uniqueArtists || 0}
+                </div>
+              </div>
+
+              {/* Top Cat */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <BarChart2 size={12} /> Top Genre
+                </div>
+                <div className="text-lg font-bold truncate group-hover:text-[var(--accent)] transition-colors" title={stats?.topCat?.[0] || 'N/A'}>
+                  {stats?.topCat ? stats.topCat[0] : 'N/A'}
+                  <span className="text-xs text-[var(--text-secondary)] ml-2">({stats?.topCat?.[1] || 0})</span>
+                </div>
+              </div>
+
+              {/* Most Played */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <TrendingUp size={12} /> Most Played
+                </div>
+                <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                  {stats?.mostPlayed?.title || 'N/A'}
+                </div>
+                <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                  {stats?.mostPlayed?.play_count || 0} views
+                </div>
+              </div>
+
+              {/* Total Duration */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <Clock size={12} /> Total Time
+                </div>
+                <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                  {Math.floor((stats?.totalDuration || 0) / 3600)}h {Math.floor(((stats?.totalDuration || 0) % 3600) / 60)}m
+                </div>
+                <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                  Avg: {formatDuration(stats?.avgDuration)}
+                </div>
+              </div>
+
+              {/* Lyrics Coverage */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <FileText size={12} /> Lyrics Progress
+                </div>
+                <div className="text-lg font-bold group-hover:text-[var(--accent)] transition-colors">
+                  {Math.round(stats?.lyricsProgress || 0)}%
+                </div>
+                {/* Progress bar */}
+                <div className="w-full h-1 bg-[var(--text-secondary)]/20 mt-2 overflow-hidden">
+                  <div
+                    className="h-full bg-[var(--accent)] transition-all duration-1000"
+                    style={{ width: `${stats?.lyricsProgress || 0}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Longest */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <Maximize2 size={12} /> Longest
+                </div>
+                <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                  {stats?.longest?.title || 'N/A'}
+                </div>
+                <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                  {formatDuration(stats?.longest?.duration)}
+                </div>
+              </div>
+
+              {/* Top Uploader */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <Users size={12} /> Top Uploader
+                </div>
+                <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                  {stats?.topUploader?.[0] || 'Admin'}
+                </div>
+                <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                  {stats?.topUploader?.[1] || 0} tracks
+                </div>
+              </div>
+
+              {/* Today's Uploads */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <Calendar size={12} /> Uploaded Today
+                </div>
+                <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                  {stats?.todaysUploads || 0}
+                </div>
+              </div>
+
+              {/* Storage Size Estimate */}
+              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
+                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+                  <Database size={12} /> Est. Storage
+                </div>
+                <div className="text-xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                  {stats?.storageEstimateMB || 0} MB
+                </div>
               </div>
             </div>
 
-            {/* Top Uploader */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <Users size={12} /> Top Uploader
+            {/* Play Count Trend Chart Card */}
+            <div className="bg-black/40 border border-[var(--text-secondary)]/30 p-6 backdrop-blur-sm mt-6">
+              <div className="flex items-center justify-between mb-4 border-b border-[var(--text-secondary)]/20 pb-3">
+                <div className="flex items-center gap-2 text-xs font-mono text-[var(--accent)] font-bold uppercase tracking-widest">
+                  <TrendingUp size={16} /> Play Count Trend & Top Tracks
+                </div>
+                <div className="text-[10px] font-mono text-[var(--text-secondary)]">REAL-TIME DB METRICS</div>
               </div>
-              <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
-                 {stats?.topUploader?.[0] || 'Admin'}
-              </div>
-              <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
-                 {stats?.topUploader?.[1] || 0} tracks
+              <div className="space-y-3 font-mono">
+                {list
+                  .slice()
+                  .sort((a, b) => (b.play_count || 0) - (a.play_count || 0))
+                  .slice(0, 5)
+                  .map((song, idx) => {
+                    const maxPlays = Math.max(1, ...list.map(s => s.play_count || 0));
+                    const pct = Math.round(((song.play_count || 0) / maxPlays) * 100);
+                    return (
+                      <div key={song.id} className="space-y-1">
+                        <div className="flex justify-between text-xs font-mono">
+                          <span className="text-white truncate max-w-[280px] sm:max-w-md">
+                            #{idx + 1} {song.title} <span className="text-[var(--text-secondary)]">({song.artist || 'Unknown'})</span>
+                          </span>
+                          <span className="text-[var(--accent)] font-bold shrink-0 ml-2">{song.play_count || 0} plays</span>
+                        </div>
+                        <div className="w-full h-2 bg-black/60 border border-[var(--text-secondary)]/20 overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-[var(--text-secondary)] via-[var(--accent)] to-[var(--accent)] transition-all duration-1000 shadow-[0_0_10px_var(--accent)]"
+                            style={{ width: `${Math.max(4, pct)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                {list.length === 0 && (
+                  <div className="text-center py-6 text-xs text-[var(--text-secondary)] font-mono">NO TRACK METRICS AVAILABLE</div>
+                )}
               </div>
             </div>
-
-            {/* Today's Uploads */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <Calendar size={12} /> Uploaded Today
-              </div>
-              <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
-                 {stats?.todaysUploads || 0}
-              </div>
-            </div>
-
-            {/* Storage Size Estimate */}
-            <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-              <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                 <Database size={12} /> Est. Storage
-              </div>
-              <div className="text-xl font-bold group-hover:text-[var(--accent)] transition-colors">
-                 {stats?.storageEstimateMB || 0} MB
-              </div>
-            </div>
-        </div>
-
-        {/* Play Count Trend Chart Card */}
-        <div className="bg-black/40 border border-[var(--text-secondary)]/30 p-6 backdrop-blur-sm mt-6">
-          <div className="flex items-center justify-between mb-4 border-b border-[var(--text-secondary)]/20 pb-3">
-            <div className="flex items-center gap-2 text-xs font-mono text-[var(--accent)] font-bold uppercase tracking-widest">
-              <TrendingUp size={16} /> Play Count Trend & Top Tracks
-            </div>
-            <div className="text-[10px] font-mono text-[var(--text-secondary)]">REAL-TIME DB METRICS</div>
           </div>
-          <div className="space-y-3 font-mono">
-            {list
-              .slice()
-              .sort((a, b) => (b.play_count || 0) - (a.play_count || 0))
-              .slice(0, 5)
-              .map((song, idx) => {
-                const maxPlays = Math.max(1, ...list.map(s => s.play_count || 0));
-                const pct = Math.round(((song.play_count || 0) / maxPlays) * 100);
-                return (
-                  <div key={song.id} className="space-y-1">
-                    <div className="flex justify-between text-xs font-mono">
-                      <span className="text-white truncate max-w-[280px] sm:max-w-md">
-                        #{idx + 1} {song.title} <span className="text-[var(--text-secondary)]">({song.artist || 'Unknown'})</span>
-                      </span>
-                      <span className="text-[var(--accent)] font-bold shrink-0 ml-2">{song.play_count || 0} plays</span>
+
+          {/* Main Content */}
+          <div className="relative">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center p-32 border border-[var(--text-secondary)]/30 bg-black/40 backdrop-blur-sm relative overflow-hidden group">
+                {/* Scanning Line Background */}
+                <div className="absolute inset-0 bg-[linear-gradient(transparent_0%,var(--accent)_50%,transparent_100%)] opacity-5 w-full h-[200%] -translate-y-1/2 animate-[scan_4s_linear_infinite]" style={{ backgroundSize: '100% 3px' }}></div>
+
+                {/* Main Loader */}
+                <div className="relative w-24 h-24 mb-8">
+                  {/* Outer Ring */}
+                  <div className="absolute inset-0 border-2 border-[var(--accent)]/30 rounded-full animate-[spin_3s_linear_infinite]" style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }} />
+                  <div className="absolute inset-0 border-2 border-[var(--accent)]/30 rounded-full animate-[spin_3s_linear_infinite_reverse]" style={{ borderBottomColor: 'transparent', borderRightColor: 'transparent' }} />
+
+                  {/* Inner Hexagon/Square */}
+                  <div className="absolute inset-4 border border-[var(--accent)] rounded-sm rotate-45 animate-pulse flex items-center justify-center bg-[var(--accent)]/5">
+                    <div className="w-2 h-2 bg-[var(--accent)] rounded-full shadow-[0_0_10px_var(--accent)] animate-ping" />
+                  </div>
+
+                  {/* Orbiting Particle */}
+                  <div className="absolute inset-0 animate-[spin_1.5s_linear_infinite]">
+                    <div className="h-2 w-2 bg-[var(--accent)] rounded-full absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 shadow-[0_0_10px_var(--accent)]" />
+                  </div>
+                </div>
+
+                {/* Text Animation */}
+                <div className="flex flex-col items-center gap-2 relative z-10">
+                  <span className="text-[var(--accent)] font-black text-lg tracking-[0.3em] font-mono animate-pulse text-glow">
+                    INITIALIZING
+                  </span>
+                  <div className="flex gap-1">
+                    <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce [animation-delay:-0.3s]"></span>
+                    <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce [animation-delay:-0.15s]"></span>
+                    <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce"></span>
+                  </div>
+                  <span className="text-[var(--text-secondary)] text-[10px] tracking-[0.5em] uppercase opacity-70 mt-2">
+                    Retrieving Neural Data...
+                  </span>
+                </div>
+              </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center p-16 md:p-32 border border-red-500/50 bg-red-950/20 backdrop-blur-sm relative overflow-hidden group mt-4">
+                <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,0,0,0.1)_0,transparent_100%)]"></div>
+
+                <AlertTriangle className="w-16 h-16 text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(255,0,0,0.8)] animate-pulse" />
+                <h2 className="text-2xl font-black text-red-500 tracking-[0.3em] font-mono uppercase mb-4 text-glow px-4 text-center">
+                  SYSTEM ERROR
+                </h2>
+                <div className="px-6 py-3 border border-red-500/30 bg-red-900/20 font-mono text-sm tracking-wider text-red-300 max-w-lg text-center leading-relaxed">
+                  {error}
+                </div>
+
+                <button
+                  onClick={() => window.location.reload()}
+                  className="mt-8 px-8 py-3 bg-red-500/10 border border-red-500 text-red-500 hover:bg-red-500 hover:text-black font-bold font-mono tracking-widest text-xs uppercase transition-all shadow-[0_0_15px_rgba(255,0,0,0.2)] hover:shadow-[0_0_25px_rgba(255,0,0,0.4)]"
+                >
+                  REBOOT SYSTEM
+                </button>
+              </div>
+            ) : (
+              <div className="bg-black/40 border border-[var(--text-secondary)] backdrop-blur-sm overflow-hidden">
+                {/* Bulk Action Bar */}
+                {selectedAdminIds.size > 0 && (
+                  <div className="p-3 bg-[var(--accent)]/10 border-b border-[var(--accent)]/40 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2 text-xs font-mono text-[var(--accent)] font-bold">
+                      <span>{selectedAdminIds.size} TA TREK TANLANDI</span>
                     </div>
-                    <div className="w-full h-2 bg-black/60 border border-[var(--text-secondary)]/20 overflow-hidden relative">
-                      <div
-                        className="h-full bg-gradient-to-r from-[var(--text-secondary)] via-[var(--accent)] to-[var(--accent)] transition-all duration-1000 shadow-[0_0_10px_var(--accent)]"
-                        style={{ width: `${Math.max(4, pct)}%` }}
+                    <div className="flex flex-wrap items-center gap-2 font-mono">
+                      <input
+                        type="text"
+                        value={bulkCategoryInput}
+                        onChange={e => setBulkCategoryInput(e.target.value)}
+                        placeholder="Yangi janr (masalan: Rock)..."
+                        className="bg-black/60 border border-[var(--text-secondary)] px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[var(--accent)]"
                       />
+                      <button
+                        onClick={handleBulkCategoryApply}
+                        disabled={bulkSaving || !bulkCategoryInput.trim()}
+                        className="px-3 py-1.5 bg-[var(--accent)] text-black font-bold text-xs uppercase hover:opacity-90 disabled:opacity-40"
+                      >
+                        Janrni O'zgartirish
+                      </button>
+                      <button
+                        onClick={handleBulkDeleteAdmin}
+                        disabled={bulkSaving}
+                        className="px-3 py-1.5 bg-red-500/20 border border-red-500 text-red-400 font-bold text-xs uppercase hover:bg-red-500 hover:text-black transition-all"
+                      >
+                        O'chirish ({selectedAdminIds.size})
+                      </button>
+                      <button
+                        onClick={() => setSelectedAdminIds(new Set())}
+                        className="px-2 py-1.5 text-[var(--text-secondary)] hover:text-white text-xs"
+                      >
+                        ✕
+                      </button>
                     </div>
                   </div>
-                );
-              })}
-            {list.length === 0 && (
-              <div className="text-center py-6 text-xs text-[var(--text-secondary)] font-mono">NO TRACK METRICS AVAILABLE</div>
-            )}
-          </div>
-        </div>
-      </div>
+                )}
 
-      {/* Main Content */}
-      <div className="relative">
-        {loading ? (
-           <div className="flex flex-col items-center justify-center p-32 border border-[var(--text-secondary)]/30 bg-black/40 backdrop-blur-sm relative overflow-hidden group">
-             {/* Scanning Line Background */}
-             <div className="absolute inset-0 bg-[linear-gradient(transparent_0%,var(--accent)_50%,transparent_100%)] opacity-5 w-full h-[200%] -translate-y-1/2 animate-[scan_4s_linear_infinite]" style={{ backgroundSize: '100% 3px' }}></div>
-             
-             {/* Main Loader */}
-             <div className="relative w-24 h-24 mb-8">
-               {/* Outer Ring */}
-               <div className="absolute inset-0 border-2 border-[var(--accent)]/30 rounded-full animate-[spin_3s_linear_infinite]" style={{ borderTopColor: 'transparent', borderLeftColor: 'transparent' }} />
-               <div className="absolute inset-0 border-2 border-[var(--accent)]/30 rounded-full animate-[spin_3s_linear_infinite_reverse]" style={{ borderBottomColor: 'transparent', borderRightColor: 'transparent' }} />
-               
-               {/* Inner Hexagon/Square */}
-               <div className="absolute inset-4 border border-[var(--accent)] rounded-sm rotate-45 animate-pulse flex items-center justify-center bg-[var(--accent)]/5">
-                  <div className="w-2 h-2 bg-[var(--accent)] rounded-full shadow-[0_0_10px_var(--accent)] animate-ping" />
-               </div>
-               
-               {/* Orbiting Particle */}
-               <div className="absolute inset-0 animate-[spin_1.5s_linear_infinite]">
-                 <div className="h-2 w-2 bg-[var(--accent)] rounded-full absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 shadow-[0_0_10px_var(--accent)]" />
-               </div>
-             </div>
-             
-             {/* Text Animation */}
-             <div className="flex flex-col items-center gap-2 relative z-10">
-               <span className="text-[var(--accent)] font-black text-lg tracking-[0.3em] font-mono animate-pulse text-glow">
-                 INITIALIZING
-               </span>
-               <div className="flex gap-1">
-                 <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce [animation-delay:-0.3s]"></span>
-                 <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce [animation-delay:-0.15s]"></span>
-                 <span className="w-1 h-1 bg-[var(--text-secondary)] animate-bounce"></span>
-               </div>
-               <span className="text-[var(--text-secondary)] text-[10px] tracking-[0.5em] uppercase opacity-70 mt-2">
-                 Retrieving Neural Data...
-               </span>
-             </div>
-           </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center p-16 md:p-32 border border-red-500/50 bg-red-950/20 backdrop-blur-sm relative overflow-hidden group mt-4">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-red-500 to-transparent opacity-50"></div>
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,0,0,0.1)_0,transparent_100%)]"></div>
-            
-            <AlertTriangle className="w-16 h-16 text-red-500 mb-6 drop-shadow-[0_0_15px_rgba(255,0,0,0.8)] animate-pulse" />
-            <h2 className="text-2xl font-black text-red-500 tracking-[0.3em] font-mono uppercase mb-4 text-glow px-4 text-center">
-              SYSTEM ERROR
-            </h2>
-            <div className="px-6 py-3 border border-red-500/30 bg-red-900/20 font-mono text-sm tracking-wider text-red-300 max-w-lg text-center leading-relaxed">
-              {error}
-            </div>
-            
-            <button 
-              onClick={() => window.location.reload()}
-              className="mt-8 px-8 py-3 bg-red-500/10 border border-red-500 text-red-500 hover:bg-red-500 hover:text-black font-bold font-mono tracking-widest text-xs uppercase transition-all shadow-[0_0_15px_rgba(255,0,0,0.2)] hover:shadow-[0_0_25px_rgba(255,0,0,0.4)]"
-            >
-              REBOOT SYSTEM
-            </button>
-          </div>
-        ) : (
-          <div className="bg-black/40 border border-[var(--text-secondary)] backdrop-blur-sm overflow-hidden">
-            {/* Bulk Action Bar */}
-            {selectedAdminIds.size > 0 && (
-              <div className="p-3 bg-[var(--accent)]/10 border-b border-[var(--accent)]/40 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
-                <div className="flex items-center gap-2 text-xs font-mono text-[var(--accent)] font-bold">
-                  <span>{selectedAdminIds.size} TA TREK TANLANDI</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 font-mono">
-                  <input
-                    type="text"
-                    value={bulkCategoryInput}
-                    onChange={e => setBulkCategoryInput(e.target.value)}
-                    placeholder="Yangi janr (masalan: Rock)..."
-                    className="bg-black/60 border border-[var(--text-secondary)] px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[var(--accent)]"
-                  />
-                  <button
-                    onClick={handleBulkCategoryApply}
-                    disabled={bulkSaving || !bulkCategoryInput.trim()}
-                    className="px-3 py-1.5 bg-[var(--accent)] text-black font-bold text-xs uppercase hover:opacity-90 disabled:opacity-40"
-                  >
-                    Janrni O'zgartirish
-                  </button>
-                  <button
-                    onClick={handleBulkDeleteAdmin}
-                    disabled={bulkSaving}
-                    className="px-3 py-1.5 bg-red-500/20 border border-red-500 text-red-400 font-bold text-xs uppercase hover:bg-red-500 hover:text-black transition-all"
-                  >
-                    O'chirish ({selectedAdminIds.size})
-                  </button>
-                  <button
-                    onClick={() => setSelectedAdminIds(new Set())}
-                    className="px-2 py-1.5 text-[var(--text-secondary)] hover:text-white text-xs"
-                  >
-                    ✕
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Table Header */}
-            <div className="grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--text-secondary)] bg-[var(--text-secondary)]/5 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-semibold items-center">
-              <input
-                type="checkbox"
-                checked={paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id))}
-                onChange={() => toggleSelectAllAdmin(paginatedList)}
-                className="cursor-pointer accent-[var(--accent)]"
-                title="Select/Deselect All on page"
-              />
-              <div className="w-12 text-center">Img</div>
-              <div>Title</div>
-              <div>Artist</div>
-              <div>Category</div>
-              <div>Uploader</div>
-              <div className="text-right">Time</div>
-              <div className="text-right">Actions</div>
-            </div>
-
-            {/* List */}
-            {/* Horizontal scroll hint for small screens */}
-            <div className="block sm:hidden text-[9px] font-mono text-[var(--text-secondary)]/40 text-right px-4 py-1 border-b border-[var(--text-secondary)]/10">
-              ← Jadval uchun suring →
-            </div>
-            <div className="overflow-x-auto custom-scrollbar">
-            <div className="min-w-[700px]">
-            <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-              {paginatedList.map(m => (
-                <div 
-                  key={m.id} 
-                  className={`grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--text-secondary)]/20 items-center hover:bg-[var(--text-secondary)]/5 transition-colors ${
-                    editingId === m.id ? 'bg-[var(--text-secondary)]/10 ring-1 ring-inset ring-[var(--accent)]' : selectedAdminIds.has(m.id) ? 'bg-[var(--accent)]/5' : ''
-                  }`}
-                >
+                {/* Table Header */}
+                <div className="grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--text-secondary)] bg-[var(--text-secondary)]/5 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-semibold items-center">
                   <input
                     type="checkbox"
-                    checked={selectedAdminIds.has(m.id)}
-                    onChange={() => toggleSelectAdmin(m.id)}
+                    checked={paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id))}
+                    onChange={() => toggleSelectAllAdmin(paginatedList)}
                     className="cursor-pointer accent-[var(--accent)]"
+                    title="Select/Deselect All on page"
                   />
-                  {/* Cover */}
-                  <div className="w-12 h-12 border border-[var(--text-secondary)] overflow-hidden bg-black relative group/cover">
-                    <img 
-                      src={newCoverPreview || m.cover || m.coverUrl || '/placeholder.png'} 
-                      alt={`${m.title} cover`}
-                      className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
-                    />
-                    {editingId === m.id && (
-                      <label className="absolute inset-0 bg-black/60 flex items-center justify-center cursor-pointer opacity-0 group-hover/cover:opacity-100 transition-opacity">
-                        <ImageIcon className="w-5 h-5 text-[var(--accent)]" />
-                        <input 
-                          type="file" 
-                          className="hidden" 
-                          accept="image/*"
-                          onChange={handleCoverChange}
-                        />
-                      </label>
-                    )}
-                  </div>
+                  <div className="w-12 text-center">Img</div>
+                  <div>Title</div>
+                  <div>Artist</div>
+                  <div>Category</div>
+                  <div>Uploader</div>
+                  <div className="text-right">Time</div>
+                  <div className="text-right">Actions</div>
+                </div>
 
-                  {/* Title */}
-                  <div className="min-w-0">
-                    {editingId === m.id ? (
-                      <input 
-                        className="w-full bg-black/50 border border-[var(--text-secondary)] p-2 text-sm focus:border-[var(--accent)] focus:outline-none"
-                        value={editForm.title || ""} 
-                        onChange={e => setEditForm({ ...editForm, title: e.target.value })}
-                        placeholder="Title"
-                        autoFocus
-                      />
-                    ) : (
-                      <div className="font-bold truncate" title={m.title}>{m.title}</div>
-                    )}
-                  </div>
-
-                  {/* Artist */}
-                  <div className="min-w-0">
-                     {editingId === m.id ? (
-                      <input 
-                        className="w-full bg-black/50 border border-[var(--text-secondary)] p-2 text-sm focus:border-[var(--accent)] focus:outline-none"
-                        value={editForm.artist || ""} 
-                        onChange={e => setEditForm({ ...editForm, artist: e.target.value })}
-                        placeholder="Artist"
-                      />
-                    ) : (
-                      <div className="text-sm opacity-80 truncate" title={m.artist}>{m.artist}</div>
-                    )}
-                  </div>
-
-                  {/* Category */}
-                  <div className="min-w-0">
-                     {editingId === m.id ? (
-                      <div className="flex flex-col gap-2">
-                        <select
-                          className="w-full bg-black/50 border border-[var(--text-secondary)] p-2 text-sm focus:border-[var(--accent)] focus:outline-none appearance-none"
-                          value={editForm.category || "General"} 
-                          onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                {/* List */}
+                {/* Horizontal scroll hint for small screens */}
+                <div className="block sm:hidden text-[9px] font-mono text-[var(--text-secondary)]/40 text-right px-4 py-1 border-b border-[var(--text-secondary)]/10">
+                  ← Jadval uchun suring →
+                </div>
+                <div className="overflow-x-auto custom-scrollbar">
+                  <div className="min-w-[700px]">
+                    <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+                      {paginatedList.map(m => (
+                        <div
+                          key={m.id}
+                          className={`grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--text-secondary)]/20 items-center hover:bg-[var(--text-secondary)]/5 transition-colors ${editingId === m.id ? 'bg-[var(--text-secondary)]/10 ring-1 ring-inset ring-[var(--accent)]' : selectedAdminIds.has(m.id) ? 'bg-[var(--accent)]/5' : ''
+                            }`}
                         >
-                           {categories.map(c => <option key={c} value={c}>{c}</option>)}
-                           <option value="New">+ New...</option>
-                        </select>
-                        {editForm.category === "New" && (
                           <input
-                            className="w-full bg-black/50 border border-[var(--accent)] p-2 text-sm focus:border-[var(--accent)] focus:outline-none translate-y-0 opacity-100 animate-in fade-in slide-in-from-top-2"
-                            placeholder="Type new category..."
-                            value={newCategoryInput}
-                            onChange={e => setNewCategoryInput(e.target.value)}
-                            autoFocus
+                            type="checkbox"
+                            checked={selectedAdminIds.has(m.id)}
+                            onChange={() => toggleSelectAdmin(m.id)}
+                            className="cursor-pointer accent-[var(--accent)]"
                           />
-                        )}
-                      </div>
-                    ) : (
-                      <div className="inline-block px-2 py-1 text-[10px] border border-[var(--text-secondary)] text-[var(--text-secondary)] uppercase tracking-wider">
-                        {m.category || "General"}
-                      </div>
-                    )}
-                  </div>
+                          {/* Cover */}
+                          <div className="w-12 h-12 border border-[var(--text-secondary)] overflow-hidden bg-black relative group/cover">
+                            <img
+                              src={newCoverPreview || m.cover || m.coverUrl || '/placeholder.png'}
+                              alt={`${m.title} cover`}
+                              className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
+                            />
+                            {editingId === m.id && (
+                              <label className="absolute inset-0 bg-black/60 flex items-center justify-center cursor-pointer opacity-0 group-hover/cover:opacity-100 transition-opacity">
+                                <ImageIcon className="w-5 h-5 text-[var(--accent)]" />
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={handleCoverChange}
+                                />
+                              </label>
+                            )}
+                          </div>
 
-                  {/* Uploader */}
-                  <div className="min-w-0 flex items-center gap-1.5">
-                    <Users size={12} className="text-[var(--text-secondary)] shrink-0" />
-                    <span className="text-xs text-[var(--text-secondary)] truncate" title={m.uploaded_by || 'Admin'}>
-                      {m.uploaded_by || 'Admin'}
-                    </span>
-                  </div>
+                          {/* Title */}
+                          <div className="min-w-0">
+                            {editingId === m.id ? (
+                              <input
+                                className="w-full bg-black/50 border border-[var(--text-secondary)] p-2 text-sm focus:border-[var(--accent)] focus:outline-none"
+                                value={editForm.title || ""}
+                                onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                                placeholder="Title"
+                                autoFocus
+                              />
+                            ) : (
+                              <div className="font-bold truncate" title={m.title}>{m.title}</div>
+                            )}
+                          </div>
 
-                  {/* Duration */}
-                  <div className="text-right text-sm text-[var(--text-secondary)] font-mono">
-                    {formatDuration(m.duration)}
-                  </div>
+                          {/* Artist */}
+                          <div className="min-w-0">
+                            {editingId === m.id ? (
+                              <input
+                                className="w-full bg-black/50 border border-[var(--text-secondary)] p-2 text-sm focus:border-[var(--accent)] focus:outline-none"
+                                value={editForm.artist || ""}
+                                onChange={e => setEditForm({ ...editForm, artist: e.target.value })}
+                                placeholder="Artist"
+                              />
+                            ) : (
+                              <div className="text-sm opacity-80 truncate" title={m.artist}>{m.artist}</div>
+                            )}
+                          </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center justify-end gap-2">
-                    {editingId === m.id ? (
-                      <>
-                        <button 
-                          onClick={() => saveEdit(m.id)}
-                          disabled={saving}
-                          className="p-2 border border-[var(--accent)] bg-[var(--accent)] text-[var(--bg-main)] hover:bg-transparent hover:text-[var(--accent)] transition-all"
-                          title="Save"
-                        >
-                          <Save size={16} />
-                        </button>
-                        <button 
-                          onClick={cancelEdit}
-                          className="p-2 border border-red-500/50 text-red-400 hover:bg-red-500/10 transition-all"
-                          title="Cancel"
-                        >
-                          <X size={16} />
-                        </button>
-                        <button 
-                          onClick={() => setLyricsModalOpen(true)}
-                          className="p-2 border border-[var(--text-secondary)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all ml-2"
-                          title="Edit Lyrics"
-                        >
-                          <span className="text-xs font-bold font-mono">LYRICS</span>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button 
-                          onClick={() => startEdit(m)}
-                          className="p-2 border border-[var(--text-secondary)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
-                          title="Edit"
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button 
-                          onClick={() => handleDelete(m.id)}
-                          className="p-2 border border-red-500/50 text-red-400 hover:border-red-500 hover:bg-red-500/10 transition-all"
-                          title="Delete Track"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                        <button 
-                          onClick={() => togglePreview(m)}
-                          disabled={!m.url}
-                          className={`p-2 border transition-all ${
-                            previewId === m.id 
-                              ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10" 
-                              : "border-[var(--text-secondary)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
-                          }`}
-                          title={previewId === m.id ? "Stop Preview" : "Preview Track"}
-                        >
-                          {previewId === m.id ? <Pause size={16} /> : <Play size={16} />}
-                        </button>
-                      </>
-                    )}
-                  </div>
+                          {/* Category */}
+                          <div className="min-w-0">
+                            {editingId === m.id ? (
+                              <div className="flex flex-col gap-2">
+                                <select
+                                  className="w-full bg-black/50 border border-[var(--text-secondary)] p-2 text-sm focus:border-[var(--accent)] focus:outline-none appearance-none"
+                                  value={editForm.category || "General"}
+                                  onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                                >
+                                  {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                                  <option value="New">+ New...</option>
+                                </select>
+                                {editForm.category === "New" && (
+                                  <input
+                                    className="w-full bg-black/50 border border-[var(--accent)] p-2 text-sm focus:border-[var(--accent)] focus:outline-none translate-y-0 opacity-100 animate-in fade-in slide-in-from-top-2"
+                                    placeholder="Type new category..."
+                                    value={newCategoryInput}
+                                    onChange={e => setNewCategoryInput(e.target.value)}
+                                    autoFocus
+                                  />
+                                )}
+                              </div>
+                            ) : (
+                              <div className="inline-block px-2 py-1 text-[10px] border border-[var(--text-secondary)] text-[var(--text-secondary)] uppercase tracking-wider">
+                                {m.category || "General"}
+                              </div>
+                            )}
+                          </div>
 
-                </div>
-              ))}
-              
-              {filtered.length === 0 && (
-                <div className="p-12 text-center text-[var(--text-secondary)] tracking-widest">
-                  NO TRACKS FOUND IN DATABASE
-                </div>
-              )}
-            </div>
-            </div>{/* /min-w */}
-            </div>{/* /overflow-x-auto */}
-            
-            {totalPages > 1 && (
-              <div className="p-4 border-t border-[var(--text-secondary)]/20 bg-black/40">
-                <Pagination 
-                  currentPage={currentPage} 
-                  totalPages={totalPages} 
-                  onPageChange={setCurrentPage} 
-                />
+                          {/* Uploader */}
+                          <div className="min-w-0 flex items-center gap-1.5">
+                            <Users size={12} className="text-[var(--text-secondary)] shrink-0" />
+                            <span className="text-xs text-[var(--text-secondary)] truncate" title={m.uploaded_by || 'Admin'}>
+                              {m.uploaded_by || 'Admin'}
+                            </span>
+                          </div>
+
+                          {/* Duration */}
+                          <div className="text-right text-sm text-[var(--text-secondary)] font-mono">
+                            {formatDuration(m.duration)}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center justify-end gap-2">
+                            {editingId === m.id ? (
+                              <>
+                                <button
+                                  onClick={() => saveEdit(m.id)}
+                                  disabled={saving}
+                                  className="p-2 border border-[var(--accent)] bg-[var(--accent)] text-[var(--bg-main)] hover:bg-transparent hover:text-[var(--accent)] transition-all"
+                                  title="Save"
+                                >
+                                  <Save size={16} />
+                                </button>
+                                <button
+                                  onClick={cancelEdit}
+                                  className="p-2 border border-red-500/50 text-red-400 hover:bg-red-500/10 transition-all"
+                                  title="Cancel"
+                                >
+                                  <X size={16} />
+                                </button>
+                                <button
+                                  onClick={() => setLyricsModalOpen(true)}
+                                  className="p-2 border border-[var(--text-secondary)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all ml-2"
+                                  title="Edit Lyrics"
+                                >
+                                  <span className="text-xs font-bold font-mono">LYRICS</span>
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => startEdit(m)}
+                                  className="p-2 border border-[var(--text-secondary)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
+                                  title="Edit"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(m.id)}
+                                  className="p-2 border border-red-500/50 text-red-400 hover:border-red-500 hover:bg-red-500/10 transition-all"
+                                  title="Delete Track"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => togglePreview(m)}
+                                  disabled={!m.url}
+                                  className={`p-2 border transition-all ${previewId === m.id
+                                      ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10"
+                                      : "border-[var(--text-secondary)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                    }`}
+                                  title={previewId === m.id ? "Stop Preview" : "Preview Track"}
+                                >
+                                  {previewId === m.id ? <Pause size={16} /> : <Play size={16} />}
+                                </button>
+                              </>
+                            )}
+                          </div>
+
+                        </div>
+                      ))}
+
+                      {filtered.length === 0 && (
+                        <div className="p-12 text-center text-[var(--text-secondary)] tracking-widest">
+                          NO TRACKS FOUND IN DATABASE
+                        </div>
+                      )}
+                    </div>
+                  </div>{/* /min-w */}
+                </div>{/* /overflow-x-auto */}
+
+                {totalPages > 1 && (
+                  <div className="p-4 border-t border-[var(--text-secondary)]/20 bg-black/40">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      onPageChange={setCurrentPage}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
-    </div>
-  )}
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
 
@@ -1224,7 +1222,7 @@ export default function Admin() {
               <div className="text-[10px] font-mono text-[var(--text-secondary)] mb-5 border-l-2 border-green-500/30 pl-3">
                 {approveDays === 'forever' ? 'Ruxsat muddatsiz, bekor qilguningizcha amal qiladi.'
                   : approveDays === 'custom' ? `Ruxsat ${customDays} kundan so'ng avtomatik tugaydi.`
-                  : `Ruxsat ${approveDays} kundan so'ng avtomatik tugaydi.`}
+                    : `Ruxsat ${approveDays} kundan so'ng avtomatik tugaydi.`}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1250,31 +1248,31 @@ export default function Admin() {
           <div className="bg-[#0a0a0a] border-2 border-red-500/30 w-full max-w-md p-8 shadow-[0_0_50px_rgba(239,68,68,0.15)] relative overflow-hidden">
             {/* Background pattern */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#ff0000_1px,transparent_1px)] [background-size:20px_20px]"></div>
-            
+
             <div className="relative z-10 text-center">
               <div className="w-20 h-20 bg-red-500/10 border border-red-500/50 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_20px_rgba(239,68,68,0.2)]">
                 <AlertTriangle size={40} className="text-red-500" />
               </div>
-              
+
               <h3 className="text-2xl font-bold tracking-[0.2em] text-white mb-2 font-mono uppercase">
                 Confirm Deletion
               </h3>
-              
+
               <div className="h-0.5 w-16 bg-red-500 mx-auto mb-6"></div>
-              
+
               <p className="text-gray-400 mb-8 font-mono text-sm leading-relaxed uppercase tracking-widest">
                 Warning: The track <span className="text-white font-bold">"{list.find(m => m.id === deleteConfirmId)?.title || "Unknown Track"}"</span> and all associated files will be <span className="text-red-500 underline decoration-red-500/30">permanently purged</span> from the mainframe.
               </p>
-              
+
               <div className="grid grid-cols-2 gap-4">
-                <button 
+                <button
                   onClick={() => setDeleteConfirmId(null)}
                   disabled={saving}
                   className="py-3 border border-gray-700 text-gray-500 font-mono text-xs tracking-[0.3em] hover:bg-white/5 hover:text-white transition-all uppercase disabled:opacity-50"
                 >
                   ABORT
                 </button>
-                <button 
+                <button
                   onClick={confirmDelete}
                   disabled={saving}
                   className="py-3 bg-red-500 text-black font-mono font-bold text-xs tracking-[0.3em] hover:bg-red-600 transition-all uppercase shadow-[0_0_15px_rgba(239,68,68,0.3)] disabled:opacity-50 flex items-center justify-center"
@@ -1287,7 +1285,7 @@ export default function Admin() {
                 </button>
               </div>
             </div>
-            
+
             {/* Scanline effect */}
             <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-white/5 to-transparent h-[2px] w-full animate-scanline opacity-20"></div>
           </div>
@@ -1308,11 +1306,11 @@ export default function Admin() {
             <textarea
               className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-4 font-mono text-sm leading-relaxed focus:border-[var(--accent)] focus:outline-none resize-none custom-scrollbar"
               value={editForm.lyrics || ""}
-              onChange={e => setEditForm({...editForm, lyrics: e.target.value})}
+              onChange={e => setEditForm({ ...editForm, lyrics: e.target.value })}
               placeholder="Enter lyrics here..."
             />
             <div className="mt-4 flex justify-end">
-              <button 
+              <button
                 onClick={() => setLyricsModalOpen(false)}
                 className="px-6 py-2 bg-[var(--accent)] text-[var(--bg-main)] font-bold tracking-wider hover:opacity-90"
               >
@@ -1323,7 +1321,7 @@ export default function Admin() {
         </div>,
         document.body
       )}
-      
+
     </div>
   );
 }

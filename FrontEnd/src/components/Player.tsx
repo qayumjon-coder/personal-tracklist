@@ -927,16 +927,24 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
                           return (
                             <div className="flex items-center justify-center gap-1.5 mt-1.5 max-w-full">
-                              {visibleGenres.map((genre, idx) => (
-                                <button
-                                  key={idx}
-                                  onClick={() => { playClick(); setSelectedCategory(genre); }}
-                                  className="text-[8px] sm:text-[9px] font-mono px-2 py-0.5 bg-black/50 backdrop-blur-sm border border-[var(--accent)]/40 text-[var(--accent)] uppercase tracking-wider shadow-[0_2px_6px_rgba(0,0,0,0.6)] transition-all hover:bg-[var(--accent)]/20 active:scale-95 opacity-80 hover:opacity-100 max-w-[110px] truncate"
-                                  title={`Filter playlist by #${genre}`}
-                                >
-                                  #{genre}
-                                </button>
-                              ))}
+                              {visibleGenres.map((genre, idx) => {
+                                const isActive = selectedCategory.toLowerCase() === genre.toLowerCase();
+                                return (
+                                  <button
+                                    key={idx}
+                                    onClick={() => { playClick(); setSelectedCategory(isActive ? 'All' : genre); }}
+                                    className={`text-[8px] sm:text-[9px] font-mono px-2 py-0.5 backdrop-blur-sm border uppercase tracking-wider shadow-[0_2px_6px_rgba(0,0,0,0.6)] transition-all active:scale-95 flex items-center gap-1 max-w-[120px] ${
+                                      isActive
+                                        ? 'bg-[var(--accent)]/25 border-[var(--accent)] text-[var(--accent)] opacity-100 shadow-[0_0_10px_rgba(var(--accent-rgb),0.35)] font-bold'
+                                        : 'bg-black/50 border-[var(--accent)]/40 text-[var(--accent)] opacity-80 hover:opacity-100 hover:bg-[var(--accent)]/20 hover:border-[var(--accent)]'
+                                    }`}
+                                    title={isActive ? `Clear #${genre} filter` : `Filter playlist by #${genre}`}
+                                  >
+                                    <span className="truncate">#{genre}</span>
+                                    {isActive && <X size={8} className="shrink-0 opacity-80" />}
+                                  </button>
+                                );
+                              })}
 
                               {/* Extra genres overflow badge */}
                               {extraGenres.length > 0 && (
@@ -955,16 +963,24 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                                       More Genres ({extraGenres.length})
                                     </div>
                                     <div className="flex flex-wrap gap-1 justify-center max-h-36 overflow-y-auto custom-scrollbar p-0.5">
-                                      {extraGenres.map((extra, eIdx) => (
-                                        <button
-                                          key={eIdx}
-                                          onClick={() => { playClick(); setSelectedCategory(extra); }}
-                                          className="text-[8px] font-mono px-1.5 py-0.5 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/30 text-[var(--accent)] border border-[var(--accent)]/30 uppercase tracking-wider transition-colors max-w-[150px] truncate"
-                                          title={`Filter by #${extra}`}
-                                        >
-                                          #{extra}
-                                        </button>
-                                      ))}
+                                      {extraGenres.map((extra, eIdx) => {
+                                        const isExtraActive = selectedCategory.toLowerCase() === extra.toLowerCase();
+                                        return (
+                                          <button
+                                            key={eIdx}
+                                            onClick={() => { playClick(); setSelectedCategory(isExtraActive ? 'All' : extra); }}
+                                            className={`text-[8px] font-mono px-1.5 py-0.5 border uppercase tracking-wider transition-colors max-w-[150px] flex items-center gap-1 ${
+                                              isExtraActive
+                                                ? 'bg-[var(--accent)]/25 border-[var(--accent)] text-[var(--accent)] font-bold'
+                                                : 'bg-[var(--accent)]/10 hover:bg-[var(--accent)]/30 text-[var(--accent)] border-[var(--accent)]/30'
+                                            }`}
+                                            title={isExtraActive ? `Clear #${extra} filter` : `Filter by #${extra}`}
+                                          >
+                                            <span className="truncate">#{extra}</span>
+                                            {isExtraActive && <X size={8} className="shrink-0 opacity-80" />}
+                                          </button>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 </div>
