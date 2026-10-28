@@ -1,4 +1,4 @@
-import { useState, useRef, type ChangeEvent, type DragEvent } from "react";
+import { useState, useRef, useEffect, type ChangeEvent, type DragEvent } from "react";
 import { 
   Upload as UploadIcon, 
   Music, 
@@ -11,8 +11,8 @@ import {
   RefreshCw, 
   Sparkles, 
   Check, 
-  X,
-  PlayCircle
+  PlayCircle,
+  Clipboard
 } from "lucide-react";
 import { parseBlob } from "music-metadata";
 import { uploadSong } from "../services/musicApi";
@@ -51,6 +51,80 @@ export function BatchUploadPanel({
   const [bulkCategory, setBulkCategory] = useState("");
   const [bulkCoverPreview, setBulkCoverPreview] = useState<string | null>(null);
   const [bulkCoverFile, setBulkCoverFile] = useState<File | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
+
+  // Apply a cover image File to a specific item or to all items
+  const applyCoverToItem = (file: File, itemId?: string | null) => {
+    const fileSizeMB = file.size / (1024 * 1024);
+    if (fileSizeMB > 8) {
+      toast.error(`Rasm hajmi juda katta (${fileSizeMB.toFixed(1)} MB). 8MB dan kichik rasm tanlang.`);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(file);
+
+    if (itemId) {
+      const target = items.find(it => it.id === itemId);
+      setItems(prev => prev.map(it => it.id === itemId ? {
+        ...it,
+        coverFile: file,
+        coverPreviewUrl: previewUrl
+      } : it));
+      toast.success(`"${target?.title || 'Trek'}" uchun muqova rasmi o'rnatildi!`);
+    } else {
+      setBulkCoverFile(file);
+      setBulkCoverPreview(previewUrl);
+      setItems(prev => prev.map(it => ({
+        ...it,
+        coverFile: file,
+        coverPreviewUrl: previewUrl
+      })));
+      toast.success(`Barcha ${items.length} ta trekka umumiy muqova rasmi o'rnatildi!`);
+    }
+  };
+
+  // Paste from clipboard (1-click action via navigator.clipboard or prompt)
+  const handlePasteFromClipboard = async (itemId?: string | null) => {
+    try {
+      if (navigator.clipboard?.read) {
+        const clipboardItems = await navigator.clipboard.read();
+        for (const item of clipboardItems) {
+          const imageType = item.types.find(type => type.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const file = new File([blob], `pasted_cover_${Date.now()}.${imageType.split('/')[1] || 'png'}`, { type: imageType });
+            applyCoverToItem(file, itemId);
+            return;
+          }
+        }
+      }
+      toast.info("Xotirada rasm topilmadi. Avval rasmni nusxalang (Copy Image), so'ng Ctrl+V tugmasini bosing.");
+    } catch {
+      toast.info("Rasmni o'rnatish uchun trek ustida Ctrl+V tugmasini bosing.");
+    }
+  };
+
+  // Global Ctrl+V paste listener for batch panel
+  useEffect(() => {
+    const handleGlobalPaste = (e: ClipboardEvent) => {
+      const clipItems = e.clipboardData?.items;
+      if (!clipItems) return;
+
+      for (let i = 0; i < clipItems.length; i++) {
+        if (clipItems[i].type.indexOf('image') !== -1) {
+          const file = clipItems[i].getAsFile();
+          if (file) {
+            e.preventDefault();
+            e.stopPropagation();
+            applyCoverToItem(file, activeItemId);
+            break;
+          }
+        }
+      }
+    };
+
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [activeItemId, items]);
   
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const folderInputRef = useRef<HTMLInputElement | null>(null);
@@ -466,15 +540,26 @@ export function BatchUploadPanel({
               </div>
 
               {/* Bulk Cover Setter */}
-              <button
-                type="button"
-                onClick={() => bulkCoverInputRef.current?.click()}
-                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-white flex items-center gap-1.5 transition-all"
-                title="Barcha treklarga umumiy albom rasmi belgilash"
-              >
-                <ImageIcon size={13} className="text-[var(--accent)]" />
-                <span className="hidden sm:inline">Umumiy Rasm</span>
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => bulkCoverInputRef.current?.click()}
+                  className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-white flex items-center gap-1.5 transition-all"
+                  title="Fayldan umumiy albom rasmi tanlash"
+                >
+                  <ImageIcon size={13} className="text-[var(--accent)]" />
+                  <span className="hidden sm:inline">Umumiy Rasm</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePasteFromClipboard(null)}
+                  className="px-2.5 py-1.5 bg-[var(--accent)]/15 hover:bg-[var(--accent)] text-[var(--accent)] hover:text-black border border-[var(--accent)]/40 text-xs font-bold flex items-center gap-1 transition-all"
+                  title="Clipboard'dan rasmni barchasiga qo'yish (Ctrl+V)"
+                >
+                  <Clipboard size={13} />
+                  <span className="hidden md:inline">Paste</span>
+                </button>
+              </div>
               <input
                 ref={bulkCoverInputRef}
                 type="file"
@@ -518,26 +603,30 @@ export function BatchUploadPanel({
 
           {/* Table of tracks */}
           <div className="cyber-panel overflow-hidden border border-white/15 shadow-xl">
-            <div className="overflow-x-auto custom-scrollbar">
-              <div className="min-w-[800px]">
+            <div className="overflow-x-auto overflow-y-hidden custom-scrollbar">
+              <div className="min-w-[650px] sm:min-w-full">
                 {/* Table Header */}
-                <div className="grid grid-cols-[60px_60px_2.5fr_2fr_1.5fr_80px_70px_50px] gap-3 p-3 bg-white/[0.04] border-b border-white/10 text-[10px] uppercase font-bold tracking-widest text-white/70 items-center">
+                <div className="grid grid-cols-[55px_45px_minmax(140px,2fr)_minmax(110px,1.5fr)_minmax(90px,1fr)_50px_45px_35px] gap-2.5 p-3 bg-white/[0.04] border-b border-white/10 text-[10px] uppercase font-bold tracking-widest text-white/70 items-center">
                   <div>Holat</div>
                   <div>Muqova</div>
                   <div>Qo'shiq Nomi</div>
-                  <div>Ijrochi (Artist)</div>
+                  <div>Ijrochi</div>
                   <div>Janr</div>
                   <div>Vaqt</div>
-                  <div>Hajmi</div>
+                  <div>Hajm</div>
                   <div className="text-center">X</div>
                 </div>
 
-                {/* Table Rows */}
-                <div className="max-h-[500px] overflow-y-auto custom-scrollbar divide-y divide-white/5">
+                {/* Table Rows - strictly overflow-x-hidden to prevent duplicate horizontal scrollbars */}
+                <div className="max-h-[480px] overflow-y-auto overflow-x-hidden custom-scrollbar divide-y divide-white/5">
                   {items.map((item, idx) => (
                     <div 
                       key={item.id}
-                      className={`grid grid-cols-[60px_60px_2.5fr_2fr_1.5fr_80px_70px_50px] gap-3 p-3 items-center transition-all ${
+                      onClick={() => setActiveItemId(item.id)}
+                      onMouseEnter={() => setActiveItemId(item.id)}
+                      className={`grid grid-cols-[55px_45px_minmax(140px,2fr)_minmax(110px,1.5fr)_minmax(90px,1fr)_50px_45px_35px] gap-2.5 p-2.5 items-center transition-all ${
+                        activeItemId === item.id ? 'ring-1 ring-[var(--accent)]/50 bg-[var(--accent)]/5' : ''
+                      } ${
                         item.status === 'success' 
                           ? 'bg-emerald-950/20' 
                           : item.status === 'error' 
@@ -576,28 +665,49 @@ export function BatchUploadPanel({
                         )}
                       </div>
 
-                      {/* Cover Thumbnail */}
-                      <div className="relative group/cover w-10 h-10">
+                      {/* Cover Thumbnail with Paste / Select Overlay */}
+                      <div className="relative group/cover w-10 h-10 shrink-0">
                         <img
                           src={item.coverPreviewUrl || '/placeholder.png'}
                           alt=""
-                          className="w-10 h-10 object-cover border border-white/20 bg-black/40"
+                          className={`w-10 h-10 object-cover border bg-black/40 transition-all ${
+                            activeItemId === item.id ? 'border-[var(--accent)] shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]' : 'border-white/20'
+                          }`}
                         />
-                        <label className="absolute inset-0 bg-black/70 opacity-0 group-hover/cover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity">
-                          <ImageIcon size={14} className="text-white" />
-                          <input
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                updateItem(item.id, 'coverFile', file);
-                                updateItem(item.id, 'coverPreviewUrl', URL.createObjectURL(file));
-                              }
+                        <div className="absolute inset-0 bg-black/85 opacity-0 group-hover/cover:opacity-100 flex items-center justify-center gap-1 transition-opacity">
+                          {/* Paste Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveItemId(item.id);
+                              handlePasteFromClipboard(item.id);
                             }}
-                          />
-                        </label>
+                            className="p-1 bg-[var(--accent)] text-black hover:scale-110 transition-transform"
+                            title="Clipboard'dan qo'yish (Ctrl+V)"
+                          >
+                            <Clipboard size={11} />
+                          </button>
+                          {/* Browse File Button */}
+                          <label 
+                            className="p-1 bg-white/20 text-white hover:bg-white/40 hover:scale-110 cursor-pointer transition-all"
+                            title="Fayldan tanlash"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ImageIcon size={11} />
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  applyCoverToItem(file, item.id);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
                       </div>
 
                       {/* Editable Title */}
@@ -606,7 +716,7 @@ export function BatchUploadPanel({
                         value={item.title}
                         disabled={item.status === 'success' || item.status === 'uploading'}
                         onChange={e => updateItem(item.id, 'title', e.target.value)}
-                        className="bg-black/40 border border-white/10 hover:border-white/30 focus:border-[var(--accent)] px-2 py-1 text-xs text-white focus:outline-none transition-colors truncate"
+                        className="bg-black/40 border border-white/10 hover:border-white/30 focus:border-[var(--accent)] px-2 py-1 text-xs text-white focus:outline-none transition-colors truncate w-full min-w-0"
                       />
 
                       {/* Editable Artist */}
@@ -615,7 +725,7 @@ export function BatchUploadPanel({
                         value={item.artist}
                         disabled={item.status === 'success' || item.status === 'uploading'}
                         onChange={e => updateItem(item.id, 'artist', e.target.value)}
-                        className="bg-black/40 border border-white/10 hover:border-white/30 focus:border-[var(--accent)] px-2 py-1 text-xs text-white/80 focus:outline-none transition-colors truncate"
+                        className="bg-black/40 border border-white/10 hover:border-white/30 focus:border-[var(--accent)] px-2 py-1 text-xs text-white/80 focus:outline-none transition-colors truncate w-full min-w-0"
                       />
 
                       {/* Editable Category */}
@@ -625,7 +735,7 @@ export function BatchUploadPanel({
                         disabled={item.status === 'success' || item.status === 'uploading'}
                         onChange={e => updateItem(item.id, 'category', e.target.value)}
                         list="row-genres-list"
-                        className="bg-black/40 border border-white/10 hover:border-white/30 focus:border-[var(--accent)] px-2 py-1 text-xs text-white/80 focus:outline-none transition-colors truncate"
+                        className="bg-black/40 border border-white/10 hover:border-white/30 focus:border-[var(--accent)] px-2 py-1 text-xs text-white/80 focus:outline-none transition-colors truncate w-full min-w-0"
                       />
 
                       {/* Duration */}

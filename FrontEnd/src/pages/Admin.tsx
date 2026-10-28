@@ -1305,7 +1305,7 @@ export default function Admin() {
                 </div>
                 <div className="overflow-x-auto custom-scrollbar">
                   <div className="min-w-[700px]">
-                    <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
+                    <div className="max-h-[600px] overflow-y-auto overflow-x-hidden custom-scrollbar">
                       {paginatedList.map((m, idx) => (
                         <div
                           key={m.id}

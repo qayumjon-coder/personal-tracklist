@@ -2,7 +2,8 @@ import { useState, useEffect, type ChangeEvent, type FormEvent, type ClipboardEv
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { useFetchSongs } from "../hooks/useFetchSongs";
-import { ArrowLeft, Music, Image as ImageIcon, AlertCircle, LogOut, Sparkles, Link2, Loader2, X } from "lucide-react";
+import { ArrowLeft, Music, Image as ImageIcon, AlertCircle, LogOut, Sparkles, Link2, Loader2, X, Layers } from "lucide-react";
+import { BatchUploadPanel } from "../components/BatchUploadPanel";
 import { uploadSong } from "../services/musicApi";
 import { useAuth } from "../contexts/AuthContext";
 import { useUploadPermission } from "../hooks/useUploadPermission";
@@ -144,6 +145,7 @@ export function Upload() {
   });
   const { songs } = useFetchSongs();
   const [genreInput, setGenreInput] = useState("");
+  const [uploadMode, setUploadMode] = useState<'single' | 'batch'>('single');
 
   const popularGenres = [
     "Synthwave", "Cyberpunk", "Electronic", "Rock", "Lo-Fi",
@@ -385,6 +387,7 @@ export function Upload() {
 
   // ── Paste handler ───────────────────────────────────────────────────────────
   const handlePaste = (e: ClipboardEvent<HTMLDivElement>) => {
+    if (uploadMode === 'batch') return; // Let BatchUploadPanel handle its own paste
     const items = e.clipboardData?.items;
     if (!items) return;
 
@@ -549,6 +552,44 @@ export function Upload() {
         <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-40"></div>
       </div>
 
+      {/* ── Mode Selection Tabs (Single vs Batch) ────────────────────────── */}
+      <div className="flex gap-0 border border-white/20 w-fit bg-black/80 backdrop-blur-md mb-2">
+        <button
+          type="button"
+          onClick={() => setUploadMode("single")}
+          className={`flex items-center gap-2 px-6 py-2.5 text-xs font-mono uppercase tracking-widest transition-all ${
+            uploadMode === "single"
+              ? "bg-[var(--accent)] text-black font-black shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]"
+              : "text-white/70 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <Music size={14} /> Yagona Yuklash (Single)
+        </button>
+        <button
+          type="button"
+          onClick={() => setUploadMode("batch")}
+          className={`flex items-center gap-2 px-6 py-2.5 text-xs font-mono uppercase tracking-widest transition-all relative ${
+            uploadMode === "batch"
+              ? "bg-[var(--accent)] text-black font-black shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]"
+              : "text-white/70 hover:text-white hover:bg-white/5"
+          }`}
+        >
+          <Layers size={14} /> Ommaviy Yuklash (Batch)
+          <span className="px-1.5 py-0.2 bg-emerald-500 text-black text-[9px] font-black uppercase tracking-normal">
+            BATCH
+          </span>
+        </button>
+      </div>
+
+      {uploadMode === "batch" ? (
+        <BatchUploadPanel
+          popularGenres={popularGenres}
+          existingCategories={existingCategories}
+          isAuthenticated={isAuthenticated}
+          onFinished={() => navigate('/')}
+        />
+      ) : (
+        <>
       {/* ── Quick Import Panel ─────────────────────────────────────────────── */}
       <div className="border border-[var(--accent)]/30 bg-black/75 backdrop-blur-md p-6 space-y-4 shadow-[0_0_25px_rgba(0,0,0,0.6)]">
         <div className="flex items-center gap-2 mb-1">
@@ -919,6 +960,8 @@ export function Upload() {
 
         </div>
       </form>
+        </>
+      )}
     </div>
   );
 }

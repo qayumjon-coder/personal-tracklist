@@ -30,24 +30,25 @@ body {
 /* Standard base font size */
 html { font-size: 16px; }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar - Slim & Sleek */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-main);
-  border-left: 1px solid var(--text-secondary);
+  background: rgba(0, 0, 0, 0.4);
+  border-left: 1px solid rgba(var(--accent-rgb), 0.1);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--text-secondary);
-  border: 1px solid var(--bg-main);
+  background: rgba(var(--accent-rgb), 0.35);
+  border: 1px solid rgba(0, 0, 0, 0.5);
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
-  box-shadow: 0 0 6px var(--accent-glow);
+  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 /* Global Focus Ring - Accessibility */
@@ -375,11 +376,10 @@ button, a, [role="button"] {
   height: 4px;
 }
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
-  border-left: 1px solid rgba(var(--accent-rgb), 0.05);
+  background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(var(--accent-rgb), 0.4);
+  background: rgba(var(--accent-rgb), 0.35);
   border-radius: 0px !important;
   transition: background 0.2s ease;
 }
@@ -389,7 +389,16 @@ button, a, [role="button"] {
 }
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(var(--accent-rgb), 0.4) rgba(0, 0, 0, 0.2);
+  scrollbar-color: rgba(var(--accent-rgb), 0.35) transparent;
+}
+
+/* No Scrollbar Utility */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 
 /* Touch-friendly progress/seek areas */
