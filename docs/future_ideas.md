@@ -22,3 +22,14 @@ This file contains concepts and features planned for future integration into the
 ## 5. Picture-in-Picture (PiP) Mini Player
 - Use the Document Picture-in-Picture API to detach the player from the main browser tab.
 - Creates a small, borderless, floating Cyberpunk widget that persists over other applications while the user works or browses other tabs.
+
+## 6. Cyber Command Palette (Ctrl+K Global Search)
+- Port the Admin Panel's `Ctrl+K` cyberpunk command palette to the main Player page.
+- Direct instant playback, queue additions, lyrics peek, and keyboard navigation.
+- See detailed architecture in `docs/PLAYER_COMMAND_PALETTE_ROADMAP.md`.
+
+## 7. Custom Cyberpunk Category Dropdown for Player
+- Replace the legacy basic category dropdown in `PlayerRightPanel.tsx` with the Admin panel's searchable, badge-counted, quick-filtered cyberpunk dropdown.
+- Include instant genre search, song count badges, and click-outside dismissal.
+- Documented in `docs/PLAYER_COMMAND_PALETTE_ROADMAP.md`.
+
