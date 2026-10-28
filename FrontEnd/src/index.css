@@ -446,3 +446,12 @@ button, a, [role="button"] {
   letter-spacing: 0.05em;
   min-width: 18px;
 }
+
+
+/* Cyber Frosted Glass Panel (Theme tinted, blurred, balanced contrast) */
+.cyber-panel {
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.10) 0%, rgba(var(--accent-rgb), 0.04) 100%), rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+}

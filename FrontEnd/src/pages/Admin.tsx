@@ -41,8 +41,72 @@ export default function Admin() {
   const [editForm, setEditForm] = useState<Partial<Music>>({});
   const [saving, setSaving] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState("");
+  const [filterCategory, setFilterCategory] = useState<string>("All");
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [categorySearch, setCategorySearch] = useState("");
+  const categoryDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target as Node)) {
+        setIsCategoryDropdownOpen(false);
+      }
+    }
+    if (isCategoryDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isCategoryDropdownOpen]);
 
   // Cover Update State
+  // Global Search Modal State (Ctrl+K Command Palette)
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [searchModalQuery, setSearchModalQuery] = useState("");
+  const searchModalInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    function handleGlobalKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchModalOpen(prev => !prev);
+      } else if (e.key === 'Escape' && isSearchModalOpen) {
+        setIsSearchModalOpen(false);
+      }
+    }
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [isSearchModalOpen]);
+
+  useEffect(() => {
+    if (isSearchModalOpen) {
+      const timer = setTimeout(() => searchModalInputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    } else {
+      setSearchModalQuery("");
+    }
+  }, [isSearchModalOpen]);
+
+  const searchModalResults = useMemo(() => {
+    if (!searchModalQuery.trim()) return [];
+    const q = searchModalQuery.trim().toLowerCase();
+    return list.filter(m =>
+      (m.title && m.title.toLowerCase().includes(q)) ||
+      (m.artist && m.artist.toLowerCase().includes(q)) ||
+      (m.category && m.category.toLowerCase().includes(q))
+    ).slice(0, 10);
+  }, [searchModalQuery, list]);
+
+  const handleSelectFromSearchModal = (song: Music) => {
+    setQuery(song.title);
+    setIsSearchModalOpen(false);
+    setTimeout(() => {
+      const el = document.getElementById("admin-database-section");
+      if (el) el.scrollIntoView({ behavior: "smooth" });
+    }, 100);
+  };
+
   const [newCoverFile, setNewCoverFile] = useState<File | null>(null);
   const [newCoverPreview, setNewCoverPreview] = useState<string | null>(null);
 
@@ -373,19 +437,36 @@ export default function Admin() {
 
   const debouncedQuery = useDebounce(query, 300);
 
+  const categoryCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    list.forEach(m => {
+      const c = m.category || "General";
+      map[c] = (map[c] || 0) + 1;
+    });
+    return map;
+  }, [list]);
+
+  const allCategories = useMemo(() => {
+    const cats = Array.from(new Set(list.map(s => s.category || "General"))).sort();
+    return ["All", ...cats];
+  }, [list]);
+
   useEffect(() => {
     const q = debouncedQuery.trim().toLowerCase();
-    if (!q) {
-      setFiltered(list);
-      return;
+    let res = list;
+    if (filterCategory !== "All") {
+      res = res.filter(m => (m.category || "General").toLowerCase() === filterCategory.toLowerCase());
     }
-    setFiltered(list.filter(m => (
-      (m.title || "").toLowerCase().includes(q) ||
-      (m.artist || "").toLowerCase().includes(q) ||
-      (m.category || "").toLowerCase().includes(q)
-    )));
+    if (q) {
+      res = res.filter(m => (
+        (m.title || "").toLowerCase().includes(q) ||
+        (m.artist || "").toLowerCase().includes(q) ||
+        (m.category || "").toLowerCase().includes(q)
+      ));
+    }
+    setFiltered(res);
     setCurrentPage(1);
-  }, [debouncedQuery, list]);
+  }, [debouncedQuery, filterCategory, list]);
 
   const totalPages = Math.ceil(filtered.length / itemsPerPage);
   const paginatedList = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -469,25 +550,48 @@ export default function Admin() {
       </Helmet>
 
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-[var(--text-secondary)] pb-6">
+      <div 
+        className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b pb-6"
+        style={{ borderImage: 'linear-gradient(90deg, transparent, var(--accent), transparent) 1' }}
+      >
         <div>
-          <h1 className="text-3xl font-bold tracking-wider mb-2 flex items-center gap-3">
-            <MusicIcon className="w-8 h-8 text-[var(--accent)]" />
-            EDITOR // <span className="text-[var(--text-secondary)]">MANAGE</span>
-          </h1>
+          <div className="flex flex-wrap items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold tracking-wider flex items-center gap-3">
+              <MusicIcon className="w-8 h-8 text-[var(--accent)] drop-shadow-[0_0_12px_rgba(var(--accent-rgb),0.5)]" />
+              EDITOR // <span className="text-[var(--text-secondary)]">MANAGE</span>
+            </h1>
+            <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#10b981]" />
+              <span>SYSTEM ONLINE // SUPABASE CONNECTED</span>
+            </div>
+          </div>
           <p className="text-[var(--text-secondary)] text-sm uppercase tracking-widest">Library Management Database</p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Global Search Pill (Ctrl+K Command Palette) */}
+          <button
+            type="button"
+            onClick={() => setIsSearchModalOpen(true)}
+            className="flex items-center gap-2.5 px-3 py-2 cyber-panel border border-white/20 hover:border-[var(--accent)] text-white/70 hover:text-white transition-all text-xs font-mono group cursor-pointer shadow-sm hover:shadow-[0_0_15px_rgba(var(--accent-rgb),0.2)]"
+            title="Tezkor qidiruv (Ctrl+K)"
+          >
+            <Search size={14} className="text-[var(--accent)] group-hover:scale-110 transition-transform" />
+            <span className="hidden sm:inline text-white/60 group-hover:text-white font-medium">Qidiruv...</span>
+            <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] bg-black/70 border border-white/20 text-[var(--accent)] font-bold rounded">
+              Ctrl+K
+            </kbd>
+          </button>
+
           <Link
             to="/upload"
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--text-secondary)]/10 border border-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/20 transition-all text-sm uppercase tracking-wider"
+            className="flex items-center gap-2 px-4 py-2 bg-[var(--text-secondary)]/10 border border-[var(--text-secondary)]/40 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all text-sm uppercase tracking-wider"
           >
             <Upload size={16} />
             New Upload
           </Link>
           <Link
             to="/"
-            className="flex items-center gap-2 px-4 py-2 border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-[var(--bg-main)] transition-all text-sm uppercase tracking-wider shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.4)]"
+            className="flex items-center gap-2 px-4 py-2 border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5 hover:bg-[var(--accent)] hover:text-black font-bold transition-all text-sm uppercase tracking-wider shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.4)]"
           >
             <ArrowLeft size={16} />
             Back to Player
@@ -649,161 +753,149 @@ export default function Admin() {
           {/* Stats & Search */}
           <div className="space-y-6 mb-8">
 
-            {/* Search Bar & Actions */}
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative group flex-1">
-                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                  <Search className="w-5 h-5 text-[var(--text-secondary)] group-focus-within:text-[var(--accent)] transition-colors" />
-                </div>
-                <input
-                  value={query}
-                  onChange={e => setQuery(e.target.value)}
-                  placeholder="SEARCH DATABASE..."
-                  className="w-full bg-black/40 border border-[var(--text-secondary)] pl-12 pr-4 py-4 focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/50 text-base"
-                />
-              </div>
-              <button
-                onClick={exportCSV}
-                className="px-6 py-4 bg-black/40 border border-[var(--accent)]/50 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black font-mono font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shrink-0 shadow-[0_0_15px_rgba(var(--accent-rgb),0.1)]"
-                title="Export full library as CSV file"
-              >
-                <Database size={16} /> Export CSV
-              </button>
-            </div>
-
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {/* Total */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+            {/* Stats Grid - Color-coded Cards with Top Accent Line */}
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+              {/* Total Tracks */}
+              <div className="relative cyber-panel relative border border-[var(--accent)]/60 hover:border-[var(--accent)] p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-[var(--accent)] text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <MusicIcon size={12} /> Total Tracks
                 </div>
-                <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">{list.length}</div>
+                <div className="text-2xl font-black text-white group-hover:text-[var(--accent)] transition-colors">{list.length}</div>
               </div>
 
               {/* Total Plays */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              <div className="relative cyber-panel relative border border-purple-500/50 hover:border-purple-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(168,85,247,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-purple-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <PlayCircle size={12} /> Total Plays
                 </div>
-                <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-2xl font-black text-white group-hover:text-purple-300 transition-colors">
                   {stats?.totalPlays.toLocaleString() || 0}
                 </div>
               </div>
 
               {/* Artists */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              <div className="relative cyber-panel relative border border-blue-500/50 hover:border-blue-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(59,130,246,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-blue-500 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-blue-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <Users size={12} /> Unique Artists
                 </div>
-                <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-2xl font-black text-white group-hover:text-blue-300 transition-colors">
                   {stats?.uniqueArtists || 0}
                 </div>
               </div>
 
-              {/* Top Cat */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              {/* Top Genre */}
+              <div className="relative cyber-panel relative border border-yellow-500/50 hover:border-yellow-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(234,179,8,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-yellow-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <BarChart2 size={12} /> Top Genre
                 </div>
-                <div className="text-lg font-bold truncate group-hover:text-[var(--accent)] transition-colors" title={stats?.topCat?.[0] || 'N/A'}>
+                <div className="text-lg font-black text-white truncate group-hover:text-yellow-300 transition-colors" title={stats?.topCat?.[0] || 'N/A'}>
                   {stats?.topCat ? stats.topCat[0] : 'N/A'}
-                  <span className="text-xs text-[var(--text-secondary)] ml-2">({stats?.topCat?.[1] || 0})</span>
+                  <span className="text-xs text-yellow-500/80 ml-1.5 font-normal">({stats?.topCat?.[1] || 0})</span>
                 </div>
               </div>
 
               {/* Most Played */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              <div className="relative cyber-panel relative border border-orange-500/50 hover:border-orange-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(249,115,22,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-orange-500 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-orange-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <TrendingUp size={12} /> Most Played
                 </div>
-                <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-sm font-bold truncate text-white group-hover:text-orange-300 transition-colors" title={stats?.mostPlayed?.title || 'N/A'}>
                   {stats?.mostPlayed?.title || 'N/A'}
                 </div>
-                <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                <div className="text-[10px] text-orange-400/80 mt-1 font-mono">
                   {stats?.mostPlayed?.play_count || 0} views
                 </div>
               </div>
 
               {/* Total Duration */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              <div className="relative cyber-panel relative border border-cyan-500/50 hover:border-cyan-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(6,182,212,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-cyan-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-cyan-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <Clock size={12} /> Total Time
                 </div>
-                <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-sm font-bold truncate text-white group-hover:text-cyan-300 transition-colors">
                   {Math.floor((stats?.totalDuration || 0) / 3600)}h {Math.floor(((stats?.totalDuration || 0) % 3600) / 60)}m
                 </div>
-                <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                <div className="text-[10px] text-cyan-400/80 mt-1 font-mono">
                   Avg: {formatDuration(stats?.avgDuration)}
                 </div>
               </div>
 
               {/* Lyrics Coverage */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              <div className="relative cyber-panel relative border border-emerald-500/50 hover:border-emerald-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-emerald-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <FileText size={12} /> Lyrics Progress
                 </div>
-                <div className="text-lg font-bold group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-lg font-black text-white group-hover:text-emerald-300 transition-colors">
                   {Math.round(stats?.lyricsProgress || 0)}%
                 </div>
-                {/* Progress bar */}
-                <div className="w-full h-1 bg-[var(--text-secondary)]/20 mt-2 overflow-hidden">
+                <div className="w-full h-1.5 bg-black/60 border border-emerald-500/20 mt-2 overflow-hidden">
                   <div
-                    className="h-full bg-[var(--accent)] transition-all duration-1000"
+                    className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 shadow-[0_0_8px_#10b981] transition-all duration-1000"
                     style={{ width: `${stats?.lyricsProgress || 0}%` }}
                   />
                 </div>
               </div>
 
               {/* Longest */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
-                  <Maximize2 size={12} /> Longest
+              <div className="relative cyber-panel relative border border-violet-500/50 hover:border-violet-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(139,92,246,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-violet-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-violet-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
+                  <Maximize2 size={12} /> Longest Track
                 </div>
-                <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-sm font-bold truncate text-white group-hover:text-violet-300 transition-colors" title={stats?.longest?.title || 'N/A'}>
                   {stats?.longest?.title || 'N/A'}
                 </div>
-                <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                <div className="text-[10px] text-violet-400/80 mt-1 font-mono">
                   {formatDuration(stats?.longest?.duration)}
                 </div>
               </div>
 
               {/* Top Uploader */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              <div className="relative cyber-panel relative border border-pink-500/50 hover:border-pink-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(236,72,153,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-pink-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-pink-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <Users size={12} /> Top Uploader
                 </div>
-                <div className="text-sm font-bold truncate group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-sm font-bold truncate text-white group-hover:text-pink-300 transition-colors">
                   {stats?.topUploader?.[0] || 'Admin'}
                 </div>
-                <div className="text-[10px] text-[var(--text-secondary)] mt-1 font-mono">
+                <div className="text-[10px] text-pink-400/80 mt-1 font-mono">
                   {stats?.topUploader?.[1] || 0} tracks
                 </div>
               </div>
 
               {/* Today's Uploads */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              <div className="relative cyber-panel relative border border-teal-500/50 hover:border-teal-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(20,184,166,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-teal-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-teal-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <Calendar size={12} /> Uploaded Today
                 </div>
-                <div className="text-2xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-2xl font-black text-white group-hover:text-teal-300 transition-colors">
                   {stats?.todaysUploads || 0}
                 </div>
               </div>
 
               {/* Storage Size Estimate */}
-              <div className="bg-black/40 border border-[var(--text-secondary)] p-4 backdrop-blur-sm group hover:border-[var(--accent)] transition-colors">
-                <div className="flex items-center gap-2 text-[var(--text-secondary)] text-[10px] uppercase tracking-widest mb-2">
+              <div className="relative cyber-panel relative border border-indigo-500/50 hover:border-indigo-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center gap-2 text-indigo-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <Database size={12} /> Est. Storage
                 </div>
-                <div className="text-xl font-bold group-hover:text-[var(--accent)] transition-colors">
+                <div className="text-xl font-black text-white group-hover:text-indigo-300 transition-colors">
                   {stats?.storageEstimateMB || 0} MB
                 </div>
               </div>
             </div>
 
             {/* Play Count Trend Chart Card */}
-            <div className="bg-black/40 border border-[var(--text-secondary)]/30 p-6 backdrop-blur-sm mt-6">
+            <div className="cyber-panel p-6 mt-6 shadow-[0_6px_25px_rgba(0,0,0,0.5)]">
               <div className="flex items-center justify-between mb-4 border-b border-[var(--text-secondary)]/20 pb-3">
                 <div className="flex items-center gap-2 text-xs font-mono text-[var(--accent)] font-bold uppercase tracking-widest">
                   <TrendingUp size={16} /> Play Count Trend & Top Tracks
@@ -842,7 +934,254 @@ export default function Admin() {
             </div>
           </div>
 
-          {/* Main Content */}
+          
+          {/* Database Section: Header + Filter Toolbar directly above the table! */}
+          <div id="admin-database-section" className="space-y-4 pt-6 border-t border-[var(--accent)]/30">
+            {/* Section Header with Live Records Count & Quick Reset */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1">
+              <div className="flex items-center gap-3">
+                <Database className="w-5 h-5 text-[var(--accent)]" />
+                <h2 className="text-sm font-bold tracking-widest uppercase text-white">
+                  DATABASE RECORDS // <span className="text-[var(--text-secondary)]">TREKLAR JADVALI</span>
+                </h2>
+                <span className="text-[10px] font-mono px-2 py-0.5 bg-[var(--accent)]/15 border border-[var(--accent)]/40 text-[var(--accent)] font-bold">
+                  {filtered.length} / {list.length} TA
+                </span>
+              </div>
+
+              {(query || filterCategory !== "All") && (
+                <button
+                  onClick={() => { setQuery(""); setFilterCategory("All"); }}
+                  className="text-xs text-red-400 hover:text-red-300 font-mono flex items-center gap-1.5 transition-colors self-start sm:self-auto"
+                >
+                  <X size={12} /> Barcha filtrlarni tozalash
+                </button>
+              )}
+            </div>
+
+            {/* Compact Search & Category Filter Toolbar */}
+            <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
+              {/* Search Database Box */}
+              <div className="relative group flex-1">
+                <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
+                  <Search className="w-4 h-4 text-[var(--text-secondary)] group-focus-within:text-[var(--accent)] transition-colors" />
+                </div>
+                <input
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="SEARCH DATABASE (TITLE, ARTIST, GENRE)..."
+                  className="cyber-panel w-full pl-11 pr-9 py-3 text-xs focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_20px_rgba(var(--accent-rgb),0.25)] transition-all placeholder-white/40 text-white font-mono"
+                />
+                {query && (
+                  <button 
+                    onClick={() => setQuery("")}
+                    className="absolute inset-y-0 right-3 flex items-center text-white/40 hover:text-white transition-colors"
+                    title="Clear search"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Custom Cyberpunk Category Dropdown */}
+              <div className="relative shrink-0" ref={categoryDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                  className={`cyber-panel w-full md:w-64 py-3 px-3.5 text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-between gap-2 transition-all ${
+                    filterCategory !== "All"
+                      ? 'border-[var(--accent)] text-[var(--accent)] bg-[rgba(var(--accent-rgb),0.15)] shadow-[0_0_15px_rgba(var(--accent-rgb),0.25)]'
+                      : 'text-white/90 hover:border-[var(--accent)]/60'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="w-1.5 h-1.5 bg-[var(--accent)] shadow-[0_0_6px_var(--accent)] shrink-0" />
+                    <span className="truncate">
+                      {filterCategory === "All" ? "BARCHA JANRLAR" : filterCategory.toUpperCase()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-[10px] font-bold px-1.5 py-0.2 ${
+                      filterCategory !== "All" ? 'bg-[var(--accent)] text-black' : 'bg-white/15 text-white/70'
+                    }`}>
+                      {filterCategory === "All" ? list.length : (categoryCounts[filterCategory] || 0)}
+                    </span>
+                    <span className={`text-[10px] transition-transform duration-200 text-[var(--accent)] ${
+                      isCategoryDropdownOpen ? 'rotate-180' : ''
+                    }`}>
+                      ▼
+                    </span>
+                  </div>
+                </button>
+
+                {/* Custom Dropdown Popup Menu */}
+                {isCategoryDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-72 sm:w-80 z-50 bg-[#0a0d14]/95 border border-[var(--accent)]/50 backdrop-blur-xl shadow-[0_15px_40px_rgba(0,0,0,0.95),0_0_20px_rgba(var(--accent-rgb),0.25)] p-2 font-mono animate-in fade-in zoom-in-95 duration-150">
+                    {/* Inner Mini Search */}
+                    <div className="relative mb-2">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40" />
+                      <input
+                        type="text"
+                        value={categorySearch}
+                        onChange={e => setCategorySearch(e.target.value)}
+                        placeholder="Janr nomini qidiring..."
+                        className="w-full bg-black/60 border border-white/20 pl-8 pr-7 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-[var(--accent)] font-mono"
+                        autoFocus
+                      />
+                      {categorySearch && (
+                        <button
+                          onClick={() => setCategorySearch("")}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-white/40 hover:text-white"
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Genres List */}
+                    <div className="max-h-56 overflow-y-auto custom-scrollbar space-y-0.5">
+                      {/* All Option */}
+                      {(!categorySearch || "barcha janrlar".includes(categorySearch.toLowerCase()) || "all".includes(categorySearch.toLowerCase())) && (
+                        <button
+                          onClick={() => {
+                            setFilterCategory("All");
+                            setIsCategoryDropdownOpen(false);
+                            setCategorySearch("");
+                          }}
+                          className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-left transition-colors ${
+                            filterCategory === "All"
+                              ? 'bg-[var(--accent)] text-black font-black'
+                              : 'text-white/80 hover:bg-[var(--accent)]/15 hover:text-white'
+                          }`}
+                        >
+                          <span className="font-bold">-- BARCHA JANRLAR --</span>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.2 ${
+                            filterCategory === "All" ? 'bg-black/30 text-black' : 'bg-white/10 text-white/60'
+                          }`}>
+                            {list.length}
+                          </span>
+                        </button>
+                      )}
+
+                      {/* Filtered Genres List */}
+                      {allCategories
+                        .filter(c => c !== "All")
+                        .filter(c => !categorySearch || c.toLowerCase().includes(categorySearch.toLowerCase()))
+                        .sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))
+                        .map(cat => {
+                          const isSelected = filterCategory.toLowerCase() === cat.toLowerCase();
+                          return (
+                            <button
+                              key={cat}
+                              onClick={() => {
+                                setFilterCategory(cat);
+                                setIsCategoryDropdownOpen(false);
+                                setCategorySearch("");
+                              }}
+                              className={`w-full flex items-center justify-between px-2.5 py-1.5 text-xs text-left transition-colors ${
+                                isSelected
+                                  ? 'bg-[var(--accent)] text-black font-black shadow-sm'
+                                  : 'text-white/80 hover:bg-[var(--accent)]/15 hover:text-white'
+                              }`}
+                            >
+                              <span className="truncate pr-2 uppercase font-medium">{cat}</span>
+                              <span className={`text-[10px] font-bold px-1.5 py-0.2 shrink-0 ${
+                                isSelected ? 'bg-black/30 text-black' : 'bg-white/10 text-white/60'
+                              }`}>
+                                {categoryCounts[cat] || 0}
+                              </span>
+                            </button>
+                          );
+                        })}
+
+                      {allCategories
+                        .filter(c => c !== "All")
+                        .filter(c => !categorySearch || c.toLowerCase().includes(categorySearch.toLowerCase())).length === 0 && (
+                        <div className="py-4 text-center text-[11px] text-white/40">
+                          Mos keluvchi janr topilmadi
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Dropdown Footer */}
+                    <div className="pt-2 mt-1 border-t border-white/10 flex items-center justify-between text-[10px] text-white/40">
+                      <span>{allCategories.length - 1} ta jami janr</span>
+                      {filterCategory !== "All" && (
+                        <button
+                          onClick={() => {
+                            setFilterCategory("All");
+                            setIsCategoryDropdownOpen(false);
+                            setCategorySearch("");
+                          }}
+                          className="text-red-400 hover:text-red-300 font-bold"
+                        >
+                          Filtrni tozalash
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Export CSV Button */}
+              <button
+                onClick={exportCSV}
+                className="cyber-panel px-4 py-3 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black font-mono font-bold text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shrink-0 hover:shadow-[0_0_20px_var(--accent)]"
+                title="Export full library as CSV file"
+              >
+                <Database size={14} /> Export CSV
+              </button>
+            </div>
+
+            {/* Quick Filter Shortcut Bar (Top 4 Most Popular Genres + Active Tag) */}
+            <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+              <span className="text-[10px] text-white/40 uppercase tracking-widest mr-1 font-bold">TEZKOR:</span>
+              <button
+                onClick={() => setFilterCategory("All")}
+                className={`px-2.5 py-1 text-[11px] font-mono border transition-all ${
+                  filterCategory === "All"
+                    ? 'border-[var(--accent)] bg-[var(--accent)] text-black font-bold shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]'
+                    : 'border-white/10 bg-black/40 text-white/70 hover:border-white/30 hover:text-white'
+                }`}
+              >
+                HAMMASI ({list.length})
+              </button>
+
+              {allCategories
+                .filter(c => c !== "All")
+                .sort((a, b) => (categoryCounts[b] || 0) - (categoryCounts[a] || 0))
+                .slice(0, 4)
+                .map(cat => {
+                  const isSelected = filterCategory.toLowerCase() === cat.toLowerCase();
+                  return (
+                    <button
+                      key={cat}
+                      onClick={() => setFilterCategory(isSelected ? "All" : cat)}
+                      className={`px-2.5 py-1 text-[11px] font-mono border transition-all flex items-center gap-1.5 ${
+                        isSelected
+                          ? 'border-[var(--accent)] bg-[var(--accent)] text-black font-bold shadow-[0_0_10px_rgba(var(--accent-rgb),0.35)]'
+                          : 'border-white/10 bg-black/40 text-white/70 hover:border-white/30 hover:text-white'
+                      }`}
+                    >
+                      <span>{cat}</span>
+                      <span className={`text-[9px] ${isSelected ? 'text-black/80 font-bold' : 'text-white/40'}`}>
+                        ({categoryCounts[cat] || 0})
+                      </span>
+                    </button>
+                  );
+                })}
+
+              {filterCategory !== "All" && (
+                <button
+                  onClick={() => setFilterCategory("All")}
+                  className="px-2.5 py-1 text-[10px] text-red-400 hover:text-red-300 ml-auto border border-red-500/40 hover:border-red-500 bg-red-500/10 flex items-center gap-1 transition-all uppercase tracking-wider font-bold"
+                >
+                  <X size={11} /> Filtrni Bekor Qilish
+                </button>
+              )}
+            </div>
+
+{/* Main Content */}
           <div className="relative">
             {loading ? (
               <div className="flex flex-col items-center justify-center p-32 border border-[var(--text-secondary)]/30 bg-black/40 backdrop-blur-sm relative overflow-hidden group">
@@ -902,7 +1241,7 @@ export default function Admin() {
                 </button>
               </div>
             ) : (
-              <div className="bg-black/40 border border-[var(--text-secondary)] backdrop-blur-sm overflow-hidden">
+              <div className="cyber-panel overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.5)]">
                 {/* Bulk Action Bar */}
                 {selectedAdminIds.size > 0 && (
                   <div className="p-3 bg-[var(--accent)]/10 border-b border-[var(--accent)]/40 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-200">
@@ -942,7 +1281,7 @@ export default function Admin() {
                 )}
 
                 {/* Table Header */}
-                <div className="grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--text-secondary)] bg-[var(--text-secondary)]/5 text-xs uppercase tracking-widest text-[var(--text-secondary)] font-semibold items-center">
+                <div className="grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--accent)]/20 bg-[rgba(var(--accent-rgb),0.12)] backdrop-blur-md text-xs uppercase tracking-widest text-white font-black items-center shadow-sm">
                   <input
                     type="checkbox"
                     checked={paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id))}
@@ -967,11 +1306,14 @@ export default function Admin() {
                 <div className="overflow-x-auto custom-scrollbar">
                   <div className="min-w-[700px]">
                     <div className="max-h-[600px] overflow-y-auto custom-scrollbar">
-                      {paginatedList.map(m => (
+                      {paginatedList.map((m, idx) => (
                         <div
                           key={m.id}
-                          className={`grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--text-secondary)]/20 items-center hover:bg-[var(--text-secondary)]/5 transition-colors ${editingId === m.id ? 'bg-[var(--text-secondary)]/10 ring-1 ring-inset ring-[var(--accent)]' : selectedAdminIds.has(m.id) ? 'bg-[var(--accent)]/5' : ''
-                            }`}
+                          className={`grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-white/10 items-center transition-all ${
+                            idx % 2 === 1 ? 'bg-white/[0.03]' : 'bg-[#0a0d14]/40'
+                          } hover:bg-[var(--accent)]/5 hover:shadow-[inset_3px_0_0_var(--accent)] ${
+                            editingId === m.id ? 'bg-[var(--accent)]/10 ring-1 ring-inset ring-[var(--accent)]' : selectedAdminIds.has(m.id) ? 'bg-[var(--accent)]/10' : ''
+                          }`}
                         >
                           <input
                             type="checkbox"
@@ -980,7 +1322,7 @@ export default function Admin() {
                             className="cursor-pointer accent-[var(--accent)]"
                           />
                           {/* Cover */}
-                          <div className="w-12 h-12 border border-[var(--text-secondary)] overflow-hidden bg-black relative group/cover">
+                          <div className="w-12 h-12 border border-white/20 overflow-hidden bg-black relative group/cover">
                             <img
                               src={newCoverPreview || m.cover || m.coverUrl || '/placeholder.png'}
                               alt={`${m.title} cover`}
@@ -999,7 +1341,7 @@ export default function Admin() {
                             )}
                           </div>
 
-                          {/* Title */}
+                          {/* Title with Mini Equalizer when previewing */}
                           <div className="min-w-0">
                             {editingId === m.id ? (
                               <input
@@ -1010,7 +1352,16 @@ export default function Admin() {
                                 autoFocus
                               />
                             ) : (
-                              <div className="font-bold truncate" title={m.title}>{m.title}</div>
+                              <div className="flex items-center min-w-0">
+                                <div className="font-bold text-white truncate" title={m.title}>{m.title}</div>
+                                {previewId === m.id && (
+                                  <div className="flex items-end gap-0.5 h-3 ml-2 shrink-0" title="Previewing...">
+                                    <span className="w-0.5 bg-[var(--accent)] animate-[bounce_0.8s_ease-in-out_infinite] h-3" />
+                                    <span className="w-0.5 bg-[var(--accent)] animate-[bounce_0.6s_ease-in-out_0.2s_infinite] h-2" />
+                                    <span className="w-0.5 bg-[var(--accent)] animate-[bounce_0.9s_ease-in-out_0.4s_infinite] h-3" />
+                                  </div>
+                                )}
+                              </div>
                             )}
                           </div>
 
@@ -1024,11 +1375,11 @@ export default function Admin() {
                                 placeholder="Artist"
                               />
                             ) : (
-                              <div className="text-sm opacity-80 truncate" title={m.artist}>{m.artist}</div>
+                              <div className="text-sm text-white/85 font-semibold truncate" title={m.artist}>{m.artist}</div>
                             )}
                           </div>
 
-                          {/* Category */}
+                          {/* Interactive Category Chip in Table */}
                           <div className="min-w-0">
                             {editingId === m.id ? (
                               <div className="flex flex-col gap-2">
@@ -1051,9 +1402,17 @@ export default function Admin() {
                                 )}
                               </div>
                             ) : (
-                              <div className="inline-block px-2 py-1 text-[10px] border border-[var(--text-secondary)] text-[var(--text-secondary)] uppercase tracking-wider">
+                              <button
+                                onClick={() => setFilterCategory(prev => prev === (m.category || "General") ? "All" : (m.category || "General"))}
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-mono border transition-all uppercase tracking-wider ${
+                                  filterCategory.toLowerCase() === (m.category || "General").toLowerCase()
+                                    ? 'bg-[var(--accent)] text-black border-[var(--accent)] font-bold shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]'
+                                    : 'border border-[var(--accent)]/30 bg-[rgba(var(--accent-rgb),0.08)] backdrop-blur-sm text-white hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/20 font-bold shadow-sm'
+                                }`}
+                                title={`Filter by ${m.category || "General"}`}
+                              >
                                 {m.category || "General"}
-                              </div>
+                              </button>
                             )}
                           </div>
 
@@ -1066,11 +1425,11 @@ export default function Admin() {
                           </div>
 
                           {/* Duration */}
-                          <div className="text-right text-sm text-[var(--text-secondary)] font-mono">
+                          <div className="text-right text-sm text-cyan-400 font-bold font-mono">
                             {formatDuration(m.duration)}
                           </div>
 
-                          {/* Actions */}
+                          {/* Action Buttons */}
                           <div className="flex items-center justify-end gap-2">
                             {editingId === m.id ? (
                               <>
@@ -1101,14 +1460,14 @@ export default function Admin() {
                               <>
                                 <button
                                   onClick={() => startEdit(m)}
-                                  className="p-2 border border-[var(--text-secondary)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all"
-                                  title="Edit"
+                                  className="p-2 border border-[var(--accent)]/30 text-white bg-[rgba(var(--accent-rgb),0.06)] backdrop-blur-sm hover:border-[var(--accent)] hover:bg-[var(--accent)] hover:text-black hover:shadow-[0_0_12px_var(--accent)] transition-all"
+                                  title="Edit Track"
                                 >
                                   <Edit2 size={16} />
                                 </button>
                                 <button
                                   onClick={() => handleDelete(m.id)}
-                                  className="p-2 border border-red-500/50 text-red-400 hover:border-red-500 hover:bg-red-500/10 transition-all"
+                                  className="p-2 border border-red-500/50 text-red-400 bg-red-500/10 hover:border-red-500 hover:bg-red-500 hover:text-black hover:shadow-[0_0_15px_rgba(239,68,68,0.5)] transition-all"
                                   title="Delete Track"
                                 >
                                   <Trash2 size={16} />
@@ -1117,8 +1476,8 @@ export default function Admin() {
                                   onClick={() => togglePreview(m)}
                                   disabled={!m.url}
                                   className={`p-2 border transition-all ${previewId === m.id
-                                      ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10"
-                                      : "border-[var(--text-secondary)] text-[var(--text-secondary)] hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                                      ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/20 shadow-[0_0_12px_rgba(var(--accent-rgb),0.35)]"
+                                      : "border border-[var(--accent)]/30 text-white bg-[rgba(var(--accent-rgb),0.06)] backdrop-blur-sm hover:border-[var(--accent)] hover:text-black hover:bg-[var(--accent)] hover:shadow-[0_0_12px_var(--accent)]"
                                     }`}
                                   title={previewId === m.id ? "Stop Preview" : "Preview Track"}
                                 >
@@ -1132,8 +1491,22 @@ export default function Admin() {
                       ))}
 
                       {filtered.length === 0 && (
-                        <div className="p-12 text-center text-[var(--text-secondary)] tracking-widest">
-                          NO TRACKS FOUND IN DATABASE
+                        <div className="p-16 flex flex-col items-center justify-center text-center gap-3 font-mono">
+                          <div className="w-12 h-12 border border-white/15 bg-white/[0.02] flex items-center justify-center text-[var(--text-secondary)] mb-1">
+                            <Search size={24} />
+                          </div>
+                          <div className="text-white font-bold text-sm tracking-wider">NO TRACKS FOUND IN DATABASE</div>
+                          <div className="text-xs text-[var(--text-secondary)]">
+                            {filterCategory !== "All" ? `Kategoriya: "${filterCategory}" | ` : ''}Qidiruv: &quot;{query}&quot;
+                          </div>
+                          {(query || filterCategory !== "All") && (
+                            <button
+                              onClick={() => { setQuery(""); setFilterCategory("All"); }}
+                              className="mt-2 px-4 py-1.5 border border-[var(--accent)] text-[var(--accent)] text-xs uppercase tracking-widest hover:bg-[var(--accent)] hover:text-black transition-all shadow-[0_0_10px_rgba(var(--accent-rgb),0.2)]"
+                            >
+                              Filtrlarni Tozalash
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1151,6 +1524,7 @@ export default function Admin() {
                 )}
               </div>
             )}
+          </div>
           </div>
         </div>
       )}
@@ -1316,6 +1690,133 @@ export default function Admin() {
               >
                 APPLY (REMEMBER TO SAVE TRACK)
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Global Search Modal (Command Palette Ctrl+K) */}
+      {isSearchModalOpen && createPortal(
+        <div 
+          className="fixed inset-0 z-[110] flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
+          onClick={e => {
+            if (e.target === e.currentTarget) setIsSearchModalOpen(false);
+          }}
+        >
+          <div className="w-full max-w-2xl bg-[#0a0d14]/95 border-2 border-[var(--accent)] shadow-[0_0_50px_rgba(var(--accent-rgb),0.35)] flex flex-col max-h-[80vh] overflow-hidden font-mono">
+            {/* Modal Header / Search Bar */}
+            <div className="relative border-b border-[var(--accent)]/30 p-3.5 sm:p-4 bg-black/60 flex items-center gap-3">
+              <Search className="w-5 h-5 text-[var(--accent)] shrink-0 animate-pulse" />
+              <input
+                ref={searchModalInputRef}
+                type="text"
+                value={searchModalQuery}
+                onChange={e => setSearchModalQuery(e.target.value)}
+                placeholder="Musiqa, ijrochi yoki janr qidiring (Ctrl+K)..."
+                className="w-full bg-transparent text-sm sm:text-base text-white placeholder-white/40 focus:outline-none font-mono font-medium tracking-wide"
+                autoFocus
+              />
+              {searchModalQuery && (
+                <button
+                  onClick={() => setSearchModalQuery("")}
+                  className="p-1 text-white/40 hover:text-white transition-colors"
+                  title="Tozalash"
+                >
+                  <X size={16} />
+                </button>
+              )}
+              <kbd 
+                onClick={() => setIsSearchModalOpen(false)}
+                className="px-2 py-1 text-[10px] bg-white/10 hover:bg-white/20 text-white/70 border border-white/20 rounded cursor-pointer transition-colors shrink-0"
+              >
+                ESC
+              </kbd>
+            </div>
+
+            {/* Results Info Bar */}
+            <div className="px-4 py-2 bg-[rgba(var(--accent-rgb),0.06)] border-b border-white/5 flex items-center justify-between text-[11px] text-[var(--text-secondary)]">
+              <span>
+                {searchModalQuery.trim()
+                  ? `${searchModalResults.length} ta mos keluvchi trek topildi`
+                  : `Tavsiya etilgan eng sara treklar (${Math.min(5, list.length)} ta)`}
+              </span>
+              <span className="text-[10px] text-white/40 hidden sm:inline">Enter yoki bosing: Jadvalda ochish</span>
+            </div>
+
+            {/* Results List */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar max-h-[55vh]">
+              {(searchModalQuery.trim() ? searchModalResults : list.slice().sort((a,b) => (b.play_count || 0) - (a.play_count || 0)).slice(0, 5)).map(song => (
+                <div
+                  key={song.id}
+                  className="flex items-center justify-between gap-3 p-2.5 bg-white/[0.02] hover:bg-[var(--accent)]/15 border border-white/5 hover:border-[var(--accent)]/50 transition-all group"
+                >
+                  {/* Left: Cover + Title + Artist */}
+                  <div 
+                    className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+                    onClick={() => handleSelectFromSearchModal(song)}
+                  >
+                    <img
+                      src={song.cover || song.coverUrl || '/placeholder.png'}
+                      alt=""
+                      className="w-10 h-10 object-cover border border-white/10 shrink-0 group-hover:border-[var(--accent)]"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-bold text-white group-hover:text-[var(--accent)] truncate">
+                        {song.title}
+                      </div>
+                      <div className="text-xs text-[var(--text-secondary)] truncate flex items-center gap-2 mt-0.5">
+                        <span>{song.artist || 'Unknown'}</span>
+                        <span className="text-[10px] px-1.5 py-0.2 bg-white/10 text-white/70 border border-white/10 uppercase">
+                          {song.category || 'General'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right: Plays + Actions */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-[11px] text-[var(--accent)] font-bold hidden sm:inline">
+                      {song.play_count || 0} plays
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => togglePreview(song)}
+                      className={`p-2 border transition-all ${
+                        previewId === song.id
+                          ? 'border-[var(--accent)] bg-[var(--accent)] text-black font-bold shadow-[0_0_10px_var(--accent)]'
+                          : 'border-white/20 text-white/70 hover:border-[var(--accent)] hover:text-white'
+                      }`}
+                      title={previewId === song.id ? "To'xtatish" : "Tinglash"}
+                    >
+                      {previewId === song.id ? <Pause size={14} /> : <Play size={14} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectFromSearchModal(song)}
+                      className="px-2.5 py-1.5 bg-[var(--accent)]/15 hover:bg-[var(--accent)] text-[var(--accent)] hover:text-black border border-[var(--accent)]/40 hover:border-[var(--accent)] text-xs font-bold transition-all uppercase tracking-wider"
+                    >
+                      Jadvalda
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {searchModalQuery.trim() && searchModalResults.length === 0 && (
+                <div className="py-12 text-center text-sm text-[var(--text-secondary)]">
+                  <Search className="w-8 h-8 mx-auto mb-2 text-white/20" />
+                  &quot;{searchModalQuery}&quot; bo&apos;yicha hech qanday musiqa topilmadi
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-4 py-2.5 border-t border-white/10 bg-black/60 flex flex-wrap items-center justify-between gap-2 text-[10px] text-white/40">
+              <div className="flex items-center gap-3">
+                <span><kbd className="px-1 py-0.5 bg-white/10 text-white/70 rounded">Ctrl+K</kbd> Qidiruv</span>
+                <span><kbd className="px-1 py-0.5 bg-white/10 text-white/70 rounded">ESC</kbd> Yopish</span>
+              </div>
+              <span className="text-[var(--accent)]/80">CYBER COMMAND PALETTE</span>
             </div>
           </div>
         </div>,

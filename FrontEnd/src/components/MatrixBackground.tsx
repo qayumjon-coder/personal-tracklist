@@ -8,7 +8,10 @@ export function MatrixBackground() {
 
   useEffect(() => {
     if (!matrixBg) {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
       return;
     }
 
@@ -18,83 +21,118 @@ export function MatrixBackground() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Set canvas dimensions
+    canvas.width = canvas.clientWidth || window.innerWidth;
+    canvas.height = canvas.clientHeight || window.innerHeight;
+
+    // Immediately clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Strict theme color assignment
     const selectedTheme = THEME_COLORS[theme] || THEME_COLORS.aqua;
     const accentColor = selectedTheme.primary;
 
-    const fontSize = 14;
-    let columns = Math.floor(window.innerWidth / fontSize);
-    let drops = new Array(columns).fill(1).map(() => Math.random() * -100); // Start at random negative heights for natural fall
+    const fontSize = 16;
+    // Spaced columns: each column has breathing room
+    const colStep = 22; 
+    let columns = Math.floor(canvas.width / colStep);
     
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=<>?[]{}|;:,.".split("");
+    // VARIANT 1: Sparse & Ambient Rain
+    // Only ~22% of columns are active on screen at any time; the rest wait with negative delays
+    let drops = new Array(columns).fill(0).map(() => {
+      return Math.random() < 0.22
+        ? Math.floor(Math.random() * (canvas.height / fontSize))
+        : Math.floor(Math.random() * -100) - 20;
+    });
 
-    const animateMatrix = () => {
-      if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-        canvas.width = canvas.clientWidth;
-        canvas.height = canvas.clientHeight;
-        columns = Math.floor(canvas.width / fontSize);
-        // Preserve old drops if resizing, fill new ones
-        const newDrops = new Array(columns).fill(1).map((_, i) => drops[i] !== undefined ? drops[i] : Math.random() * -50);
-        drops = newDrops;
-      }
+    // Japanese Katakana + Latin + Digits
+    const chars = "ｦｱｳｴｵｶｷｹｺｻｼｽｾｿﾀﾂﾃﾅﾆﾇﾈﾊﾋﾎﾏﾐﾑﾒﾓﾔﾕﾗﾘﾜ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%&*+-=<>".split("");
+
+    let isActive = true;
+    let lastTime = 0;
+    const frameInterval = 45; // ~22 FPS for smooth retro fall
+
+    const handleResize = () => {
+      if (!canvas) return;
+      canvas.width = canvas.clientWidth || window.innerWidth;
+      canvas.height = canvas.clientHeight || window.innerHeight;
+      columns = Math.floor(canvas.width / colStep);
+      drops = new Array(columns).fill(0).map((_, i) => 
+        drops[i] !== undefined ? drops[i] : (Math.floor(Math.random() * -100) - 20)
+      );
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    const animateMatrix = (timestamp: number) => {
+      if (!isActive) return;
+
+      animationRef.current = requestAnimationFrame(animateMatrix);
+
+      if (timestamp - lastTime < frameInterval) return;
+      lastTime = timestamp;
 
       const width = canvas.width;
       const height = canvas.height;
 
-      // Fading effect for trails on a transparent canvas
+      // VARIANT 1 FADE: 0.14 fade rate ensures trails are compact comets (~12-16 chars)
+      // and eliminates permanent vertical column smudges completely
       ctx.globalCompositeOperation = 'destination-out';
-      ctx.shadowBlur = 0; // Reset shadow so it doesn't bleed into the fade
-      ctx.fillStyle = `rgba(0, 0, 0, 0.05)`; 
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
       ctx.fillRect(0, 0, width, height);
       ctx.globalCompositeOperation = 'source-over';
 
-      ctx.font = `${fontSize}px monospace`;
+      ctx.font = `bold ${fontSize}px monospace`;
       ctx.textAlign = 'center';
       
       for (let i = 0; i < drops.length; i++) {
-        // Only draw if on screen
-        if (drops[i] * fontSize > 0) {
+        const yPos = drops[i] * fontSize;
+
+        // Draw only when active on screen
+        if (yPos > 0 && yPos < height + fontSize * 2) {
           const text = chars[Math.floor(Math.random() * chars.length)];
-          
-          // Rare white glow for heads of the streams
-          if (Math.random() > 0.98) {
-             ctx.fillStyle = '#FFFFFF';
-             ctx.shadowBlur = 15;
-             ctx.shadowColor = '#FFFFFF';
+          const xPos = i * colStep + (colStep / 2);
+
+          // Head of the stream is brightest accent; trail is softer
+          const isHead = Math.random() > 0.92;
+          if (isHead) {
+            ctx.fillStyle = accentColor;
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = accentColor;
+            ctx.globalAlpha = 0.95;
           } else {
-             // Subtle accent color
-             ctx.fillStyle = accentColor;
-             ctx.shadowBlur = 5;
-             ctx.shadowColor = accentColor;
+            ctx.fillStyle = accentColor;
+            ctx.shadowBlur = 0;
+            ctx.globalAlpha = 0.55;
           }
 
-          const x = i * fontSize + (fontSize / 2);
-          const y = drops[i] * fontSize;
-
-          // Make the background matrix semi-transparent overall
-          ctx.globalAlpha = 0.4;
-          ctx.fillText(text, x, y);
-          ctx.globalAlpha = 1.0;
+          ctx.fillText(text, xPos, yPos);
         }
 
-        // Reset if off screen
-        if (drops[i] * fontSize > height && Math.random() > 0.98) {
-          drops[i] = 0;
+        // When drop goes off-screen, give it a substantial random rest delay
+        // This keeps the screen sparse (only ~20% active at any time)
+        if (yPos > height) {
+          drops[i] = Math.floor(Math.random() * -70) - 15;
         }
 
-        // Discrete falling (exactly 1 row) prevents text smudging/overlapping
+        // Advance 1 cell downwards
         drops[i] += 1;
       }
-
-      // Throttle to ~25fps for the classic discrete matrix look
-      setTimeout(() => {
-        animationRef.current = requestAnimationFrame(animateMatrix);
-      }, 40);
     };
 
-    animateMatrix();
+    animationRef.current = requestAnimationFrame(animateMatrix);
 
     return () => {
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      isActive = false;
+      window.removeEventListener('resize', handleResize);
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current);
+        animationRef.current = null;
+      }
+      if (canvas && ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
     };
   }, [matrixBg, theme]);
 
@@ -103,7 +141,7 @@ export function MatrixBackground() {
   return (
     <canvas 
       ref={canvasRef} 
-      className="fixed inset-0 w-full h-full z-[-5] pointer-events-none opacity-80" 
+      className="fixed inset-0 w-full h-full z-[-5] pointer-events-none opacity-70" 
     />
   );
 }
