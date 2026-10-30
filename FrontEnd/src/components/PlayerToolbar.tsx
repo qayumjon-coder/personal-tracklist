@@ -241,11 +241,11 @@ export function PlayerToolbar({
           onClick={() => { playClick(); onOpenSearch(); }}
           onMouseEnter={playHover}
           className="cyber-btn px-2 sm:px-3 py-1 text-[9px] group flex items-center justify-center gap-1.5"
-          title="Search (F)"
+          title="Search (Ctrl+K)"
         >
-          <Search size={14} className="sm:w-2.5 sm:h-2.5" />
+          <Search size={12} className="sm:w-3 sm:h-3 shrink-0" />
           <span className="hidden sm:inline">Search</span>
-          <span className="hidden lg:inline kbd">F</span>
+          <span className="hidden lg:inline kbd">Ctrl+K</span>
         </button>
       </div>
     </div>

@@ -2,21 +2,20 @@ import type { Song } from "../types/Song";
 import SEO from "./SEO";
 
 import { useSettings } from "../contexts/SettingsContext";
-import { Heart, Mic2, X, Upload, Search, Plus, Loader2, Check, Send, AlertTriangle, ListMusic, Share2, Moon, Clock, Minus, QrCode } from "lucide-react";
-import { Pagination } from "./Pagination";
+import { Heart, Mic2, X, Upload, Search, Send, AlertTriangle, ListMusic, Share2, Moon, Clock, QrCode } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { searchSongs, getTrendingSongs } from "../services/musicApi";
+import { getTrendingSongs, getAllSongs } from "../services/musicApi";
 import { toast } from "sonner";
 
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
 import { SkeletonPlaylist } from "./SkeletonPlaylist";
+import { PlayerCommandPalette } from "./PlayerCommandPalette";
 import { TrackProgress } from "./TrackProgress";
 import { PlaybackControls } from "./PlaybackControls";
 import { VolumeControl } from "./VolumeControl";
 import { Visualizer, FadeVisualizer, useBeatScale, AmbientBackground, ConcentricWavesVisualizer } from "./Visualizer";
 import { LyricsView } from "./LyricsView";
-import { useState, useEffect, useRef } from "react";
-import { useDebounce } from "../hooks/useDebounce";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { EqualizerPanel } from './EqualizerPanel';
 import { HotkeysMap } from './HotkeysMap';
@@ -87,9 +86,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   const [isHotkeysOpen, setIsHotkeysOpen] = useState(false);
   // Right panel tab: 'playlist' | 'queue' | 'recent'
   const [rightTab, setRightTab] = useState<'playlist' | 'queue' | 'recent'>('playlist');
-  // Search filter state
-  const [searchFilterArtist, setSearchFilterArtist] = useState('');
-  const [searchFilterDuration, setSearchFilterDuration] = useState<'all' | 'short' | 'medium' | 'long'>('all');
+
   // Upload permission
   const uploadPerm = useUploadPermission();
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -109,9 +106,11 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
 
   // Trending songs from full DB
   const [trendingSongs, setTrendingSongs] = useState<Song[]>([]);
+  const [allDbSongs, setAllDbSongs] = useState<Song[]>([]);
 
   useEffect(() => {
     getTrendingSongs(10).then(setTrendingSongs).catch(console.error);
+    getAllSongs().then(setAllDbSongs).catch(console.error);
   }, []);
 
   // Play count is tracked in useAudioPlayer (after 15s of listening) — no duplicate here
@@ -267,96 +266,30 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
   }, [zenMode, setZenMode]);
 
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  useScrollLock(isSearchOpen);
-  const [searchQuery, setSearchQuery] = useState("");
-  const debouncedSearchQuery = useDebounce(searchQuery, 400);
-  const [searchResults, setSearchResults] = useState<Song[]>([]);
-  const [searchPage, setSearchPage] = useState(1);
-  const itemsPerSearchPage = 10;
-  const searchScrollRef = useRef<HTMLDivElement>(null);
 
-  // Reset scroll position when page changes
+  // Global Ctrl+K command palette shortcut
   useEffect(() => {
-    if (searchScrollRef.current) {
-      searchScrollRef.current.scrollTop = 0;
-    }
-  }, [searchPage]);
-
-  const [isSearching, setIsSearching] = useState(false);
-  const [lastSearchQuery, setLastSearchQuery] = useState<string>("");
+    const handleGlobalPalette = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalPalette);
+    return () => window.removeEventListener('keydown', handleGlobalPalette);
+  }, []);
   const [isEqOpen, setIsEqOpen] = useState(false);
-
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   // Lock body scroll when modals are open
   useScrollLock(isSearchOpen || isKaraokeOpen || isConfigMenuOpen || isMobilePlaylistOpen || isEqOpen || isHotkeysOpen);
 
-  // Load last search from localStorage on mount
-  useEffect(() => {
-    const savedSearch = localStorage.getItem('lastSearchQuery');
-    if (savedSearch) {
-      setLastSearchQuery(savedSearch);
-    }
-  }, []);
-
-  const clearSearchHistory = () => {
-    localStorage.removeItem('lastSearchQuery');
-    setLastSearchQuery("");
-    setSearchQuery("");
-    setSearchResults([]);
-  };
-
-  // Only search when the debounced query changes
-  useEffect(() => {
-    const runSearch = async () => {
-      if (!debouncedSearchQuery.trim()) {
-        setSearchResults([]);
-        return;
-      }
-      setIsSearching(true);
-      try {
-        const results = await searchSongs(debouncedSearchQuery);
-        setSearchResults(results);
-        setSearchPage(1); // Reset page on new search
-        localStorage.setItem('lastSearchQuery', debouncedSearchQuery);
-        setLastSearchQuery(debouncedSearchQuery);
-      } catch (err) {
-        console.error('Search error:', err);
-      } finally {
-        setIsSearching(false);
-      }
-    };
-    runSearch();
-  }, [debouncedSearchQuery]);
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-  };
-
-  // Populate search results with suggestions from DB on open
-  // Only fetch when newly opened and query is empty — not on every re-render
-  const searchOpenedRef = useRef(false);
-  useEffect(() => {
-    if (isSearchOpen && !searchQuery.trim()) {
-      if (searchOpenedRef.current && searchResults.length > 0) return; // already loaded
-      searchOpenedRef.current = true;
-      setIsSearching(true);
-      searchSongs('').then(results => {
-        setSearchResults(results);
-        setSearchPage(1);
-      }).catch(err => {
-        console.error("Failed to load suggestions", err);
-      }).finally(() => {
-        setIsSearching(false);
-      });
-    } else if (!isSearchOpen) {
-      searchOpenedRef.current = false; // reset so next open re-fetches
-    }
-  }, [isSearchOpen]);
-
   // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger any player shortcuts while Command Palette / Search is open
+      if (isSearchOpen) return;
+
       // Don't trigger if user is typing in an input, textarea or select
       if (
         e.target instanceof HTMLInputElement ||
@@ -456,24 +389,73 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     window.open(`https://t.me/share/url?url=${shareUrl}&text=${text}`, '_blank', 'noopener,noreferrer');
   };
 
-  const categoriesList = Array.from(new Set(songs.map(s => s.category || "General"))).filter(c => c !== "Trending");
+  // Split composite category strings into individual distinct canonical genres (case-normalized)
+  const categoriesList = useMemo(() => {
+    const genreSet = new Set<string>();
+    songs.forEach(s => {
+      const raw = s.category || "General";
+      const parts = raw
+        .split(/[,/&|+]+|\band\b/i)
+        .map(c => c.trim().replace(/^#+/, '').toUpperCase())
+        .filter(Boolean);
+      if (parts.length === 0) {
+        genreSet.add("GENERAL");
+      } else {
+        parts.forEach(p => genreSet.add(p));
+      }
+    });
+    return Array.from(genreSet).filter(c => c !== "TRENDING").sort((a, b) => a.localeCompare(b));
+  }, [songs]);
+
   const likedCount = songs.filter(s => likedIds.has(s.id)).length;
-  const categories = [
+  const categories = useMemo(() => [
     "All",
     "Trending",
     ...(likedCount > 0 ? ["Favorites"] : []),
     ...(recentlyPlayed.length > 0 ? ["Recently Played"] : []),
     ...(player.queue.length > 0 ? ["Queue"] : []),
     ...categoriesList,
-  ];
+  ], [likedCount, recentlyPlayed.length, player.queue.length, categoriesList]);
 
-  const filteredSongs =
-    selectedCategory === "All" ? songs :
-      selectedCategory === "Trending" ? trendingSongs :
-        selectedCategory === "Favorites" ? songs.filter(s => likedIds.has(s.id)) :
-          selectedCategory === "Recently Played" ? recentlyPlayed :
-            selectedCategory === "Queue" ? player.queue :
-              songs.filter(s => (s.category || "General").toLowerCase().includes(selectedCategory.toLowerCase()));
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      All: songs.length,
+      Trending: trendingSongs.length,
+      Favorites: likedCount,
+      "Recently Played": recentlyPlayed.length,
+      Queue: player.queue?.length || 0,
+    };
+    songs.forEach(s => {
+      const raw = s.category || "General";
+      const parts = raw
+        .split(/[,/&|+]+|\band\b/i)
+        .map(c => c.trim().replace(/^#+/, '').toUpperCase())
+        .filter(Boolean);
+      const uniqueSongGenres = new Set(parts.length > 0 ? parts : ["GENERAL"]);
+      uniqueSongGenres.forEach(genre => {
+        counts[genre] = (counts[genre] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [songs, trendingSongs, likedCount, recentlyPlayed, player.queue]);
+
+  const filteredSongs = useMemo(() => {
+    if (selectedCategory === "All") return songs;
+    if (selectedCategory === "Trending") return trendingSongs;
+    if (selectedCategory === "Favorites") return songs.filter(s => likedIds.has(s.id));
+    if (selectedCategory === "Recently Played") return recentlyPlayed;
+    if (selectedCategory === "Queue") return player.queue;
+
+    const target = selectedCategory.trim().replace(/^#+/, '').toUpperCase();
+    return songs.filter(s => {
+      const raw = s.category || "General";
+      const parts = raw
+        .split(/[,/&|+]+|\band\b/i)
+        .map(c => c.trim().replace(/^#+/, '').toUpperCase())
+        .filter(Boolean);
+      return parts.includes(target) || raw.toUpperCase().includes(target);
+    });
+  }, [selectedCategory, songs, trendingSongs, likedIds, recentlyPlayed, player.queue]);
 
   if (loading) {
     return (
@@ -557,130 +539,47 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           </div>
         </div>
 
-        {/* Search Modal */}
-        {isSearchOpen && (
-          <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-4 sm:p-6 relative max-h-[85vh] sm:max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
-              <button
-                onClick={() => setIsSearchOpen(false)}
-                className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
-              >
-                <X size={20} />
-              </button>
-
-              <h2 className="text-lg sm:text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-3 sm:mb-4 uppercase">
-                Search Database
-              </h2>
-
-              {lastSearchQuery && (
-                <div className="mb-3 flex items-center justify-between p-2 bg-black/30 border border-[var(--text-secondary)]/20">
-                  <div className="flex items-center gap-2 flex-1 overflow-hidden">
-                    <span className="text-[9px] text-[var(--text-secondary)]/60 uppercase tracking-wider shrink-0">Last:</span>
-                    <span className="text-[10px] text-[var(--accent)]/80 font-mono truncate">{lastSearchQuery}</span>
-                  </div>
-                  <button
-                    onClick={clearSearchHistory}
-                    className="p-1 text-[var(--text-secondary)]/40 hover:text-[var(--danger)] transition-colors shrink-0"
-                    title="Clear History"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
-
-              <form onSubmit={handleSearch} className="flex gap-2 mb-3">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="SEARCH ARTIST OR TITLE..."
-                  className="flex-1 bg-black/50 border border-[var(--text-secondary)] p-2.5 sm:p-3 text-xs sm:text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  disabled={isSearching}
-                  className="px-4 bg-[var(--accent)] text-black font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
-                >
-                  {isSearching ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
-                </button>
-              </form>
-
-              {/* Filter Chips */}
-              <div className="flex flex-wrap gap-1.5 mb-3">
-                <span className="text-[8px] sm:text-[9px] font-mono text-[var(--text-secondary)]/50 uppercase tracking-widest self-center shrink-0">Filter:</span>
-                {/* Duration chips */}
-                {(['all', 'short', 'medium', 'long'] as const).map(d => (
-                  <button
-                    key={d}
-                    onClick={() => setSearchFilterDuration(d)}
-                    className={`px-2 py-1 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider border transition-all ${
-                      searchFilterDuration === d
-                        ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10 font-bold shadow-[0_0_8px_rgba(var(--accent-rgb),0.2)]'
-                        : 'border-[var(--text-secondary)]/20 text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:text-white'
-                    }`}
-                  >
-                    {d === 'all' ? 'Any' : d === 'short' ? '< 2m' : d === 'medium' ? '2-5m' : '> 5m'}
-                  </button>
-                ))}
-                {searchFilterArtist && (
-                  <button
-                    onClick={() => setSearchFilterArtist('')}
-                    className="px-2 py-1 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/15 flex items-center gap-1 shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]"
-                  >
-                    <span className="truncate max-w-[120px] sm:max-w-[160px]">🎤 {searchFilterArtist}</span> <X size={10} />
-                  </button>
-                )}
-              </div>
-
-              <div ref={searchScrollRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-2 pr-0.5">
-                {searchResults.length === 0 && !isSearching && searchQuery && (
-                  <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
-                    NO DATA FOUND IN SECTOR
-                  </div>
-                )}
-
-                {searchResults
-                  .filter(song => {
-                    if (searchFilterArtist && !(song.artist || '').toLowerCase().includes(searchFilterArtist.toLowerCase())) return false;
-                    const dur = song.duration || 0;
-                    if (searchFilterDuration === 'short' && dur >= 120) return false;
-                    if (searchFilterDuration === 'medium' && (dur < 120 || dur >= 300)) return false;
-                    if (searchFilterDuration === 'long' && dur < 300) return false;
-                    return true;
-                  })
-                  .map((song) => {
-                  const inPlaylist = songs.some(s => s.id === song.id);
-                  return (
-                    <div key={song.id} className="flex items-center justify-between p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <img src={song.coverUrl} alt={`${song.title} cover`} className="w-10 h-10 object-cover border border-[var(--text-secondary)]/30" />
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
-                          <button
-                            onClick={() => setSearchFilterArtist(song.artist || '')}
-                            className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider hover:text-[var(--accent)] transition-colors"
-                            title="Filter by this artist"
-                          >
-                            {song.artist}
-                          </button>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => handleAddSong(song)}
-                        disabled={inPlaylist}
-                        className={`p-2 transition-all ${inPlaylist ? 'text-green-500 cursor-default' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] border border-transparent hover:border-[var(--accent)]'}`}
-                      >
-                        {inPlaylist ? <Check size={18} /> : <Plus size={18} />}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Cyber Command Palette (Ctrl+K Global Search) */}
+        <PlayerCommandPalette
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          songs={songs}
+          allDbSongs={allDbSongs}
+          currentSong={songs[player.index]}
+          isPlaying={player.playing}
+          onPlaySong={async (song) => {
+            const idx = songs.findIndex(s => s.id === song.id);
+            if (idx !== -1) {
+              player.selectSong(idx);
+              player.play();
+            } else {
+              await handleAddSong(song);
+            }
+          }}
+          onQueueSong={async (song) => {
+            if (!songs.some(s => s.id === song.id)) {
+              await handleAddSong(song);
+            }
+            player.addToQueue(song);
+          }}
+          onToggleLike={(songId) => {
+            setLikedIds(prev => {
+              const next = new Set(prev);
+              if (next.has(songId)) {
+                next.delete(songId);
+                toast.info('Removed from Favorites');
+              } else {
+                next.add(songId);
+                toast.success('Added to Favorites');
+              }
+              localStorage.setItem('fronto_liked_ids', JSON.stringify([...next]));
+              return next;
+            });
+          }}
+          likedIds={likedIds}
+          onAddToPlaylist={handleAddSong}
+          onRemoveFromPlaylist={handleRemoveSong}
+        />
       </>
     );
   }
@@ -919,7 +818,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                         {/* Genre Tags */}
                         {current?.category && (() => {
                           const allGenres = current.category
-                            .split(/[,&/|+]+/)
+                            .split(/[,&/|+]+|\band\b/i)
                             .map(g => g.trim().replace(/^#+/, ''))
                             .filter(Boolean);
                           const visibleGenres = allGenres.slice(0, 3);
@@ -1094,6 +993,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                 categories={categories}
                 selectedCategory={selectedCategory}
                 setSelectedCategory={setSelectedCategory}
+                categoryCounts={categoryCounts}
                 rightTab={rightTab}
                 setRightTab={setRightTab}
                 isMobilePlaylistOpen={isMobilePlaylistOpen}
@@ -1239,143 +1139,47 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
         />
       )}
 
-      {/* Search Modal */}
-      {isSearchOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-start pt-12 sm:pt-4 sm:justify-center p-3 sm:p-4 animate-in fade-in duration-300">
-          <div className="w-full max-w-lg bg-[var(--bg-main)] border border-[var(--text-secondary)] p-4 sm:p-6 relative max-h-[85vh] sm:max-h-[80vh] flex flex-col overflow-hidden shadow-2xl">
-            <button
-              onClick={() => setIsSearchOpen(false)}
-              className="absolute top-4 right-4 text-[var(--text-secondary)] hover:text-[var(--accent)]"
-            >
-              <X size={20} />
-            </button>
-
-            <h2 className="text-lg sm:text-xl font-bold font-mono tracking-widest text-[var(--accent)] mb-3 sm:mb-4 uppercase">
-              Search Database
-            </h2>
-
-            {/* Search Form */}
-            <form onSubmit={handleSearch} className="flex gap-2 mb-3">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="SEARCH ARTIST OR TITLE..."
-                  className="w-full h-full bg-black/50 border border-[var(--text-secondary)] p-2.5 sm:p-3 pr-10 text-xs sm:text-sm font-mono focus:outline-none focus:border-[var(--accent)] text-[var(--text-primary)]"
-                  autoFocus
-                />
-                {searchQuery && (
-                  <button 
-                    type="button" 
-                    onClick={() => { setSearchQuery(''); document.querySelector<HTMLInputElement>('input[placeholder="SEARCH ARTIST OR TITLE..."]')?.focus(); }}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-secondary)] hover:text-[var(--accent)]"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={isSearching}
-                className="px-4 bg-[var(--accent)] text-black font-bold uppercase tracking-wider hover:opacity-90 disabled:opacity-50"
-              >
-                {isSearching ? <Loader2 className="animate-spin" size={20} /> : <Search size={20} />}
-              </button>
-            </form>
-
-            {/* Filter Chips - Fully responsive for mobile & desktop */}
-            <div className="flex flex-wrap items-center gap-1.5 mb-3">
-              <span className="text-[8px] sm:text-[9px] font-mono text-[var(--text-secondary)]/50 uppercase tracking-widest self-center shrink-0">
-                Filter:
-              </span>
-              {/* Duration chips */}
-              {(['all', 'short', 'medium', 'long'] as const).map(d => (
-                <button
-                  key={d}
-                  onClick={() => setSearchFilterDuration(d)}
-                  className={`px-2 py-1 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider border transition-all touch-manipulation ${
-                    searchFilterDuration === d
-                      ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10 font-bold shadow-[0_0_8px_rgba(var(--accent-rgb),0.2)]'
-                      : 'border-[var(--text-secondary)]/20 text-[var(--text-secondary)] hover:border-[var(--accent)]/40 hover:text-white'
-                  }`}
-                >
-                  {d === 'all' ? 'Any' : d === 'short' ? '< 2m' : d === 'medium' ? '2-5m' : '> 5m'}
-                </button>
-              ))}
-              {searchFilterArtist && (
-                <button
-                  onClick={() => setSearchFilterArtist('')}
-                  className="px-2 py-1 text-[8px] sm:text-[9px] font-mono uppercase tracking-wider border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/15 flex items-center gap-1.5 shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)] animate-in fade-in"
-                  title="Clear artist filter"
-                >
-                  <span className="truncate max-w-[120px] sm:max-w-[160px]">🎤 {searchFilterArtist}</span>
-                  <X size={10} className="shrink-0" />
-                </button>
-              )}
-            </div>
-
-            {/* Search Results */}
-            <div ref={searchScrollRef} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-2 pr-0.5">
-              {searchResults.length === 0 && !isSearching && searchQuery && (
-                <div className="text-center text-[var(--text-secondary)] text-xs font-mono mt-10">
-                  NO DATA FOUND IN SECTOR
-                </div>
-              )}
-
-              {searchResults
-                .filter(song => {
-                  if (searchFilterArtist && !(song.artist || '').toLowerCase().includes(searchFilterArtist.toLowerCase())) return false;
-                  const dur = song.duration || 0;
-                  if (searchFilterDuration === 'short' && dur >= 120) return false;
-                  if (searchFilterDuration === 'medium' && (dur < 120 || dur >= 300)) return false;
-                  if (searchFilterDuration === 'long' && dur < 300) return false;
-                  return true;
-                })
-                .slice((searchPage - 1) * itemsPerSearchPage, searchPage * itemsPerSearchPage).map((song) => {
-                const inPlaylist = songs.some(s => s.id === song.id);
-                return (
-                  <div key={song.id} className="flex items-center justify-between p-2.5 sm:p-3 border border-[var(--text-secondary)]/20 hover:border-[var(--text-secondary)]/50 bg-black/30 group transition-all">
-                    <div className="flex items-center gap-2.5 sm:gap-3 overflow-hidden min-w-0 flex-1 mr-2">
-                      <img src={song.coverUrl || '/default-cover.png'} className="w-9 h-9 sm:w-10 sm:h-10 object-cover border border-[var(--text-secondary)]/30 shrink-0" alt="" />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-bold text-[var(--text-primary)] truncate font-mono">{song.title}</div>
-                        <button
-                          onClick={() => setSearchFilterArtist(song.artist || '')}
-                          className="text-[9px] text-[var(--text-secondary)] truncate font-mono uppercase tracking-wider hover:text-[var(--accent)] transition-colors text-left block max-w-full"
-                          title="Filter by this artist"
-                        >
-                          {song.artist || 'Unknown Artist'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => inPlaylist ? handleRemoveSong(song) : handleAddSong(song)}
-                      className={`p-2 transition-all border border-transparent shrink-0 ${inPlaylist ? 'text-[var(--accent)] hover:text-[var(--danger)] hover:border-[var(--danger)]' : 'text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent)]'}`}
-                      title={inPlaylist ? "Remove from playlist" : "Add to playlist"}
-                    >
-                      {inPlaylist ? <Minus size={18} /> : <Plus size={18} />}
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Pagination */}
-            {Math.ceil(searchResults.length / itemsPerSearchPage) > 1 && (
-              <div className="shrink-0 pt-3 mt-2 border-t border-[var(--text-secondary)]/20">
-                <Pagination
-                  currentPage={searchPage}
-                  totalPages={Math.ceil(searchResults.length / itemsPerSearchPage)}
-                  onPageChange={setSearchPage}
-                  className="my-0"
-                />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Cyber Command Palette (Ctrl+K Global Search) */}
+      <PlayerCommandPalette
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        songs={songs}
+        allDbSongs={allDbSongs}
+        currentSong={songs[player.index]}
+        isPlaying={player.playing}
+        onPlaySong={async (song) => {
+          const idx = songs.findIndex(s => s.id === song.id);
+          if (idx !== -1) {
+            player.selectSong(idx);
+            player.play();
+          } else {
+            await handleAddSong(song);
+          }
+        }}
+        onQueueSong={async (song) => {
+          if (!songs.some(s => s.id === song.id)) {
+            await handleAddSong(song);
+          }
+          player.addToQueue(song);
+        }}
+        onToggleLike={(songId) => {
+          setLikedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(songId)) {
+              next.delete(songId);
+              toast.info('Removed from Favorites');
+            } else {
+              next.add(songId);
+              toast.success('Added to Favorites');
+            }
+            localStorage.setItem('fronto_liked_ids', JSON.stringify([...next]));
+            return next;
+          });
+        }}
+        likedIds={likedIds}
+        onAddToPlaylist={handleAddSong}
+        onRemoveFromPlaylist={handleRemoveSong}
+      />
 
       {/* Mobile Modals / Drawers */}
       <HotkeysMap isOpen={isHotkeysOpen} onClose={() => setIsHotkeysOpen(false)} />

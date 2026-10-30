@@ -1,4 +1,6 @@
 import { ChevronDown, ListMusic, ListPlus, History, Trash2, X, Loader2 } from "lucide-react";
+import { useMemo } from "react";
+import { CyberCategoryDropdown } from "./CyberCategoryDropdown";
 import type { Song } from "../types/Song";
 import { Playlist } from "./Playlist";
 
@@ -11,6 +13,7 @@ interface PlayerRightPanelProps {
   categories: string[];
   selectedCategory: string;
   setSelectedCategory: (cat: string) => void;
+  categoryCounts?: Record<string, number>;
   rightTab: 'playlist' | 'queue' | 'recent';
   setRightTab: (tab: 'playlist' | 'queue' | 'recent') => void;
   isMobilePlaylistOpen: boolean;
@@ -43,6 +46,7 @@ export function PlayerRightPanel({
   categories,
   selectedCategory,
   setSelectedCategory,
+  categoryCounts,
   rightTab,
   setRightTab,
   isMobilePlaylistOpen,
@@ -52,8 +56,8 @@ export function PlayerRightPanel({
   onDrawerTouchMove,
   onDrawerTouchEnd,
   drawerTouchStartY,
-  isConfigMenuOpen,
-  setIsConfigMenuOpen,
+  isConfigMenuOpen: _isConfigMenuOpen,
+  setIsConfigMenuOpen: _setIsConfigMenuOpen,
   onRemoveFromPlaylist,
   onBulkRemove,
   onReorderPlaylist,
@@ -65,6 +69,26 @@ export function PlayerRightPanel({
   playClick,
   playHover
 }: PlayerRightPanelProps) {
+  const computedCategoryCounts = useMemo(() => {
+    if (categoryCounts) return categoryCounts;
+    const counts: Record<string, number> = {
+      All: songs.length,
+      "Recently Played": recentlyPlayed.length,
+      Queue: player.queue?.length || 0,
+    };
+    songs.forEach(s => {
+      const raw = s.category || "General";
+      const parts = raw
+        .split(/[,/&|+]+|\band\b/i)
+        .map(c => c.trim().replace(/^#+/, '').toUpperCase())
+        .filter(Boolean);
+      const uniqueSongGenres = new Set(parts.length > 0 ? parts : ["GENERAL"]);
+      uniqueSongGenres.forEach(genre => {
+        counts[genre] = (counts[genre] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [categoryCounts, songs, recentlyPlayed, player.queue]);
   return (
     <>
       {/* Mobile Cover Overlay */}
@@ -127,31 +151,71 @@ export function PlayerRightPanel({
           ))}
         </div>
 
-        {/* Category filter */}
+        {/* Category filter with CyberCategoryDropdown & Quick Pills */}
         {rightTab === 'playlist' && (
-          <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-black/40">
-            <span className="text-[9px] font-mono text-white/70 font-bold tracking-widest">{filteredSongs.length} SONGS</span>
-            <div className="relative">
+          <div className="flex flex-col gap-1.5 px-3 py-2 border-b border-white/10 bg-black/40">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[9px] font-mono text-white/70 font-bold tracking-widest shrink-0">
+                {filteredSongs.length} SONGS
+              </span>
+              <div className="flex-1 max-w-[200px]">
+                <CyberCategoryDropdown
+                  categories={categories}
+                  selectedCategory={selectedCategory}
+                  onSelectCategory={(cat) => {
+                    playClick();
+                    setSelectedCategory(cat);
+                  }}
+                  categoryCounts={computedCategoryCounts}
+                  totalSongs={songs.length}
+                  align="right"
+                />
+              </div>
+            </div>
+
+            {/* Quick Filter Tag Bar (All, Top 3 Genres, Clear) */}
+            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pt-0.5">
               <button
-                onClick={() => { playClick(); setIsConfigMenuOpen(!isConfigMenuOpen); }}
-                onMouseEnter={playHover}
-                className="text-white/90 hover:text-white font-mono text-[9px] font-bold border border-[var(--accent)]/40 hover:border-[var(--accent)] px-2.5 py-1 bg-black/70 flex items-center gap-2 w-32 justify-between transition-colors shadow-sm"
+                type="button"
+                onClick={() => { playClick(); setSelectedCategory("All"); }}
+                className={`px-2 py-0.5 text-[8px] font-mono border transition-all shrink-0 ${
+                  selectedCategory === "All"
+                    ? "border-[var(--accent)] bg-[var(--accent)] text-black font-bold shadow-[0_0_6px_var(--accent)]"
+                    : "border-white/10 text-white/60 hover:text-white"
+                }`}
               >
-                <span className="truncate">{selectedCategory.toUpperCase()}</span>
-                <span className="text-[var(--accent)] font-bold">{isConfigMenuOpen ? '▴' : '▾'}</span>
+                ALL ({songs.length})
               </button>
-              {isConfigMenuOpen && (
-                <div className="absolute right-0 top-full mt-1 w-36 bg-black/95 backdrop-blur-md border border-[var(--accent)]/50 z-50 shadow-2xl max-h-48 overflow-y-auto custom-scrollbar">
-                  {categories.map(cat => (
-                    <button
-                      key={cat}
-                      onClick={() => { playClick(); setSelectedCategory(cat); setIsConfigMenuOpen(false); }}
-                      className={`w-full text-left px-3 py-2 text-[10px] font-mono uppercase tracking-wider border-b border-white/5 hover:bg-[var(--accent)]/20 transition-colors ${selectedCategory === cat ? 'text-[var(--accent)] font-bold bg-[var(--accent)]/10' : 'text-white/80 hover:text-white'}`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
+              {categories
+                .filter(c => !["All", "Trending", "Favorites", "Queue", "Recently Played"].includes(c))
+                .sort((a, b) => (computedCategoryCounts[b] || 0) - (computedCategoryCounts[a] || 0))
+                .slice(0, 3)
+                .map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => {
+                      playClick();
+                      setSelectedCategory(selectedCategory.toLowerCase() === cat.toLowerCase() ? "All" : cat);
+                    }}
+                    className={`px-1.5 py-0.5 text-[8px] font-mono border transition-all truncate max-w-[95px] shrink-0 ${
+                      selectedCategory.toLowerCase() === cat.toLowerCase()
+                        ? "border-[var(--accent)] bg-[var(--accent)] text-black font-bold shadow-[0_0_6px_var(--accent)]"
+                        : "border-white/10 text-white/60 hover:text-white"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              {selectedCategory !== "All" && (
+                <button
+                  type="button"
+                  onClick={() => { playClick(); setSelectedCategory("All"); }}
+                  className="px-1.5 py-0.5 text-[8px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500 bg-red-500/10 ml-auto shrink-0 flex items-center gap-0.5 font-bold"
+                  title="Filtrni tozalash"
+                >
+                  <X size={8} /> CLEAR
+                </button>
               )}
             </div>
           </div>

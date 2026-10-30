@@ -415,7 +415,18 @@ export default function Admin() {
   }
 
   // Derive categories from existing songs
-  const categories = ["General", ...Array.from(new Set(list.map(s => s.category || "General")))];
+  const categories = useMemo(() => {
+    const genreSet = new Set<string>(["General"]);
+    list.forEach(s => {
+      const raw = s.category || "General";
+      const parts = raw
+        .split(/[,/&|+]+|\band\b/i)
+        .map(c => c.trim().replace(/^#+/, ''))
+        .filter(Boolean);
+      parts.forEach(p => genreSet.add(p));
+    });
+    return Array.from(genreSet);
+  }, [list]);
 
   useEffect(() => {
     let mounted = true;
@@ -437,25 +448,54 @@ export default function Admin() {
 
   const debouncedQuery = useDebounce(query, 300);
 
+  // Count each distinct canonical genre accurately across all tracks
   const categoryCounts = useMemo(() => {
     const map: Record<string, number> = {};
     list.forEach(m => {
-      const c = m.category || "General";
-      map[c] = (map[c] || 0) + 1;
+      const raw = m.category || "General";
+      const parts = raw
+        .split(/[,/&|+]+|\band\b/i)
+        .map(c => c.trim().replace(/^#+/, '').toUpperCase())
+        .filter(Boolean);
+      const uniqueGenres = new Set(parts.length > 0 ? parts : ["GENERAL"]);
+      uniqueGenres.forEach(g => {
+        map[g] = (map[g] || 0) + 1;
+      });
     });
     return map;
   }, [list]);
 
+  // Distinct individual canonical categories
   const allCategories = useMemo(() => {
-    const cats = Array.from(new Set(list.map(s => s.category || "General"))).sort();
-    return ["All", ...cats];
+    const genreSet = new Set<string>();
+    list.forEach(m => {
+      const raw = m.category || "General";
+      const parts = raw
+        .split(/[,/&|+]+|\band\b/i)
+        .map(c => c.trim().replace(/^#+/, '').toUpperCase())
+        .filter(Boolean);
+      if (parts.length === 0) {
+        genreSet.add("GENERAL");
+      } else {
+        parts.forEach(p => genreSet.add(p));
+      }
+    });
+    return ["All", ...Array.from(genreSet).sort((a, b) => a.localeCompare(b))];
   }, [list]);
 
   useEffect(() => {
     const q = debouncedQuery.trim().toLowerCase();
     let res = list;
     if (filterCategory !== "All") {
-      res = res.filter(m => (m.category || "General").toLowerCase() === filterCategory.toLowerCase());
+      const target = filterCategory.trim().replace(/^#+/, '').toUpperCase();
+      res = res.filter(m => {
+        const raw = m.category || "General";
+        const parts = raw
+          .split(/[,/&|+]+|\band\b/i)
+          .map(c => c.trim().replace(/^#+/, '').toUpperCase())
+          .filter(Boolean);
+        return parts.includes(target) || raw.toUpperCase().includes(target);
+      });
     }
     if (q) {
       res = res.filter(m => (
@@ -551,50 +591,48 @@ export default function Admin() {
 
       {/* Header */}
       <div 
-        className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b pb-6"
+        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 border-b pb-4"
         style={{ borderImage: 'linear-gradient(90deg, transparent, var(--accent), transparent) 1' }}
       >
-        <div>
-          <div className="flex flex-wrap items-center gap-3 mb-2">
-            <h1 className="text-3xl font-bold tracking-wider flex items-center gap-3">
-              <MusicIcon className="w-8 h-8 text-[var(--accent)] drop-shadow-[0_0_12px_rgba(var(--accent-rgb),0.5)]" />
-              EDITOR // <span className="text-[var(--text-secondary)]">MANAGE</span>
-            </h1>
-            <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-1 shadow-[0_0_10px_rgba(16,185,129,0.15)]">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#10b981]" />
-              <span>SYSTEM ONLINE // SUPABASE CONNECTED</span>
-            </div>
-          </div>
-          <p className="text-[var(--text-secondary)] text-sm uppercase tracking-widest">Library Management Database</p>
-        </div>
         <div className="flex items-center gap-3">
+          <h1 className="text-xl sm:text-2xl font-black tracking-wider flex items-center gap-2">
+            <MusicIcon className="w-6 h-6 text-[var(--accent)] drop-shadow-[0_0_10px_rgba(var(--accent-rgb),0.5)] shrink-0" />
+            <span>EDITOR <span className="text-[var(--accent)]">//</span> <span className="text-white/60">MANAGE</span></span>
+          </h1>
+          <div className="hidden sm:inline-flex items-center gap-1.5 text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 shadow-sm">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#10b981]" />
+            <span>ONLINE</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
           {/* Global Search Pill (Ctrl+K Command Palette) */}
           <button
             type="button"
             onClick={() => setIsSearchModalOpen(true)}
-            className="flex items-center gap-2.5 px-3 py-2 cyber-panel border border-white/20 hover:border-[var(--accent)] text-white/70 hover:text-white transition-all text-xs font-mono group cursor-pointer shadow-sm hover:shadow-[0_0_15px_rgba(var(--accent-rgb),0.2)]"
+            className="flex items-center gap-2 px-2.5 py-1.5 cyber-panel border border-white/20 hover:border-[var(--accent)] text-white/70 hover:text-white transition-all text-xs font-mono group cursor-pointer shadow-sm whitespace-nowrap"
             title="Tezkor qidiruv (Ctrl+K)"
           >
-            <Search size={14} className="text-[var(--accent)] group-hover:scale-110 transition-transform" />
-            <span className="hidden sm:inline text-white/60 group-hover:text-white font-medium">Qidiruv...</span>
-            <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] bg-black/70 border border-white/20 text-[var(--accent)] font-bold rounded">
+            <Search size={13} className="text-[var(--accent)] group-hover:scale-110 transition-transform" />
+            <span className="text-white/60 group-hover:text-white font-medium">Qidiruv</span>
+            <kbd className="hidden sm:inline-flex items-center px-1 py-0.2 text-[9px] bg-black/70 border border-white/20 text-[var(--accent)] font-bold">
               Ctrl+K
             </kbd>
           </button>
 
           <Link
             to="/upload"
-            className="flex items-center gap-2 px-4 py-2 bg-[var(--text-secondary)]/10 border border-[var(--text-secondary)]/40 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all text-sm uppercase tracking-wider"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-[var(--text-secondary)]/10 border border-[var(--text-secondary)]/30 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-all text-xs font-mono uppercase tracking-wider whitespace-nowrap font-bold"
           >
-            <Upload size={16} />
-            New Upload
+            <Upload size={13} />
+            <span>Yuklash</span>
           </Link>
           <Link
             to="/"
-            className="flex items-center gap-2 px-4 py-2 border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/5 hover:bg-[var(--accent)] hover:text-black font-bold transition-all text-sm uppercase tracking-wider shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] hover:shadow-[0_0_20px_rgba(var(--accent-rgb),0.4)]"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10 hover:bg-[var(--accent)] hover:text-black font-bold transition-all text-xs font-mono uppercase tracking-wider whitespace-nowrap shadow-[0_0_8px_rgba(var(--accent-rgb),0.2)] hover:shadow-[0_0_15px_var(--accent)]"
           >
-            <ArrowLeft size={16} />
-            Back to Player
+            <ArrowLeft size={13} />
+            <span>Pleyer</span>
           </Link>
         </div>
       </div>
@@ -1283,11 +1321,18 @@ export default function Admin() {
                 {/* Table Header */}
                 <div className="grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--accent)]/20 bg-[rgba(var(--accent-rgb),0.12)] backdrop-blur-md text-xs uppercase tracking-widest text-white font-black items-center shadow-sm">
                   <input
+                    ref={el => {
+                      if (el) {
+                        const isSome = paginatedList.some(m => selectedAdminIds.has(m.id));
+                        const isAll = paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id));
+                        el.indeterminate = isSome && !isAll;
+                      }
+                    }}
                     type="checkbox"
                     checked={paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id))}
                     onChange={() => toggleSelectAllAdmin(paginatedList)}
-                    className="cursor-pointer accent-[var(--accent)]"
-                    title="Select/Deselect All on page"
+                    className="cyber-checkbox"
+                    title="Barchasini tanlash / bekor qilish"
                   />
                   <div className="w-12 text-center">Img</div>
                   <div>Title</div>
@@ -1319,7 +1364,7 @@ export default function Admin() {
                             type="checkbox"
                             checked={selectedAdminIds.has(m.id)}
                             onChange={() => toggleSelectAdmin(m.id)}
-                            className="cursor-pointer accent-[var(--accent)]"
+                            className="cyber-checkbox"
                           />
                           {/* Cover */}
                           <div className="w-12 h-12 border border-white/20 overflow-hidden bg-black relative group/cover">
@@ -1402,17 +1447,44 @@ export default function Admin() {
                                 )}
                               </div>
                             ) : (
-                              <button
-                                onClick={() => setFilterCategory(prev => prev === (m.category || "General") ? "All" : (m.category || "General"))}
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-mono border transition-all uppercase tracking-wider ${
-                                  filterCategory.toLowerCase() === (m.category || "General").toLowerCase()
-                                    ? 'bg-[var(--accent)] text-black border-[var(--accent)] font-bold shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]'
-                                    : 'border border-[var(--accent)]/30 bg-[rgba(var(--accent-rgb),0.08)] backdrop-blur-sm text-white hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/20 font-bold shadow-sm'
-                                }`}
-                                title={`Filter by ${m.category || "General"}`}
-                              >
-                                {m.category || "General"}
-                              </button>
+                              <div className="flex items-center gap-1 flex-wrap">
+                                {(() => {
+                                  const cats = (m.category || "General")
+                                    .split(/[,/&|+]+/)
+                                    .map(c => c.trim().replace(/^#+/, ''))
+                                    .filter(Boolean);
+                                  const displayCats = cats.length > 0 ? cats : ["General"];
+                                  const visible = displayCats.slice(0, 2);
+                                  const extraCount = displayCats.length - 2;
+
+                                  return (
+                                    <>
+                                      {visible.map((cat, idx) => (
+                                        <button
+                                          key={idx}
+                                          onClick={() => setFilterCategory(prev => prev.toLowerCase() === cat.toLowerCase() ? "All" : cat)}
+                                          className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9px] font-mono border transition-all uppercase tracking-wider max-w-[90px] truncate ${
+                                            filterCategory.toLowerCase() === cat.toLowerCase()
+                                              ? 'bg-[var(--accent)] text-black border-[var(--accent)] font-bold shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)]'
+                                              : 'border border-[var(--accent)]/30 bg-[rgba(var(--accent-rgb),0.08)] backdrop-blur-sm text-white hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/20 font-bold shadow-sm'
+                                          }`}
+                                          title={`Filter by ${cat}`}
+                                        >
+                                          #{cat}
+                                        </button>
+                                      ))}
+                                      {extraCount > 0 && (
+                                        <span
+                                          className="px-1.5 py-0.5 text-[8.5px] font-mono border border-white/20 text-white/60 bg-black/40 font-bold tracking-wider cursor-help"
+                                          title={displayCats.slice(2).map(c => `#${c}`).join(', ')}
+                                        >
+                                          +{extraCount}
+                                        </span>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </div>
                             )}
                           </div>
 
@@ -1713,8 +1785,9 @@ export default function Admin() {
                 type="text"
                 value={searchModalQuery}
                 onChange={e => setSearchModalQuery(e.target.value)}
-                placeholder="Musiqa, ijrochi yoki janr qidiring (Ctrl+K)..."
-                className="w-full bg-transparent text-sm sm:text-base text-white placeholder-white/40 focus:outline-none font-mono font-medium tracking-wide"
+                placeholder="Musiqa, ijrochi yoki janr..."
+                className="w-full bg-transparent text-sm sm:text-base text-white placeholder-white/40 border-0 border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 font-mono font-medium tracking-wide shadow-none focus:shadow-none focus-visible:shadow-none"
+                style={{ outline: 'none', boxShadow: 'none' }}
                 autoFocus
               />
               {searchModalQuery && (
@@ -1767,9 +1840,38 @@ export default function Admin() {
                       </div>
                       <div className="text-xs text-[var(--text-secondary)] truncate flex items-center gap-2 mt-0.5">
                         <span>{song.artist || 'Unknown'}</span>
-                        <span className="text-[10px] px-1.5 py-0.2 bg-white/10 text-white/70 border border-white/10 uppercase">
-                          {song.category || 'General'}
-                        </span>
+                        {(() => {
+                          const rawCat = song.category || 'General';
+                          const cats = rawCat
+                            .split(/[,&/|+]+/)
+                            .map(c => c.trim().replace(/^#+/, ''))
+                            .filter(Boolean);
+                          const displayCats = cats.length > 0 ? cats : ['General'];
+                          const visible = displayCats.slice(0, 2);
+                          const extraCount = displayCats.length - 2;
+
+                          return (
+                            <span className="inline-flex items-center gap-1 shrink-0">
+                              {visible.map((cat, i) => (
+                                <span
+                                  key={i}
+                                  className="text-[9px] font-mono px-1.5 py-0.5 bg-black/60 border border-[var(--accent)]/40 text-[var(--accent)] font-semibold uppercase tracking-wider shadow-sm max-w-[100px] truncate"
+                                  title={`#${cat}`}
+                                >
+                                  #{cat}
+                                </span>
+                              ))}
+                              {extraCount > 0 && (
+                                <span
+                                  className="text-[8px] font-mono px-1.5 py-0.5 bg-black/60 border border-white/20 text-white/70 font-bold tracking-wider"
+                                  title={displayCats.slice(2).map(c => `#${c}`).join(', ')}
+                                >
+                                  +{extraCount}
+                                </span>
+                              )}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

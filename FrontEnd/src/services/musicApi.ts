@@ -28,6 +28,26 @@ export async function getMusicList(page = 0, pageSize = PAGE_SIZE): Promise<Song
   }));
 }
 
+/**
+ * Fetch all songs from database (sorted by popularity)
+ */
+export async function getAllSongs(): Promise<Song[]> {
+  const { data, error } = await supabase
+    .from(DB_TABLES.SONGS)
+    .select('*')
+    .order('play_count', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching all songs:', error);
+    return [];
+  }
+
+  return data.map((song: any) => ({
+    ...song,
+    coverUrl: song.cover_url
+  }));
+}
+
 // Search songs
 export async function searchSongs(query: string): Promise<Song[]> {
   const { data, error } = await supabase

@@ -436,7 +436,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                                 <div className={`text-[8px] truncate font-mono uppercase tracking-wider flex items-center gap-1.5 flex-1 min-w-0 ${isActive ? 'text-white/90' : 'text-white/60 group-hover/item:text-white/80'}`}>
                                   <span className="truncate">{song.artist}</span>
                                   {song.category && song.category !== 'General' && (() => {
-                                    const cats = song.category.split(/[,&/|+]+/).map(c => c.trim().replace(/^#+/, '')).filter(Boolean);
+                                    const cats = song.category.split(/[,&/|+]+|\band\b/i).map(c => c.trim().replace(/^#+/, '')).filter(Boolean);
                                     const visible = cats.slice(0, 2);
                                     const extraCount = cats.length - 2;
                                     return (
