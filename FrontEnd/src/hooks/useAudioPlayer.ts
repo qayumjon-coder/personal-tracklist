@@ -165,7 +165,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     };
     const handleTimeUpdate = () => {
       // 15 Second Tracking logic for Trends
-      if (audio.currentTime >= 15 && songs[index]?.id && countedSongIdRef.current !== songs[index].id) {
+      if (audio.currentTime >= 15 && songs[index]?.id && typeof songs[index].id === 'number' && songs[index].id > 0 && countedSongIdRef.current !== songs[index].id) {
         countedSongIdRef.current = songs[index].id as number;
         incrementPlayCount(countedSongIdRef.current).catch(console.error);
       }

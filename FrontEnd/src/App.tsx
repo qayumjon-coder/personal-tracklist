@@ -1,11 +1,21 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Player } from "./components/Player";
 import { Settings } from "./components/Settings";
-import { Upload } from "./pages/Upload";
-import { AdminLogin } from "./pages/AdminLogin";
-import Admin from "./pages/Admin";
-import { NotFound } from "./pages/NotFound";
+// Lazy load non-critical routes to drastically reduce initial bundle size
+const Upload = lazy(() => import("./pages/Upload").then(m => ({ default: m.Upload })));
+const AdminLogin = lazy(() => import("./pages/AdminLogin").then(m => ({ default: m.AdminLogin })));
+const Admin = lazy(() => import("./pages/Admin"));
+const NotFound = lazy(() => import("./pages/NotFound").then(m => ({ default: m.NotFound })));
+
+function PageFallback() {
+  return (
+    <div className="w-full min-h-[60vh] flex flex-col items-center justify-center font-mono text-[var(--accent)] gap-3">
+      <div className="w-8 h-8 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin shadow-[0_0_15px_rgba(var(--accent-rgb),0.5)]" />
+      <div className="text-xs uppercase tracking-widest text-[var(--text-secondary)]">INITIALIZING MODULE...</div>
+    </div>
+  );
+}
 import { usePlaylist } from "./hooks/usePlaylist";
 import { useLocalFiles } from "./hooks/useLocalFiles";
 import { useAudioPlayer } from "./hooks/useAudioPlayer";
@@ -146,7 +156,7 @@ function MusicApp() {
             onToggleShuffle={player.toggleShuffle}
             onToggleRepeat={player.toggleRepeat}
           />
-          <Routes>
+          <Suspense fallback={<PageFallback />}><Routes>
             <Route path="/" element={
               <Player 
                 songs={combinedSongs} 
@@ -175,7 +185,7 @@ function MusicApp() {
             <Route path="/upload" element={<Upload />} />
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
-          </Routes>
+          </Routes></Suspense>
         </div>
       </Router>
   );

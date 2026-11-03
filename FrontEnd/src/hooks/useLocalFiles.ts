@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import * as idb from "idb-keyval";
-import * as mm from "music-metadata";
 import type { Song } from "../types/Song";
 
 const FOLDER_HANDLE_KEY = "fronto_local_folder_handle";
@@ -55,6 +54,7 @@ export function useLocalFiles() {
       const songUrl = URL.createObjectURL(file);
 
       try {
+        const mm = await import("music-metadata");
         const metadata = await mm.parseBlob(file, { duration: true });
         if (metadata.common.title) title = metadata.common.title;
         if (metadata.common.artist) artist = metadata.common.artist;

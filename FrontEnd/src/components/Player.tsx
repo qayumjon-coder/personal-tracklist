@@ -372,12 +372,27 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
     toast.info(`${song.title} removed from playlist`);
   };
 
-  const copyShareLink = () => {
+  const copyShareLink = async () => {
     if (!current) return;
     const url = new URL(window.location.href);
     url.searchParams.set('track', current.id.toString());
-    navigator.clipboard.writeText(url.toString());
-    toast.success("Link copied to clipboard!");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(url.toString());
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = url.toString();
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast.success("Havola nusxalandi!");
+    } catch {
+      toast.error("Havolani nusxalab bo'lmadi");
+    }
   };
 
   const shareToTelegram = () => {

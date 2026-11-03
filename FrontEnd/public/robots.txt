@@ -1,5 +1,9 @@
 User-agent: *
 Allow: /
+Disallow: /admin
+Disallow: /admin/login
+Disallow: /upload
+
 Sitemap: https://fronto-music.vercel.app/sitemap.xml
 
 # Crawl-delay: recognized by Bing and Yandex, not Google

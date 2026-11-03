@@ -33,3 +33,23 @@ This file contains concepts and features planned for future integration into the
 - Include instant genre search, song count badges, and click-outside dismissal.
 - Documented in `docs/PLAYER_COMMAND_PALETTE_ROADMAP.md`.
 
+## 8. Brand Identity & Rebranding Concept: "Pulsar"
+- **Working Title / Brand:** `Pulsar // Cyberpunk Audio Station` (or `Pulsar — Cyberpunk Music Player`)
+- **Scientific & Physical Foundation:** 
+  - Discovered in 1967 by Jocelyn Bell Burnell.
+  - A rapidly rotating, highly magnetized neutron star that emits mathematically precise electromagnetic beams into deep space.
+  - Revered in astrophysics as the cosmos's natural metronome (pulsing rhythmically with atomic-clock precision).
+- **Music & Cultural Legacy:**
+  - The radio waveform visualization of the very first discovered pulsar (`PSR B1919+21`) is the iconic cover art of Joy Division's legendary post-punk album *"Unknown Pleasures"* (1979), permanently fusing the concept of pulsars with music history and sound visualization.
+- **Cyberpunk Fit:**
+  - Dense energy core, neon electromagnetic wave pulses, deep space / dark synthwave atmosphere.
+  - Ends in `-r` (clean phonetics across Uzbek, Russian, and English).
+- **SEO & Search Differentiation Strategy:**
+  - Avoid generic collision with the legacy Android app *"Pulsar Music Player"* by branding strictly as a Cyberpunk web experience: `Pulsar Cyberpunk Player` or `Pulsar Audio Station`.
+- **Planned Execution Scope:**
+  - Global title and metadata in `FrontEnd/index.html` and `FrontEnd/src/components/SEO.tsx`.
+  - PWA manifest (`manifest.webmanifest`) and `vite.config.ts`.
+  - ASCII logo art in `Terminal.tsx` and boot screen branding in `LoadingScreen.tsx`.
+  - Search engine directives (`robots.txt`, `sitemap.xml`).
+
+
