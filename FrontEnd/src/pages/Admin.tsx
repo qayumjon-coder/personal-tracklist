@@ -409,8 +409,12 @@ export default function Admin() {
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      if (newCoverPreview) {
+        URL.revokeObjectURL(newCoverPreview);
+      }
       setNewCoverFile(file);
       setNewCoverPreview(URL.createObjectURL(file));
+      e.target.value = '';
     }
   }
 
@@ -512,6 +516,9 @@ export default function Admin() {
   const paginatedList = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   function startEdit(m: Music) {
+    if (newCoverPreview) {
+      URL.revokeObjectURL(newCoverPreview);
+    }
     setEditingId(m.id);
     setEditForm({ title: m.title, artist: m.artist, category: m.category, lyrics: m.lyrics || "" });
     setNewCoverFile(null);
@@ -520,6 +527,9 @@ export default function Admin() {
   }
 
   function cancelEdit() {
+    if (newCoverPreview) {
+      URL.revokeObjectURL(newCoverPreview);
+    }
     setEditingId(null);
     setEditForm({});
     setNewCoverFile(null);
@@ -540,6 +550,9 @@ export default function Admin() {
         lyrics: editForm.lyrics
       }, newCoverFile || undefined);
 
+      if (newCoverPreview) {
+        URL.revokeObjectURL(newCoverPreview);
+      }
       setList(prev => prev.map(p => p.id === id ? { ...updated, coverUrl: updated.cover_url } : p));
       setEditingId(null);
       setEditForm({});
@@ -1367,14 +1380,16 @@ export default function Admin() {
                             className="cyber-checkbox"
                           />
                           {/* Cover */}
-                          <div className="w-12 h-12 border border-white/20 overflow-hidden bg-black relative group/cover">
+                          <div className={`w-12 h-12 border overflow-hidden bg-black relative group/cover ${
+                            editingId === m.id && newCoverPreview ? 'border-[var(--accent)] ring-1 ring-[var(--accent)] shadow-[0_0_8px_rgba(var(--accent-rgb),0.4)]' : 'border-white/20'
+                          }`}>
                             <img
-                              src={newCoverPreview || m.cover || m.coverUrl || '/placeholder.png'}
+                              src={(editingId === m.id && newCoverPreview) ? newCoverPreview : (m.cover || m.coverUrl || '/placeholder.png')}
                               alt={`${m.title} cover`}
                               className="w-full h-full object-cover opacity-80 hover:opacity-100 transition-opacity"
                             />
                             {editingId === m.id && (
-                              <label className="absolute inset-0 bg-black/60 flex items-center justify-center cursor-pointer opacity-0 group-hover/cover:opacity-100 transition-opacity">
+                              <label className="absolute inset-0 bg-black/60 flex items-center justify-center cursor-pointer opacity-0 group-hover/cover:opacity-100 transition-opacity" title="Rasmni o'zgartirish">
                                 <ImageIcon className="w-5 h-5 text-[var(--accent)]" />
                                 <input
                                   type="file"
@@ -1383,6 +1398,9 @@ export default function Admin() {
                                   onChange={handleCoverChange}
                                 />
                               </label>
+                            )}
+                            {editingId === m.id && newCoverPreview && (
+                              <span className="absolute top-1 right-1 w-2 h-2 bg-[var(--accent)] rounded-full animate-ping" title="Yangi rasm tanlandi (saqlash kutilmoqda)" />
                             )}
                           </div>
 
