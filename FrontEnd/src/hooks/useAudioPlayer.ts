@@ -31,6 +31,17 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const countedSongIdRef = useRef<number | null>(null);
+  const songsRef = useRef(songs);
+  const indexRef = useRef(index);
+  const shuffleRef = useRef(shuffle);
+  const crossfadeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const historyRef = useRef<number[]>([]);
+  const nextRef = useRef<() => void>(() => {});
+  const prevRef = useRef<() => void>(() => {});
+
+  useEffect(() => { songsRef.current = songs; }, [songs]);
+  useEffect(() => { indexRef.current = index; }, [index]);
+  useEffect(() => { shuffleRef.current = shuffle; }, [shuffle]);
 
   // Equalizer State
   const [eq, setEq] = useState({ bass: 0, mid: 0, treble: 0 });
@@ -164,9 +175,16 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       setAudioError('AUDIO PLAYBACK FAILED. THE FILE MAY BE CORRUPTED OR UNSUPPORTED.');
     };
     const handleTimeUpdate = () => {
+      const currentSong = songsRef.current[indexRef.current];
       // 15 Second Tracking logic for Trends
-      if (audio.currentTime >= 15 && songs[index]?.id && typeof songs[index].id === 'number' && songs[index].id > 0 && countedSongIdRef.current !== songs[index].id) {
-        countedSongIdRef.current = songs[index].id as number;
+      if (
+        audio.currentTime >= 15 &&
+        currentSong?.id &&
+        typeof currentSong.id === 'number' &&
+        currentSong.id > 0 &&
+        countedSongIdRef.current !== currentSong.id
+      ) {
+        countedSongIdRef.current = currentSong.id as number;
         incrementPlayCount(countedSongIdRef.current).catch(console.error);
       }
     };
@@ -244,17 +262,25 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       audio.src = targetUrl;
       audio.load();
 
+      if (crossfadeTimerRef.current) {
+        clearInterval(crossfadeTimerRef.current);
+        crossfadeTimerRef.current = null;
+      }
+
       if (crossfade > 0 && playing) {
         audio.volume = 0;
         let fadeStep = 0;
         const fadeSteps = 10;
         const fadeInterval = (crossfade * 1000) / fadeSteps;
-        const timer = setInterval(() => {
+        crossfadeTimerRef.current = setInterval(() => {
           fadeStep++;
           if (audioRef.current) {
             audioRef.current.volume = Math.min(targetVol, (fadeStep / fadeSteps) * targetVol);
           }
-          if (fadeStep >= fadeSteps) clearInterval(timer);
+          if (fadeStep >= fadeSteps && crossfadeTimerRef.current) {
+            clearInterval(crossfadeTimerRef.current);
+            crossfadeTimerRef.current = null;
+          }
         }, fadeInterval);
       } else {
         audio.volume = targetVol;
@@ -293,6 +319,13 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
         ]
       });
     }
+
+    return () => {
+      if (crossfadeTimerRef.current) {
+        clearInterval(crossfadeTimerRef.current);
+        crossfadeTimerRef.current = null;
+      }
+    };
   }, [index, songs, playing]);
 
   // Media Session API - Action Handlers
@@ -301,12 +334,10 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       navigator.mediaSession.setActionHandler('play', () => setPlaying(true));
       navigator.mediaSession.setActionHandler('pause', () => setPlaying(false));
       navigator.mediaSession.setActionHandler('previoustrack', () => {
-        setIndex(prev => (prev === 0 ? songs.length - 1 : prev - 1));
-        setPlaying(true);
+        prevRef.current();
       });
       navigator.mediaSession.setActionHandler('nexttrack', () => {
-        setIndex(prev => (prev + 1) % songs.length);
-        setPlaying(true);
+        nextRef.current();
       });
     }
     return () => {
@@ -317,7 +348,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
         navigator.mediaSession.setActionHandler('nexttrack', null);
       }
     };
-  }, [songs.length]);
+  }, []);
 
 
   // 4. Handle End of Track
@@ -342,8 +373,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
 
       if (autoplay || repeat === 'all') {
         if (songs.length > 1 || repeat === 'all') {
-          setIndex(prev => (prev + 1) % songs.length);
-          setPlaying(true);
+          nextRef.current();
         } else {
           setPlaying(false);
         }
@@ -359,9 +389,9 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   // 5. Volume Sync
   useEffect(() => {
     if (audioRef.current) {
-      audioRef.current.volume = volume / 100;
+      audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
-  }, [volume]);
+  }, [volume, isMuted]);
 
   // 6. Sleep Timer countdown & soft fade-out
   useEffect(() => {
@@ -428,6 +458,15 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     }
   };
 
+  const getRandomIndex = (currIdx: number, total: number) => {
+    if (total <= 1) return 0;
+    let nextIdx = Math.floor(Math.random() * total);
+    if (nextIdx === currIdx) {
+      nextIdx = (nextIdx + 1) % total;
+    }
+    return nextIdx;
+  };
+
   const next = () => {
     if (songs.length === 0) return;
     // If there's something in the queue, play that first
@@ -436,6 +475,8 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       setQueue(rest);
       // Find the song in the main songs array and jump to it
       const idx = songs.findIndex(s => s.id === nextSong.id);
+      historyRef.current.push(index);
+      if (historyRef.current.length > 50) historyRef.current.shift();
       if (idx !== -1) {
         setIndex(idx);
       } else {
@@ -445,15 +486,36 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       setPlaying(true);
       return;
     }
-    setIndex(prev => (prev + 1) % songs.length);
+
+    historyRef.current.push(index);
+    if (historyRef.current.length > 50) historyRef.current.shift();
+
+    if (shuffle) {
+      setIndex(getRandomIndex(index, songs.length));
+    } else {
+      setIndex(prev => (prev + 1) % songs.length);
+    }
     setPlaying(true);
   };
 
   const prev = () => {
     if (songs.length === 0) return;
-    setIndex(prev => (prev - 1 + songs.length) % songs.length);
+    if (shuffle && historyRef.current.length > 0) {
+      const lastIdx = historyRef.current.pop()!;
+      if (lastIdx >= 0 && lastIdx < songs.length) {
+        setIndex(lastIdx);
+        setPlaying(true);
+        return;
+      }
+    }
+    setIndex(prev => (prev === 0 ? songs.length - 1 : prev - 1));
     setPlaying(true);
   };
+
+  useEffect(() => {
+    nextRef.current = next;
+    prevRef.current = prev;
+  });
 
   const setBass = (val: number) => {
     if (bassFilterRef.current) bassFilterRef.current.gain.value = val;

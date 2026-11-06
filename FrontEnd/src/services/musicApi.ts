@@ -29,13 +29,13 @@ export async function getMusicList(page = 0, pageSize = PAGE_SIZE): Promise<Song
 }
 
 /**
- * Fetch all songs from database (sorted by popularity)
+ * Fetch all songs from database
  */
-export async function getAllSongs(): Promise<Song[]> {
+export async function getAllSongs(orderBy = 'created_at', ascending = false): Promise<Song[]> {
   const { data, error } = await supabase
     .from(DB_TABLES.SONGS)
     .select('*')
-    .order('play_count', { ascending: false });
+    .order(orderBy, { ascending });
 
   if (error) {
     console.error('Error fetching all songs:', error);
@@ -50,10 +50,13 @@ export async function getAllSongs(): Promise<Song[]> {
 
 // Search songs
 export async function searchSongs(query: string): Promise<Song[]> {
+  const cleanQuery = query.replace(/[,.()]/g, ' ').trim();
+  if (!cleanQuery) return [];
+
   const { data, error } = await supabase
     .from(DB_TABLES.SONGS)
     .select('*')
-    .or(`title.ilike.%${query}%,artist.ilike.%${query}%`)
+    .or(`title.ilike.%${cleanQuery}%,artist.ilike.%${cleanQuery}%`)
     .limit(50);
 
   if (error) {

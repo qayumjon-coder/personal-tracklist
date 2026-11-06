@@ -17,19 +17,25 @@ export function AdminLogin() {
     setError('');
     setLoading(true);
 
-    const res = await login(email, password);
+    try {
+      const res = await login(email, password);
 
-    if (res.success) {
-      navigate('/admin');
-    } else {
-      setError(res.message);
-      setLoading(false);
-      // Cyberpunk shake effect
-      const box = document.getElementById('login-box');
-      if (box) {
-        box.classList.add('animate-[shake_0.5s_ease-in-out]');
-        setTimeout(() => box.classList.remove('animate-[shake_0.5s_ease-in-out]'), 500);
+      if (res.success) {
+        navigate('/admin');
+      } else {
+        setError(res.message);
+        // Cyberpunk shake effect
+        const box = document.getElementById('login-box');
+        if (box) {
+          box.classList.add('animate-[shake_0.5s_ease-in-out]');
+          setTimeout(() => box.classList.remove('animate-[shake_0.5s_ease-in-out]'), 500);
+        }
       }
+    } catch (err: any) {
+      console.error('Login error:', err);
+      setError(err?.message || 'Login failed unexpectedly. Please check your network.');
+    } finally {
+      setLoading(false);
     }
   };
 

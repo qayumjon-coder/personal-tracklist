@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { getMusicList, updateSong, deleteSong } from "../services/musicApi";
+import { getAllSongs, updateSong, deleteSong } from "../services/musicApi";
 import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, PlayCircle, Users, Clock, FileText, TrendingUp, CheckCircle, ShieldOff, ShieldCheck, Calendar, Inbox, Database } from "lucide-react";
 import { Pagination } from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
@@ -435,7 +435,7 @@ export default function Admin() {
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    getMusicList()
+    getAllSongs()
       .then((data) => {
         if (!mounted) return;
         setList(data);
@@ -553,7 +553,7 @@ export default function Admin() {
       if (newCoverPreview) {
         URL.revokeObjectURL(newCoverPreview);
       }
-      setList(prev => prev.map(p => p.id === id ? { ...updated, coverUrl: updated.cover_url } : p));
+      setList(prev => prev.map(p => p.id === id ? { ...p, ...updated, cover: updated.cover_url, coverUrl: updated.cover_url } : p));
       setEditingId(null);
       setEditForm({});
       setNewCoverFile(null);

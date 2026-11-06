@@ -198,7 +198,7 @@ export default function App() {
         <HelmetProvider>
           <MusicApp />
           <Analytics 
-            debug={true} 
+            debug={import.meta.env.DEV} 
             mode={import.meta.env.MODE === 'development' ? 'development' : 'production'} 
           />
         </HelmetProvider>

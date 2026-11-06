@@ -42,6 +42,11 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 15;
 
+  // Reset pagination to page 1 whenever the song list changes (filter, search, category)
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [songs]);
+
   const totalPages = Math.ceil(songs.length / itemsPerPage);
   const paginatedSongs = songs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 

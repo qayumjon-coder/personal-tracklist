@@ -360,7 +360,7 @@ export function BatchUploadPanel({
         setItems(prev => prev.map(it => it.id === item.id ? { ...it, status: 'uploading', errorMessage: undefined } : it));
 
         try {
-          const coverToUpload = item.coverFile || (item.coverPreviewUrl && !item.coverPreviewUrl.startsWith("blob:") ? item.coverPreviewUrl : "");
+          const coverToUpload = item.coverFile || (item.coverPreviewUrl && !item.coverPreviewUrl.startsWith("blob:") ? item.coverPreviewUrl : "/default-cover.png");
 
           await uploadSong(
             item.title.trim() || item.file.name,
