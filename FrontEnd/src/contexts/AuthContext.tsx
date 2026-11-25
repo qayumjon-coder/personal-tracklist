@@ -19,16 +19,14 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 function checkIsAdmin(session: Session | null): boolean {
   if (!session?.user) return false;
   const role = session.user.app_metadata?.role;
-  const configuredAdminEmail = (import.meta.env.VITE_ADMIN_EMAIL as string | undefined)?.trim().toLowerCase();
-
+  if (role === 'admin') return true;
   if (role && role !== 'admin') return false;
-  if (configuredAdminEmail) {
-    return (
-      role === 'admin' ||
-      session.user.email?.toLowerCase() === configuredAdminEmail
-    );
-  }
-  return true;
+
+  const configuredAdminEmail = (import.meta.env.VITE_ADMIN_EMAIL as string | undefined)?.trim().toLowerCase();
+  return Boolean(
+    configuredAdminEmail &&
+    session.user.email?.toLowerCase() === configuredAdminEmail
+  );
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

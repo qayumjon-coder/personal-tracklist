@@ -1,7 +1,23 @@
 import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
+import { HelmetProvider } from 'react-helmet-async';
+import { Toaster } from "sonner";
 import { Player } from "./components/Player";
 import { Settings } from "./components/Settings";
+import { LoadingScreen } from "./components/LoadingScreen";
+import { Terminal } from "./components/Terminal";
+import { MatrixBackground } from "./components/MatrixBackground";
+import { SystemCrash } from "./components/SystemCrash";
+import { MiniPlayer } from "./components/MiniPlayer";
+import { ProtectedRoute } from "./components/ProtectedRoute";
+import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
+import { AuthProvider } from "./contexts/AuthContext";
+import { usePlaylist } from "./hooks/usePlaylist";
+import { useLocalFiles } from "./hooks/useLocalFiles";
+import { useAudioPlayer } from "./hooks/useAudioPlayer";
+import { useRecentlyPlayed } from "./hooks/useRecentlyPlayed";
+
 // Lazy load non-critical routes to drastically reduce initial bundle size
 const Upload = lazy(() => import("./pages/Upload").then(m => ({ default: m.Upload })));
 const AdminLogin = lazy(() => import("./pages/AdminLogin").then(m => ({ default: m.AdminLogin })));
@@ -16,21 +32,6 @@ function PageFallback() {
     </div>
   );
 }
-import { usePlaylist } from "./hooks/usePlaylist";
-import { useLocalFiles } from "./hooks/useLocalFiles";
-import { useAudioPlayer } from "./hooks/useAudioPlayer";
-import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
-import { AuthProvider } from "./contexts/AuthContext";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { Analytics } from "@vercel/analytics/react";
-import { LoadingScreen } from "./components/LoadingScreen";
-import { HelmetProvider } from 'react-helmet-async';
-import { Toaster } from "sonner";
-import { Terminal } from "./components/Terminal";
-import { MatrixBackground } from "./components/MatrixBackground";
-import { SystemCrash } from "./components/SystemCrash";
-import { MiniPlayer } from "./components/MiniPlayer";
-import { useRecentlyPlayed } from "./hooks/useRecentlyPlayed";
 
 function MusicApp() {
   const { playlist, loading, error, addToPlaylist, removeFromPlaylist, removeMultipleFromPlaylist, reorderPlaylist } = usePlaylist();
@@ -64,23 +65,23 @@ function MusicApp() {
 
   const urlTrackHandledRef = useRef(false);
 
-  // Auto-play from URL ?track=ID (one-time)
+  // Auto-play from URL ?track=ID (one-time, after boot completes)
   useEffect(() => {
     if (urlTrackHandledRef.current) return;
-    if (!loading && !isScanning && combinedSongs.length > 0) {
+    if (!loading && !isScanning && !showBoot && combinedSongs.length > 0) {
       urlTrackHandledRef.current = true;
       const params = new URLSearchParams(window.location.search);
       const trackId = params.get('track');
       if (trackId) {
         const id = parseInt(trackId, 10);
         const idx = combinedSongs.findIndex(s => s.id === id);
-        if (idx !== -1 && player.index !== idx) {
+        if (idx !== -1) {
           player.selectSong(idx);
           window.history.replaceState({}, '', window.location.pathname);
         }
       }
     }
-  }, [loading, isScanning, combinedSongs, player]);
+  }, [loading, isScanning, showBoot, combinedSongs, player]);
 
   useEffect(() => {
     if (!loading) {

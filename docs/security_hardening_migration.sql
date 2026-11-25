@@ -4,34 +4,39 @@
 -- ============================================================
 
 -- 1. Admin check helper
--- Set app_metadata.role = 'admin' on your admin user OR update the fallback email below.
+-- Requires app_metadata.role = 'admin' on the admin user.
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean
 LANGUAGE sql
 STABLE
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = public
 AS $$
-  SELECT
-    coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false)
-    -- Optionally restrict by your exact admin email if app_metadata.role isn't set yet:
-    -- OR lower(coalesce(auth.jwt() ->> 'email', '')) = 'your-admin@example.com'
-  ;
+  SELECT coalesce((auth.jwt() -> 'app_metadata' ->> 'role') = 'admin', false);
 $$;
 
 -- ============================================================
 -- 2. Upload Permissions & Requests Privacy (Fix Fingerprint Leak)
 -- ============================================================
 
--- Remove overly permissive anon SELECT policies that leak other users' fingerprints
+-- Remove legacy & duplicate policies cleanly
 DROP POLICY IF EXISTS "User reads own permission" ON public.upload_permissions;
 DROP POLICY IF EXISTS "Admin grants permission" ON public.upload_permissions;
 DROP POLICY IF EXISTS "Admin revokes permission" ON public.upload_permissions;
+DROP POLICY IF EXISTS "Only admins read permissions" ON public.upload_permissions;
+DROP POLICY IF EXISTS "Only admins grant permissions" ON public.upload_permissions;
+DROP POLICY IF EXISTS "Only admins update permissions" ON public.upload_permissions;
+DROP POLICY IF EXISTS "Only admins delete permissions" ON public.upload_permissions;
+
 DROP POLICY IF EXISTS "Admin reads requests" ON public.upload_requests;
 DROP POLICY IF EXISTS "Admin updates requests" ON public.upload_requests;
 DROP POLICY IF EXISTS "Anyone can submit request" ON public.upload_requests;
+DROP POLICY IF EXISTS "Only admins read requests" ON public.upload_requests;
+DROP POLICY IF EXISTS "Only admins update requests" ON public.upload_requests;
+DROP POLICY IF EXISTS "Only admins delete requests" ON public.upload_requests;
+DROP POLICY IF EXISTS "Guests can submit bounded upload requests" ON public.upload_requests;
 
--- Only admins can query raw tables
+-- Only admins can query/manage raw permission & request tables
 CREATE POLICY "Only admins read permissions"
   ON public.upload_permissions FOR SELECT
   TO authenticated
@@ -48,6 +53,11 @@ CREATE POLICY "Only admins update permissions"
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
 
+CREATE POLICY "Only admins delete permissions"
+  ON public.upload_permissions FOR DELETE
+  TO authenticated
+  USING (public.is_admin());
+
 CREATE POLICY "Only admins read requests"
   ON public.upload_requests FOR SELECT
   TO authenticated
@@ -58,6 +68,11 @@ CREATE POLICY "Only admins update requests"
   TO authenticated
   USING (public.is_admin())
   WITH CHECK (public.is_admin());
+
+CREATE POLICY "Only admins delete requests"
+  ON public.upload_requests FOR DELETE
+  TO authenticated
+  USING (public.is_admin());
 
 -- Controlled public request insertion with length validation
 CREATE POLICY "Guests can submit bounded upload requests"
@@ -145,10 +160,16 @@ AS $$
 $$;
 
 DROP POLICY IF EXISTS "Public read songs" ON public.songs;
+DROP POLICY IF EXISTS "Public can view songs" ON public.songs;
 DROP POLICY IF EXISTS "Enable read access for all users" ON public.songs;
 DROP POLICY IF EXISTS "Admin update songs" ON public.songs;
+DROP POLICY IF EXISTS "Admins can update songs" ON public.songs;
+DROP POLICY IF EXISTS "Only admins update songs" ON public.songs;
 DROP POLICY IF EXISTS "Admin delete songs" ON public.songs;
+DROP POLICY IF EXISTS "Admins can delete songs" ON public.songs;
+DROP POLICY IF EXISTS "Only admins delete songs" ON public.songs;
 DROP POLICY IF EXISTS "Authorized insert songs" ON public.songs;
+DROP POLICY IF EXISTS "Admins or permitted uploaders can insert songs" ON public.songs;
 
 CREATE POLICY "Public read songs"
   ON public.songs FOR SELECT
@@ -174,7 +195,7 @@ CREATE POLICY "Only admins delete songs"
   USING (public.is_admin());
 
 -- ============================================================
--- 4. Storage Bucket Security (Block SVG/HTML, Enforce Limits)
+-- 4. Storage Bucket & Object Policies (Block SVG/HTML, Restrict Mutating Ops)
 -- ============================================================
 UPDATE storage.buckets
 SET
@@ -182,7 +203,41 @@ SET
   allowed_mime_types = ARRAY[
     'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/wave', 'audio/x-wav',
     'audio/flac', 'audio/x-flac', 'audio/ogg', 'audio/aac', 'audio/mp4',
-    'audio/x-m4a', 'audio/webm',
+    'audio/m4a', 'audio/x-m4a', 'audio/webm',
     'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/avif'
   ]
 WHERE id = 'music-files';
+
+DROP POLICY IF EXISTS "Public can view music files" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can update music files" ON storage.objects;
+DROP POLICY IF EXISTS "Only admins update music files" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can delete music files" ON storage.objects;
+DROP POLICY IF EXISTS "Only admins delete music files" ON storage.objects;
+DROP POLICY IF EXISTS "Allow upload to music files" ON storage.objects;
+
+CREATE POLICY "Public can view music files"
+  ON storage.objects FOR SELECT
+  TO anon, authenticated
+  USING (bucket_id = 'music-files');
+
+CREATE POLICY "Only admins update music files"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'music-files' AND public.is_admin())
+  WITH CHECK (bucket_id = 'music-files' AND public.is_admin());
+
+CREATE POLICY "Only admins delete music files"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'music-files' AND public.is_admin());
+
+CREATE POLICY "Allow upload to music files"
+  ON storage.objects FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (
+    bucket_id = 'music-files'
+    AND (
+      public.is_admin()
+      OR (storage.foldername(name))[1] = ANY (ARRAY['audio'::text, 'covers'::text])
+    )
+  );
