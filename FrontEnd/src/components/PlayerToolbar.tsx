@@ -1,8 +1,9 @@
 import { Moon, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { Song } from "../types/Song";
 import { useSoundEffects } from "../hooks/useSoundEffects";
 import { useAudioPlayer } from "../hooks/useAudioPlayer";
+import { useSettings } from "../contexts/SettingsContext";
 
 interface PlayerToolbarProps {
   player: ReturnType<typeof useAudioPlayer>;
@@ -24,8 +25,63 @@ export function PlayerToolbar({
   onOpenSearch
 }: PlayerToolbarProps) {
   const { playClick, playHover } = useSoundEffects();
+  const { t } = useSettings();
   const [isSleepTimerMenuOpen, setIsSleepTimerMenuOpen] = useState(false);
   const [isSpeedMenuOpen, setIsSpeedMenuOpen] = useState(false);
+  const [bufferedPct, setBufferedPct] = useState(0);
+  const sleepMenuRef = useRef<HTMLDivElement>(null);
+  const speedMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menus on outside click or Escape
+  useEffect(() => {
+    const handlePointerDown = (e: MouseEvent) => {
+      if (isSleepTimerMenuOpen && sleepMenuRef.current && !sleepMenuRef.current.contains(e.target as Node)) {
+        setIsSleepTimerMenuOpen(false);
+      }
+      if (isSpeedMenuOpen && speedMenuRef.current && !speedMenuRef.current.contains(e.target as Node)) {
+        setIsSpeedMenuOpen(false);
+      }
+    };
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsSleepTimerMenuOpen(false);
+        setIsSpeedMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      window.removeEventListener('keydown', handleEsc);
+    };
+  }, [isSleepTimerMenuOpen, isSpeedMenuOpen]);
+
+  // Keep buffer percentage synced reactively with audio events
+  useEffect(() => {
+    const audio = player.audioRef?.current;
+    if (!audio) return;
+    const updateBuffer = () => {
+      try {
+        if (!audio.duration || !isFinite(audio.duration) || audio.buffered.length === 0) {
+          setBufferedPct(0);
+          return;
+        }
+        const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+        setBufferedPct(Math.min(100, Math.round((bufferedEnd / audio.duration) * 100)));
+      } catch {
+        setBufferedPct(0);
+      }
+    };
+    updateBuffer();
+    audio.addEventListener('progress', updateBuffer);
+    audio.addEventListener('timeupdate', updateBuffer);
+    audio.addEventListener('loadedmetadata', updateBuffer);
+    return () => {
+      audio.removeEventListener('progress', updateBuffer);
+      audio.removeEventListener('timeupdate', updateBuffer);
+      audio.removeEventListener('loadedmetadata', updateBuffer);
+    };
+  }, [player.audioRef, current?.url]);
 
   return (
     <div className="absolute top-0 left-0 right-0 h-10 flex items-center justify-between px-4 bg-[var(--bg-main)]/80 backdrop-blur-md z-30" style={{ borderBottom: '1px solid transparent', borderImage: `linear-gradient(90deg, transparent, var(--accent), transparent) 1` }}>
@@ -46,12 +102,7 @@ export function PlayerToolbar({
       <div className="hidden lg:flex gap-6 text-[9px] font-mono tracking-[0.25em] uppercase">
         <div className="flex items-center gap-1.5">
           <span className="text-[var(--accent)] font-bold">BUFR:</span>
-          <span className="text-white/90 font-bold font-mono tracking-wider">{(() => {
-            const audio = player.audioRef?.current;
-            if (!audio || !audio.duration || audio.buffered.length === 0) return '0%';
-            const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
-            return `${Math.round((bufferedEnd / audio.duration) * 100)}%`;
-          })()}</span>
+          <span className="text-white/90 font-bold font-mono tracking-wider">{bufferedPct}%</span>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="text-[var(--accent)] font-bold">RATE:</span>
@@ -80,7 +131,7 @@ export function PlayerToolbar({
       {/* Controls */}
       <div className="flex items-center gap-1 sm:gap-2">
         {/* Sleep Timer */}
-        <div className="relative">
+        <div className="relative" ref={sleepMenuRef}>
           <button
             onClick={() => { playClick(); setIsSleepTimerMenuOpen(!isSleepTimerMenuOpen); }}
             onMouseEnter={playHover}
@@ -93,7 +144,7 @@ export function PlayerToolbar({
                 ? 'END'
                 : player.sleepTimerSeconds !== null && player.sleepTimerSeconds !== undefined
                 ? `${Math.floor(player.sleepTimerSeconds / 60)}:${(player.sleepTimerSeconds % 60).toString().padStart(2, '0')}`
-                : player.sleepTimer ? `${player.sleepTimer}M` : 'Sleep'}
+                : player.sleepTimer ? `${player.sleepTimer}M` : t('sleep')}
             </span>
           </button>
 
@@ -154,7 +205,7 @@ export function PlayerToolbar({
                     onClick={() => { playClick(); player.setSleepTimer(null); setIsSleepTimerMenuOpen(false); }}
                     className="w-full text-center py-1.5 text-[8px] uppercase tracking-wider bg-red-500/10 hover:bg-red-500/25 border border-red-500/30 text-red-400 transition-colors"
                   >
-                    Cancel Timer
+                    {t('cancel_timer')}
                   </button>
                 </div>
               ) : (
@@ -164,7 +215,7 @@ export function PlayerToolbar({
                     onClick={() => { playClick(); player.setSleepTimer('end-of-track'); setIsSleepTimerMenuOpen(false); }}
                     className="w-full text-left px-2 py-1.5 text-[8px] uppercase tracking-wider hover:bg-[var(--accent)]/15 border border-transparent hover:border-[var(--accent)]/40 text-[var(--accent)] transition-all flex items-center justify-between"
                   >
-                    <span>End of Track</span>
+                    <span>{t('end_of_track')}</span>
                     <span className="text-[7px] text-[var(--text-secondary)]">1 SONG</span>
                   </button>
 
@@ -193,13 +244,13 @@ export function PlayerToolbar({
           title="Config"
         >
           <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">[</span>
-          <span className="mx-1 hidden sm:inline">Config</span>
+          <span className="mx-1 hidden sm:inline">{t('config')}</span>
           <span className="opacity-60 group-hover:opacity-100 hidden sm:inline">]</span>
           <span className="sm:hidden font-mono tracking-widest text-xs">⚙</span>
         </button>
 
         {/* Playback Speed */}
-        <div className="relative">
+        <div className="relative" ref={speedMenuRef}>
           <button
             onClick={() => { playClick(); setIsSpeedMenuOpen(!isSpeedMenuOpen); }}
             onMouseEnter={playHover}
@@ -244,7 +295,7 @@ export function PlayerToolbar({
           title="Search (Ctrl+K)"
         >
           <Search size={12} className="sm:w-3 sm:h-3 shrink-0" />
-          <span className="hidden sm:inline">Search</span>
+          <span className="hidden sm:inline">{t('search')}</span>
           <span className="hidden lg:inline kbd">Ctrl+K</span>
         </button>
       </div>

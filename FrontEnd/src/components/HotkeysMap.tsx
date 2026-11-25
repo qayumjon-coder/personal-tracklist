@@ -11,9 +11,12 @@ const hotkeys = [
   { key: '→ / ←', action: 'Next / Prev Track' },
   { key: '↑ / ↓', action: 'Volume Up / Down' },
   { key: 'M', action: 'Toggle Mute' },
-  { key: 'F', action: 'Search Database' },
+  { key: 'S', action: 'Toggle Shuffle' },
+  { key: 'R', action: 'Cycle Repeat Mode' },
+  { key: 'Z', action: 'Toggle Zen Mode' },
+  { key: 'F / Ctrl+K', action: 'Search Database' },
   { key: 'Ctrl + `', action: 'Open Terminal' },
-  { key: 'H', action: 'Toggle Hotkeys Map' },
+  { key: 'H / ?', action: 'Toggle Hotkeys Map' },
   { key: 'Esc', action: 'Close Modals / Exit Zen' },
 ];
 
@@ -23,7 +26,7 @@ export function HotkeysMap({ isOpen, onClose }: HotkeysMapProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div role="dialog" aria-modal="true" aria-label="Keyboard shortcuts" className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-md animate-in fade-in duration-300"

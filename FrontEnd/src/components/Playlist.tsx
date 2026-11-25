@@ -7,7 +7,7 @@ import type { DropResult } from "@hello-pangea/dnd";
 import { Trash2, MoreVertical, Check, Square, CheckSquare2, X, LayoutGrid, List, FolderPlus, Disc, GripVertical, Download, WifiOff, ListPlus } from "lucide-react";
 import { ConfirmDeleteModal } from "./ConfirmDeleteModal";
 import { Pagination } from "./Pagination";
-import { updateSong } from "../services/musicApi";
+import { sanitizeM3uLine } from "../utils/security";
 
 interface PlaylistProps {
   songs: Song[];
@@ -50,31 +50,26 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
   const totalPages = Math.ceil(songs.length / itemsPerPage);
   const paginatedSongs = songs.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  // Auto-heal missing track durations
+  // Auto-heal missing track durations locally in UI state (never mutate DB from public player)
   const [dynamicDurations, setDynamicDurations] = useState<Record<number, number>>({});
   const fetchedDurations = useRef<Set<number>>(new Set());
 
   useEffect(() => {
-    songs.forEach(song => {
-      // If the song has no duration and hasn't been fetched yet
-      if (!song.duration && song.url && !fetchedDurations.current.has(song.id)) {
-        fetchedDurations.current.add(song.id);
-        const audio = new Audio(song.url);
-        audio.onloadedmetadata = () => {
-          if (audio.duration && isFinite(audio.duration)) {
-            setDynamicDurations(prev => ({ ...prev, [song.id]: audio.duration }));
-            updateSong(song.id, { duration: audio.duration }).catch(console.error);
-          }
-          // Cleanup to prevent memory leaks
-          audio.src = '';
-          audio.remove();
-        };
-        audio.onerror = () => {
-          console.warn("Failed to load metadata for track ID:", song.id);
-          audio.src = '';
-          audio.remove();
-        };
-      }
+    const missing = songs.filter(song => !song.duration && song.url && !fetchedDurations.current.has(song.id));
+    missing.slice(0, 5).forEach(song => {
+      fetchedDurations.current.add(song.id);
+      const audio = new Audio(song.url);
+      audio.onloadedmetadata = () => {
+        if (audio.duration && isFinite(audio.duration)) {
+          setDynamicDurations(prev => ({ ...prev, [song.id]: audio.duration }));
+        }
+        audio.src = '';
+        audio.remove();
+      };
+      audio.onerror = () => {
+        audio.src = '';
+        audio.remove();
+      };
     });
   }, [songs]);
 
@@ -89,14 +84,26 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Auto-scroll to active song
+  // Sync pagination & auto-scroll when active song changes
   useEffect(() => {
-    if (currentSong && scrollContainerRef.current) {
-      const activeEl = scrollContainerRef.current.querySelector('[data-active="true"]');
-      if (activeEl) {
-        activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (!currentSong) return;
+    const idx = songs.findIndex(s => s.id === currentSong.id);
+    if (idx !== -1) {
+      const targetPage = Math.floor(idx / itemsPerPage) + 1;
+      if (targetPage !== currentPage) {
+        setCurrentPage(targetPage);
       }
     }
+    const timer = setTimeout(() => {
+      if (scrollContainerRef.current) {
+        const activeEl = scrollContainerRef.current.querySelector('[data-active="true"]');
+        if (activeEl) {
+          activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }
+    }, 60);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentSong?.id]);
 
   const toggleSelect = (id: number) => {
@@ -171,7 +178,7 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
       mimeType = 'application/json';
       ext = 'json';
     } else {
-      content = '#EXTM3U\n' + songs.map(s => `#EXTINF:${Math.round(s.duration || 0)},${s.artist || 'Unknown'} - ${s.title}\n${s.url}`).join('\n');
+      content = '#EXTM3U\n' + songs.map(s => `#EXTINF:${Math.round(s.duration || 0)},${sanitizeM3uLine(s.artist || 'Unknown')} - ${sanitizeM3uLine(s.title)}\n${sanitizeM3uLine(s.url)}`).join('\n');
       mimeType = 'audio/x-mpegurl';
       ext = 'm3u';
     }
@@ -327,27 +334,46 @@ export function Playlist({ songs, currentSong, onSelectSong, onRemove, onBulkRem
                         {/* More Actions Toggle */}
                         <div className="absolute right-2 top-2 z-20" ref={isMenuOpen ? menuRef : null}>
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               playClick();
                               setActiveMenuId(isMenuOpen ? null : song.id);
                             }}
-                            className={`p-1 bg-black/60 rounded-sm backdrop-blur-sm transition-colors ${isMenuOpen ? 'text-[var(--accent)]' : 'text-white/50 hover:text-[var(--accent)] opacity-0 group-hover/item:opacity-100'}`}
+                            aria-label={`Actions for ${song.title}`}
+                            className={`p-1 bg-black/70 backdrop-blur-sm transition-colors ${isMenuOpen ? 'text-[var(--accent)]' : 'text-white/75 hover:text-[var(--accent)] opacity-80 sm:opacity-0 sm:group-hover/item:opacity-100 focus:opacity-100'}`}
                           >
                             <MoreVertical size={14} />
                           </button>
 
                           {/* Dropdown Menu */}
                           {isMenuOpen && (
-                            <div className="absolute right-0 top-full mt-1 w-32 bg-[var(--bg-main)] border border-[var(--text-secondary)]/30 z-50 shadow-2xl animate-in fade-in zoom-in-95 duration-200 backdrop-blur-xl">
+                            <div className="absolute right-0 top-full mt-1 w-36 bg-[var(--bg-main)] border border-[var(--text-secondary)]/30 z-50 shadow-2xl animate-in fade-in zoom-in-95 duration-200 backdrop-blur-xl">
                               <button
+                                type="button"
                                 onClick={(e) => { e.stopPropagation(); toggleSelect(song.id); }}
                                 className="w-full flex items-center gap-3 px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors border-b border-[var(--text-secondary)]/10"
                               >
                                 <Check size={12} />
                                 <span>{isSelected ? 'Unselect' : 'Select'}</span>
                               </button>
+                              {onAddToQueue && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    playClick();
+                                    onAddToQueue(song);
+                                    setActiveMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2 text-[10px] font-mono uppercase tracking-wider text-[var(--text-secondary)] hover:text-[var(--accent)] hover:bg-[var(--accent)]/10 transition-colors border-b border-[var(--text-secondary)]/10"
+                                >
+                                  <ListPlus size={12} />
+                                  <span>Add to Queue</span>
+                                </button>
+                              )}
                               <button
+                                type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   playClick();

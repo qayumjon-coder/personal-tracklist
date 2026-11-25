@@ -162,7 +162,7 @@ export function MiniPlayer({
     <div className="fixed bottom-4 right-4 z-[95] font-mono">
       {/* Persistent Outer Card with Smooth Vertical Expansion Animation */}
       <div
-        className="bg-black/95 border border-[var(--accent)] text-white backdrop-blur-2xl shadow-[0_0_40px_rgba(0,0,0,0.9),0_0_25px_rgba(var(--accent-rgb),0.25)] w-[360px] sm:w-[420px] relative overflow-hidden transition-[height,box-shadow,border-color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
+        className="bg-black/95 border border-[var(--accent)] text-white backdrop-blur-2xl shadow-[0_0_40px_rgba(0,0,0,0.9),0_0_25px_rgba(var(--accent-rgb),0.25)] w-[min(360px,calc(100vw-2rem))] sm:w-[420px] relative overflow-hidden transition-[height,box-shadow,border-color] duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]"
         style={{
           height: isExpanded ? '435px' : '62px'
         }}
@@ -273,7 +273,16 @@ export function MiniPlayer({
                   onMouseLeave={() => setIsVolumeHovered(false)}
                 >
                   <button
-                    onClick={() => { playClick(); onToggleMute(); }}
+                    type="button"
+                    onClick={() => {
+                      playClick();
+                      // On touch/coarse pointers, first tap expands slider if closed, second tap toggles mute
+                      if (window.matchMedia?.('(hover: none)').matches && !isVolumeHovered) {
+                        setIsVolumeHovered(true);
+                      } else {
+                        onToggleMute();
+                      }
+                    }}
                     className={`w-7 h-7 flex items-center justify-center border transition-colors ${
                       isMuted || effectiveVolume === 0
                         ? 'border-[var(--danger)] text-[var(--danger)] bg-[var(--danger)]/10'
@@ -281,7 +290,8 @@ export function MiniPlayer({
                         ? 'border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10'
                         : 'border-white/20 bg-black/60 text-white/80 hover:border-[var(--accent)] hover:text-[var(--accent)]'
                     }`}
-                    title={isMuted ? "Unmute" : `Volume: ${volume}% (Scroll/Hover to adjust)`}
+                    title={isMuted ? "Unmute" : `Volume: ${volume}%`}
+                    aria-label={isMuted ? "Unmute" : "Mute / Adjust volume"}
                   >
                     {isMuted || effectiveVolume === 0 ? <VolumeX size={13} /> : effectiveVolume < 50 ? <Volume1 size={13} /> : <Volume2 size={13} />}
                   </button>

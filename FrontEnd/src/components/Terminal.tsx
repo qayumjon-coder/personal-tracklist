@@ -36,7 +36,16 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
   
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const keystrokeCtxRef = useRef<AudioContext | null>(null);
   const { setTheme, setVisualizerMode, zenMode, setZenMode, matrixBg, setMatrixBg } = useSettings();
+
+  useEffect(() => {
+    return () => {
+      if (keystrokeCtxRef.current && keystrokeCtxRef.current.state !== 'closed') {
+        keystrokeCtxRef.current.close().catch(() => {});
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (isVisible) {
@@ -223,11 +232,18 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
 
   const playKeystroke = () => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (!keystrokeCtxRef.current || keystrokeCtxRef.current.state === 'closed') {
+        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        keystrokeCtxRef.current = new AudioContextClass();
+      }
+      const audioCtx = keystrokeCtxRef.current;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
+      }
       const oscillator = audioCtx.createOscillator();
       const gainNode = audioCtx.createGain();
       oscillator.type = 'square';
-      oscillator.frequency.setValueAtTime(100 + Math.random() * 50, audioCtx.currentTime); // Slight randomization for realism
+      oscillator.frequency.setValueAtTime(100 + Math.random() * 50, audioCtx.currentTime);
       oscillator.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.05);
       gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
@@ -235,7 +251,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
       gainNode.connect(audioCtx.destination);
       oscillator.start();
       oscillator.stop(audioCtx.currentTime + 0.05);
-    } catch(e) {}
+    } catch {}
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

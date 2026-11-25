@@ -1,5 +1,5 @@
 import { Activity } from 'lucide-react';
-import { useRef, useCallback, useState } from 'react';
+import { useRef, useCallback, useState, useEffect } from 'react';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 import type { AudioEffect } from '../hooks/useAudioPlayer';
 
@@ -60,11 +60,29 @@ function VerticalSlider({ label, value, setter, playClick }: SliderBand & { play
       {/* Slider track area */}
       <div
         ref={trackRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={`${label} gain`}
+        aria-valuemin={-12}
+        aria-valuemax={12}
+        aria-valuenow={value}
         className="relative flex-1 w-8 cursor-pointer"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={onPointerUp}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
+            e.preventDefault();
+            setter(clamp(value + 1, -12, 12));
+          } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
+            e.preventDefault();
+            setter(clamp(value - 1, -12, 12));
+          } else if (e.key === '0' || e.key === 'Home') {
+            e.preventDefault();
+            setter(0);
+          }
+        }}
       >
         {/* Track line */}
         <div className="absolute left-1/2 top-0 bottom-0 w-[2px] -translate-x-1/2 bg-[var(--text-secondary)]/20" />
@@ -114,6 +132,14 @@ export function EqualizerPanel({ eq, setBass, setMid, setTreble, activeEffect, s
   const { playClick, playHover } = useSoundEffects();
   const [activeTab, setActiveTab] = useState<'eq' | 'fx'>('eq');
 
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
+
   const bands: SliderBand[] = [
     { label: 'BASS', value: eq.bass, setter: setBass },
     { label: 'MID',  value: eq.mid,  setter: setMid  },
@@ -142,7 +168,13 @@ export function EqualizerPanel({ eq, setBass, setMid, setTreble, activeEffect, s
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Neural Audio Equalizer"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div className="cyber-panel p-5 sm:p-6 w-full max-w-md flex flex-col gap-4 shadow-[0_0_50px_rgba(0,0,0,0.8)] border border-[var(--accent)]/30">
 
         {/* Header */}

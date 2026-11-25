@@ -14,10 +14,9 @@ export function useSoundEffects() {
 
     const playHover = useCallback(() => {
         if (!soundEnabled) return;
-        initContext();
         const ctx = audioContextRef.current;
-        if (!ctx) return;
-        if (ctx.state === 'suspended') ctx.resume();
+        // Skip before first user gesture to avoid browser autoplay policy warnings
+        if (!ctx || ctx.state !== 'running') return;
 
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -34,7 +33,7 @@ export function useSoundEffects() {
 
         osc.start();
         osc.stop(ctx.currentTime + 0.05);
-    }, [initContext, soundEnabled]);
+    }, [soundEnabled]);
 
     const playClick = useCallback(() => {
         if (!soundEnabled) return;

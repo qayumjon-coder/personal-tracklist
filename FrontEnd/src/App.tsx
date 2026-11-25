@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, lazy, Suspense } from "react";
+import { useState, useMemo, useEffect, useRef, lazy, Suspense } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { Player } from "./components/Player";
 import { Settings } from "./components/Settings";
@@ -22,7 +22,7 @@ import { useAudioPlayer } from "./hooks/useAudioPlayer";
 import { SettingsProvider, useSettings } from "./contexts/SettingsContext";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
-import { Analytics } from "@vercel/analytics/react"
+import { Analytics } from "@vercel/analytics/react";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { HelmetProvider } from 'react-helmet-async';
 import { Toaster } from "sonner";
@@ -51,7 +51,6 @@ function MusicApp() {
   // Global Terminal Shortcut
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      // Ctrl + ` (Backtick) or just ` depending on preference. Let's use Ctrl + `
       if (e.ctrlKey && e.key === '`') {
         e.preventDefault();
         if (window.innerWidth > 768 && !systemCrashed) {
@@ -63,9 +62,13 @@ function MusicApp() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [systemCrashed]);
 
-  // Auto-play from URL ?track=ID
+  const urlTrackHandledRef = useRef(false);
+
+  // Auto-play from URL ?track=ID (one-time)
   useEffect(() => {
+    if (urlTrackHandledRef.current) return;
     if (!loading && !isScanning && combinedSongs.length > 0) {
+      urlTrackHandledRef.current = true;
       const params = new URLSearchParams(window.location.search);
       const trackId = params.get('track');
       if (trackId) {
@@ -73,16 +76,15 @@ function MusicApp() {
         const idx = combinedSongs.findIndex(s => s.id === id);
         if (idx !== -1 && player.index !== idx) {
           player.selectSong(idx);
-          // Optional: Remove query from URL so refresh doesn't loop
           window.history.replaceState({}, '', window.location.pathname);
         }
       }
     }
-  }, [loading, isScanning, combinedSongs.length]);
+  }, [loading, isScanning, combinedSongs, player]);
 
   useEffect(() => {
     if (!loading) {
-      const timer = setTimeout(() => setShowBoot(false), 2500);
+      const timer = setTimeout(() => setShowBoot(false), 1500);
       return () => clearTimeout(timer);
     }
   }, [loading]);
@@ -106,14 +108,14 @@ function MusicApp() {
 
   const handleBulkRemove = (ids: number[]) => {
     const localIds = ids.filter(id => id < 0);
-    const globalIds = ids.filter(id => id > 0);
+    const globalIds = ids.filter(id => id >= 0);
     localIds.forEach(removeLocalFile);
     if (globalIds.length > 0) {
        removeMultipleFromPlaylist(globalIds);
     }
   };
 
-  if (showBoot) return <LoadingScreen />;
+  if (showBoot) return <LoadingScreen onSkip={() => setShowBoot(false)} />;
 
   if (systemCrashed) {
     return <SystemCrash />;
@@ -133,7 +135,7 @@ function MusicApp() {
             songs={combinedSongs} 
             onSystemCrash={() => {
               setSystemCrashed(true);
-              player.pause(); // stop music immediately on crash
+              player.pause();
             }}
           />
           <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

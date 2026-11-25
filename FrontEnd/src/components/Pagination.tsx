@@ -63,7 +63,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
               key={page}
               onClick={() => onPageChange(page as number)}
               className={`w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded text-xs font-mono font-medium transition-all shrink-0 ${isCurrent
-                ? 'bg-cyan-500/20 text-cyan-400 border border-cyan-400/50 shadow-[0_0_12px_rgba(34,211,238,0.25)]'
+                ? 'bg-[var(--accent)]/20 text-[var(--accent)] border border-[var(--accent)]/60 shadow-[0_0_12px_rgba(var(--accent-rgb),0.25)]'
                 : 'bg-white/5 text-white/70 border border-white/10 hover:bg-white/10 hover:text-white'
                 }`}
             >

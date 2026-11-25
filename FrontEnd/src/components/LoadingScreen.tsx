@@ -1,7 +1,11 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSoundEffects } from '../hooks/useSoundEffects';
 
-export function LoadingScreen() {
+interface LoadingScreenProps {
+  onSkip?: () => void;
+}
+
+export function LoadingScreen({ onSkip }: LoadingScreenProps) {
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const { playClick, playStartup, playScan } = useSoundEffects();
@@ -30,9 +34,8 @@ export function LoadingScreen() {
     const interval = setInterval(() => {
       if (currentLog < bootLogs.length) {
         setLogs(prev => [...prev.slice(-3), `> ${bootLogs[currentLog]}`]);
-        setProgress(Math.min(100, (currentLog + 1) * 15));
+        setProgress(Math.min(100, Math.round(((currentLog + 1) / bootLogs.length) * 100)));
         
-        // Use refs so sound functions are never stale
         if (interactedRef.current && currentLog < bootLogs.length - 1) {
            playScanRef.current();
         } else if (interactedRef.current && currentLog === bootLogs.length - 1) {
@@ -43,13 +46,12 @@ export function LoadingScreen() {
       } else {
         setProgress(100);
         bootFinishedRef.current = true;
-        // If user already interacted but boot finished before their tap, play now
         if (interactedRef.current) {
           playStartupRef.current();
         }
         clearInterval(interval);
       }
-    }, 400);
+    }, 200);
 
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -61,11 +63,9 @@ export function LoadingScreen() {
       interactedRef.current = true;
       
       if (bootFinishedRef.current) {
-        // Boot already done — play startup immediately
         playStartupRef.current();
       } else {
-        // Wake up AudioContext on first gesture
-        playClick(); 
+        playClick();
       }
     }
   };
@@ -81,6 +81,20 @@ export function LoadingScreen() {
         </div>
       )}
 
+      {onSkip && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSkip();
+          }}
+          className="absolute bottom-8 right-8 px-3 py-1.5 border border-[var(--accent)]/40 text-[var(--accent)]/80 hover:bg-[var(--accent)] hover:text-black text-[10px] font-mono uppercase tracking-widest transition-all"
+          aria-label="Skip boot screen"
+        >
+          [ SKIP &gt;&gt; ]
+        </button>
+      )}
+
       {/* Logo / Brand */}
       <div className="relative z-10 mb-12 text-center">
         <div className="text-[40px] font-black tracking-[0.3em] uppercase text-[var(--accent)] text-glow" style={{ fontFamily: 'Fira Code, monospace' }}>
@@ -91,25 +105,24 @@ export function LoadingScreen() {
       
       <div className="w-72 space-y-4 relative z-10">
         <div className="flex justify-between text-[10px] text-[var(--accent)] tracking-widest">
-            <span>SYS_BOOT_REv.5.0</span>
+            <span>SYS_BOOT_REV.5.0</span>
             <span>{progress}%</span>
         </div>
         
         <div className="h-[2px] w-full bg-white/5 relative overflow-hidden">
             <div 
-                className="absolute inset-y-0 left-0 bg-[var(--accent)] transition-all duration-300 shadow-[0_0_10px_var(--accent)]"
+                className="absolute inset-y-0 left-0 bg-[var(--accent)] transition-all duration-200 shadow-[0_0_10px_var(--accent)]"
                 style={{ width: `${progress}%` }}
             />
-            {/* Shimmer */}
             <div
-              className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent transition-all duration-300"
+              className="absolute inset-y-0 w-20 bg-gradient-to-r from-transparent via-white/30 to-transparent transition-all duration-200"
               style={{ left: `calc(${progress}% - 40px)` }}
             />
         </div>
 
         <div className="flex flex-col gap-1 min-h-[60px]">
             {logs.map((log, i) => (
-                <div key={i} className={`text-[8px] uppercase tracking-tighter transition-opacity duration-300 ${i === logs.length - 1 ? 'text-[var(--accent)] opacity-100' : 'text-[var(--accent)]/40 opacity-60'}`}>
+                <div key={i} className={`text-[9px] uppercase tracking-tighter transition-opacity duration-200 ${i === logs.length - 1 ? 'text-[var(--accent)] opacity-100' : 'text-[var(--accent)]/50 opacity-70'}`}>
                     {log}
                 </div>
             ))}

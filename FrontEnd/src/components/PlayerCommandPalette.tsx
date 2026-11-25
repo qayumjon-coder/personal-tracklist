@@ -14,6 +14,7 @@ import {
 import type { Song } from "../types/Song";
 import { getAllSongs } from "../services/musicApi";
 import { toast } from "sonner";
+import { useSettings } from "../contexts/SettingsContext";
 
 export interface PlayerCommandPaletteProps {
   isOpen: boolean;
@@ -44,6 +45,7 @@ export function PlayerCommandPalette({
   onAddToPlaylist,
   onRemoveFromPlaylist,
 }: PlayerCommandPaletteProps) {
+  const { t } = useSettings();
   const [query, setQuery] = useState("");
   const [durationFilter, setDurationFilter] = useState<'all' | 'short' | 'medium' | 'long'>('all');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -194,6 +196,9 @@ export function PlayerCommandPalette({
 
   return createPortal(
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command Palette Search"
       className="fixed inset-0 z-[120] flex items-start justify-center pt-10 sm:pt-20 px-3 sm:px-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
       onClick={e => {
         if (e.target === e.currentTarget) onClose();
@@ -211,7 +216,7 @@ export function PlayerCommandPalette({
             type="text"
             value={query}
             onChange={e => setQuery(e.target.value)}
-            placeholder="Musiqa, ijrochi yoki janr..."
+            placeholder={t('cmd_placeholder')}
             className="w-full bg-transparent text-sm sm:text-base text-white placeholder-white/40 border-0 border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 font-mono font-medium tracking-wide shadow-none focus:shadow-none focus-visible:shadow-none"
             style={{ outline: 'none', boxShadow: 'none' }}
           />
@@ -225,19 +230,21 @@ export function PlayerCommandPalette({
               <X size={16} />
             </button>
           )}
-          <kbd 
+          <button
+            type="button"
             onClick={onClose}
-            className="px-2 py-1 text-[10px] bg-white/10 hover:bg-white/20 text-white/70 border border-white/20 rounded cursor-pointer transition-colors shrink-0"
+            aria-label="Close search"
+            className="px-2 py-1 text-[10px] bg-white/10 hover:bg-white/20 text-white/70 border border-white/20 cursor-pointer transition-colors shrink-0"
           >
             ESC
-          </kbd>
+          </button>
         </div>
 
         {/* Filter Chips Bar + Source Scope Selector */}
         <div className="px-3 sm:px-4 py-1.5 bg-[rgba(var(--accent-rgb),0.06)] border-b border-white/5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[var(--text-secondary)]">
           {/* Duration Filters */}
           <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">Vaqt:</span>
+            <span className="text-[9px] text-white/40 uppercase tracking-widest font-bold">{t('cmd_time')}</span>
             {(['all', 'short', 'medium', 'long'] as const).map(d => (
               <button
                 key={d}
@@ -249,7 +256,7 @@ export function PlayerCommandPalette({
                     : 'border-white/10 text-white/60 hover:border-white/30 hover:text-white'
                 }`}
               >
-                {d === 'all' ? 'Hammasi' : d === 'short' ? '< 2m' : d === 'medium' ? '2-5m' : '> 5m'}
+                {d === 'all' ? t('cmd_time_all') : d === 'short' ? t('cmd_time_short') : d === 'medium' ? t('cmd_time_medium') : t('cmd_time_long')}
               </button>
             ))}
           </div>
@@ -266,9 +273,8 @@ export function PlayerCommandPalette({
                       ? 'bg-[var(--accent)] text-black shadow-sm'
                       : 'text-white/60 hover:text-white'
                   }`}
-                  title="Shaxsiy pleylistim"
                 >
-                  Pleylist ({songs.length})
+                  {t('cmd_source_playlist')} ({songs.length})
                 </button>
                 <button
                   type="button"
@@ -278,14 +284,13 @@ export function PlayerCommandPalette({
                       ? 'bg-[var(--accent)] text-black shadow-sm'
                       : 'text-white/60 hover:text-white'
                   }`}
-                  title="Barcha musiqa bazasi"
                 >
-                  Baza ({dbSongs.length || '...'})
+                  {t('cmd_source_db')} ({dbSongs.length || '...'})
                 </button>
               </div>
             ) : (
               <span className="text-[9px] font-mono text-[var(--accent)] font-bold tracking-wider uppercase">
-                Baza ({dbSongs.length || '...'})
+                {t('cmd_source_db')} ({dbSongs.length || '...'})
               </span>
             )}
           </div>
@@ -506,7 +511,7 @@ export function PlayerCommandPalette({
           {query.trim() && searchResults.length === 0 && (
             <div className="py-12 text-center text-sm text-[var(--text-secondary)] font-mono">
               <Search className="w-8 h-8 mx-auto mb-2 text-white/20" />
-              &quot;{query}&quot; bo&apos;yicha hech qanday trek topilmadi
+              {t('cmd_no_results')}
               {effectiveScope === 'playlist' && (
                 <div className="mt-3">
                   <button
@@ -514,7 +519,7 @@ export function PlayerCommandPalette({
                     onClick={() => setScope('database')}
                     className="px-3 py-1.5 bg-[var(--accent)]/15 border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--accent)] hover:text-black text-xs font-bold transition-all uppercase"
                   >
-                    Butun bazadan qidirish
+                    {t('cmd_source_db')}
                   </button>
                 </div>
               )}
@@ -525,9 +530,9 @@ export function PlayerCommandPalette({
         {/* Modal Footer */}
         <div className="px-4 py-2 border-t border-white/10 bg-black/60 flex items-center justify-between text-[10px] text-white/40 font-mono">
           <div className="flex items-center gap-3">
-            <span><kbd className="px-1 py-0.2 bg-white/10 text-white/70">↑↓</kbd> Tanlash</span>
-            <span><kbd className="px-1 py-0.2 bg-white/10 text-white/70">Enter</kbd> Ijro</span>
-            <span><kbd className="px-1 py-0.2 bg-white/10 text-white/70">ESC</kbd> Yopish</span>
+            <span><kbd className="px-1 py-0.2 bg-white/10 text-white/70">↑↓</kbd> {t('cmd_footer_nav')}</span>
+            <span><kbd className="px-1 py-0.2 bg-white/10 text-white/70">Enter</kbd> {t('cmd_footer_play')}</span>
+            <span><kbd className="px-1 py-0.2 bg-white/10 text-white/70">ESC</kbd> {t('cmd_footer_close')}</span>
           </div>
 
           <span className="text-[var(--accent)]/50 text-[9px] uppercase tracking-wider hidden sm:inline">

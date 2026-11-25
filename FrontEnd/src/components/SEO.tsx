@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
+import { sanitizeMediaUrl } from '../utils/security';
 
 interface SEOProps {
   title?: string;
@@ -9,54 +10,53 @@ interface SEOProps {
   url?: string;
 }
 
-const SEO: React.FC<SEOProps> = ({ 
-  title = 'Fronto - Cyber Music Player', 
+const SEO: React.FC<SEOProps> = ({
+  title = 'Fronto - Cyber Music Player',
   description = 'Experience music in a futuristic cyberpunk interface with Fronto.',
   keywords = 'music player, cyberpunk, audio, playlist, frontend',
   image = '/PTracklist.png',
-  url = window.location.href
+  url,
 }) => {
+  const safeOrigin = typeof window !== 'undefined' ? window.location.origin : '';
+  const safeUrl = sanitizeMediaUrl(url) || (typeof window !== 'undefined' ? window.location.href : '');
+  const safeImage = sanitizeMediaUrl(image) || '/PTracklist.png';
   const siteTitle = title;
 
   useEffect(() => {
     document.title = siteTitle;
   }, [siteTitle]);
 
+  const jsonLd = JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Fronto",
+    "url": safeOrigin,
+    "description": description,
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Web",
+    "image": safeImage,
+  }).replace(/</g, '\\u003c');
+
   return (
     <Helmet>
-      {/* Standard metadata tags */}
       <title>{siteTitle}</title>
-      <meta name='description' content={description} />
-      <meta name='keywords' content={keywords} />
+      <meta name="description" content={description} />
+      <meta name="keywords" content={keywords} />
 
-      {/* Open Graph tags */}
-      <meta property='og:type' content='website' />
-      <meta property='og:title' content={siteTitle} />
-      <meta property='og:description' content={description} />
-      <meta property='og:image' content={image} />
-      <meta property='og:url' content={url} />
+      <meta property="og:type" content="website" />
+      <meta property="og:title" content={siteTitle} />
+      <meta property="og:description" content={description} />
+      <meta property="og:image" content={safeImage} />
+      {safeUrl && <meta property="og:url" content={safeUrl} />}
 
-      {/* Twitter tags */}
-      <meta name='twitter:card' content='summary_large_image' />
-      <meta name='twitter:title' content={siteTitle} />
-      <meta name='twitter:description' content={description} />
-      <meta name='twitter:image' content={image} />
-      
-      {/* Structured Data */}
-      <script type="application/ld+json">
-        {JSON.stringify({
-          "@context": "https://schema.org",
-          "@type": "WebApplication",
-          "name": "Fronto",
-          "url": window.location.origin,
-          "description": description,
-          "applicationCategory": "MultimediaApplication",
-          "operatingSystem": "Web",
-          "image": image
-        })}
-      </script>
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={siteTitle} />
+      <meta name="twitter:description" content={description} />
+      <meta name="twitter:image" content={safeImage} />
 
-      <link rel="canonical" href={url} />
+      <script type="application/ld+json">{jsonLd}</script>
+
+      {safeUrl && <link rel="canonical" href={safeUrl} />}
     </Helmet>
   );
 };

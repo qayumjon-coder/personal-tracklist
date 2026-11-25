@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from "react";
 import { Search, X, Filter, Flame, Heart, Clock, ListMusic } from "lucide-react";
+import { useSettings } from "../contexts/SettingsContext";
 
 export interface CyberCategoryDropdownProps {
   categories: string[];
@@ -20,6 +21,7 @@ export function CyberCategoryDropdown({
   className = "",
   align = 'right',
 }: CyberCategoryDropdownProps) {
+  const { t } = useSettings();
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -64,15 +66,15 @@ export function CyberCategoryDropdown({
   // Special system presets
   const systemPresets = useMemo(() => {
     const list = [
-      { id: "All", label: "BARCHA TREKLAR", icon: Filter, count: totalSongs || categoryCounts["All"] || 0 },
-      { id: "Trending", label: "TRENDING", icon: Flame, count: categoryCounts["Trending"] || 0 },
-      { id: "Favorites", label: "SEVIMLILAR", icon: Heart, count: categoryCounts["Favorites"] || 0 },
-      { id: "Queue", label: "NAVBAT", icon: ListMusic, count: categoryCounts["Queue"] || 0 },
-      { id: "Recently Played", label: "YAQINDA TINGLANGAN", icon: Clock, count: categoryCounts["Recently Played"] || 0 },
+      { id: "All", label: t('all_tracks'), icon: Filter, count: totalSongs || categoryCounts["All"] || 0 },
+      { id: "Trending", label: t('trending'), icon: Flame, count: categoryCounts["Trending"] || 0 },
+      { id: "Favorites", label: t('favorites'), icon: Heart, count: categoryCounts["Favorites"] || 0 },
+      { id: "Queue", label: t('queue'), icon: ListMusic, count: categoryCounts["Queue"] || 0 },
+      { id: "Recently Played", label: t('recently_played'), icon: Clock, count: categoryCounts["Recently Played"] || 0 },
     ];
     // Filter to only presets that exist in categories prop
     return list.filter(p => categories.includes(p.id));
-  }, [categories, categoryCounts, totalSongs]);
+  }, [categories, categoryCounts, totalSongs, t]);
 
   // Pure musical genres (excluding system presets, defensively split and uppercase canonicalized)
   const musicalGenres = useMemo(() => {
@@ -134,7 +136,7 @@ export function CyberCategoryDropdown({
         <div className="flex items-center gap-1.5 truncate">
           <span className="w-1.5 h-1.5 bg-[var(--accent)] shadow-[0_0_6px_var(--accent)] shrink-0" />
           <span className="truncate">
-            {selectedCategory === "All" ? "BARCHA JANRLAR" : selectedCategory.toUpperCase()}
+            {selectedCategory === "All" ? t('all_genres') : selectedCategory.toUpperCase()}
           </span>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -162,7 +164,7 @@ export function CyberCategoryDropdown({
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Janr nomini qidiring..."
+              placeholder={t('search_genres_ph')}
               className="w-full bg-black/70 border border-white/20 pl-7 pr-6 py-1 text-[11px] text-white placeholder-white/40 focus:outline-none focus:border-[var(--accent)] font-mono"
             />
             {search && (
@@ -246,14 +248,14 @@ export function CyberCategoryDropdown({
 
             {filteredPresets.length === 0 && filteredGenres.length === 0 && (
               <div className="py-4 text-center text-[10px] text-white/40">
-                Mos keluvchi janr topilmadi
+                {t('no_matching_genres')}
               </div>
             )}
           </div>
 
           {/* Footer */}
           <div className="pt-2 mt-1 border-t border-white/10 flex items-center justify-between text-[9px] text-white/40">
-            <span>{categories.length} ta kategoriya</span>
+            <span>{categories.length} {t('categories_word')}</span>
             {selectedCategory !== "All" && (
               <button
                 type="button"
@@ -264,7 +266,7 @@ export function CyberCategoryDropdown({
                 }}
                 className="text-red-400 hover:text-red-300 font-bold"
               >
-                Filtrni tozalash
+                {t('clear_filter_btn')}
               </button>
             )}
           </div>

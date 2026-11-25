@@ -51,23 +51,32 @@ html { font-size: 16px; }
   box-shadow: 0 0 8px var(--accent-glow);
 }
 
-/* Global Focus Ring - Accessibility */
+/* Global Focus Ring - Accessibility (keeps mouse click clean while preserving keyboard focus) */
 :focus-visible {
   outline: 1px solid var(--accent);
   outline-offset: 2px;
   box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.15);
 }
 
-/* Exclude inputs/elements that explicitly opt out of outline */
-.outline-none,
-.focus\:outline-none:focus,
-.focus-visible\:outline-none:focus-visible,
-input.outline-none,
-input:focus-visible[class*="outline-none"],
-input:focus[class*="outline-none"] {
-  outline: none !important;
-  outline-offset: 0 !important;
-  box-shadow: none !important;
+/* Soft opt-out only for mouse/non-keyboard focus */
+.outline-none:focus:not(:focus-visible),
+.focus\:outline-none:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanline,
+  .crt-flicker,
+  .animate-marquee,
+  .hover-marquee:hover .marquee-inner,
+  .playlist-active-bg,
+  .eq-bar,
+  .animate-pulse,
+  .animate-ping,
+  .animate-bounce {
+    animation: none !important;
+  }
 }
 
 /* Custom Cyberpunk Checkbox */
@@ -168,7 +177,7 @@ button, a, [role="button"] {
 
 #root {
   width: 100%;
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -401,12 +410,6 @@ button, a, [role="button"] {
         inset 0 2px 6px 0 rgba(0, 0, 0, 0.8),
         0 2px 8px rgba(0, 0, 0, 0.5),
         0 0 12px var(--accent-glow);
-}
-.cyber-panel {
-    background: var(--bg-card);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(var(--accent-rgb), 0.4);
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8), 0 0 15px rgba(var(--accent-rgb), 0.1);
 }
 
 .custom-eq-slider {

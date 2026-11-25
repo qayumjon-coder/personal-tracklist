@@ -1,4 +1,4 @@
-import { useState, useEffect, type ChangeEvent, type FormEvent, type ClipboardEvent } from "react";
+import { useState, useEffect, useRef, useCallback, type ChangeEvent, type FormEvent, type ClipboardEvent } from "react";
 import { Helmet } from "react-helmet-async";
 import { Link, useNavigate } from "react-router-dom";
 import { useFetchSongs } from "../hooks/useFetchSongs";
@@ -9,16 +9,22 @@ import { useAuth } from "../contexts/AuthContext";
 import { useUploadPermission } from "../hooks/useUploadPermission";
 import { parseBlob } from "music-metadata";
 import { toast } from "sonner";
+import {
+  isTrustedMusicDomain,
+  isPublicHttpsUrl,
+  sanitizeMediaUrl,
+  validateAudioFile,
+  validateImageFile,
+} from "../utils/security";
 
 // ─── oEmbed helpers ───────────────────────────────────────────────────────────
 
-
 function isSpotifyUrl(url: string) {
-  return url.includes("spotify.com/track/");
+  return isTrustedMusicDomain(url, 'spotify');
 }
 
 function isSoundCloudUrl(url: string) {
-  return url.includes("soundcloud.com/");
+  return isTrustedMusicDomain(url, 'soundcloud');
 }
 
 async function fetchSpotifyOembed(url: string) {
@@ -64,49 +70,32 @@ async function fetchGenreFromMusicBrainz(title: string, artist: string): Promise
   }
 }
 
-/** Download a remote image URL and return it as a File (so it can be uploaded to Supabase) */
+/** Download a validated HTTPS image URL and return it as a File (so it can be uploaded to Supabase) */
 async function urlToFile(imageUrl: string, filename: string): Promise<File> {
+  if (!isPublicHttpsUrl(imageUrl)) {
+    throw new Error("Blocked non-HTTPS or private image URL");
+  }
+
+  const isSafeImageBlob = (blob: Blob) =>
+    blob.size > 0 && blob.type.startsWith("image/") && blob.type !== "image/svg+xml";
+
   // 1. Direct fetch (fastest if CORS is enabled on source CDN)
   try {
     const res = await fetch(imageUrl, { mode: 'cors' });
     if (res.ok) {
       const blob = await res.blob();
-      if (blob.size > 0) return new File([blob], filename, { type: blob.type || "image/jpeg" });
+      if (isSafeImageBlob(blob)) return new File([blob], filename, { type: blob.type || "image/jpeg" });
     }
   } catch {
     // Ignore
   }
 
-  // 2. wsrv.nl image proxy (very fast and reliable)
+  // 2. wsrv.nl image proxy (only for verified public HTTPS URLs)
   try {
     const res = await fetch(`https://wsrv.nl/?url=${encodeURIComponent(imageUrl)}&output=jpg`);
     if (res.ok) {
       const blob = await res.blob();
-      if (blob.size > 0) return new File([blob], filename, { type: blob.type || "image/jpeg" });
-    }
-  } catch {
-    // Ignore
-  }
-
-  // 3. corsproxy.io
-  try {
-    const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(imageUrl)}`;
-    const res = await fetch(proxyUrl);
-    if (res.ok) {
-      const blob = await res.blob();
-      if (blob.size > 0) return new File([blob], filename, { type: blob.type || "image/jpeg" });
-    }
-  } catch {
-    // Ignore
-  }
-
-  // 4. allorigins.win
-  try {
-    const allOriginsUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
-    const res = await fetch(allOriginsUrl);
-    if (res.ok) {
-      const blob = await res.blob();
-      if (blob.size > 0) return new File([blob], filename, { type: blob.type || "image/jpeg" });
+      if (isSafeImageBlob(blob)) return new File([blob], filename, { type: blob.type || "image/jpeg" });
     }
   } catch {
     // Ignore
@@ -182,9 +171,31 @@ export function Upload() {
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverUrl, setCoverUrl] = useState<string>("");
   const [coverTab, setCoverTab] = useState<"file" | "url">("file");
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewUrl, setPreviewUrlState] = useState<string | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const coverEpochRef = useRef(0);
+  const progressIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  const setPreviewUrl = useCallback((nextUrl: string | null) => {
+    if (previewUrlRef.current && previewUrlRef.current.startsWith("blob:") && previewUrlRef.current !== nextUrl) {
+      URL.revokeObjectURL(previewUrlRef.current);
+    }
+    previewUrlRef.current = nextUrl;
+    setPreviewUrlState(nextUrl);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current?.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
 
   // ── Import State ────────────────────────────────────────────────────────────
   const [importUrl, setImportUrl] = useState("");
@@ -228,14 +239,17 @@ export function Upload() {
       }
 
       // Immediately set URL preview and coverUrl so submit works even if image download is slow or blocked
-      if (thumbnailUrl) {
-        setCoverUrl(thumbnailUrl);
-        setPreviewUrl(thumbnailUrl);
+      const safeThumb = sanitizeMediaUrl(thumbnailUrl);
+      if (safeThumb) {
+        const importEpoch = ++coverEpochRef.current;
+        setCoverUrl(safeThumb);
+        setPreviewUrl(safeThumb);
         setCoverFile(null);
 
-        // Best effort: download thumbnail as File in background
-        urlToFile(thumbnailUrl, "imported_cover.jpg")
+        // Best effort: download thumbnail as File in background without overwriting manual edits
+        urlToFile(safeThumb, "imported_cover.jpg")
           .then(fetchedFile => {
+            if (coverEpochRef.current !== importEpoch) return;
             setCoverFile(fetchedFile);
             setPreviewUrl(URL.createObjectURL(fetchedFile));
           })
@@ -272,11 +286,11 @@ export function Upload() {
   const handleFileChange = async (e: ChangeEvent<HTMLInputElement>, type: "audio" | "cover") => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      const fileSizeMB = file.size / (1024 * 1024);
 
       if (type === "audio") {
-        if (fileSizeMB > 20) {
-          toast.error(`Audio file is too big! (${fileSizeMB.toFixed(2)} MB). Max limit is 20MB.`);
+        const check = validateAudioFile(file);
+        if (!check.valid) {
+          toast.error(check.error || "Invalid audio file.");
           return;
         }
         setAudioFile(file);
@@ -349,16 +363,22 @@ export function Upload() {
              fallbackTitle = filename;
           }
 
-          const audio = new Audio(URL.createObjectURL(file));
+          const tempAudioUrl = URL.createObjectURL(file);
+          const audio = new Audio(tempAudioUrl);
           await new Promise<void>((resolve) => {
+              const finish = () => {
+                URL.revokeObjectURL(tempAudioUrl);
+                audio.src = '';
+                resolve();
+              };
               audio.onloadedmetadata = () => {
                 setFormData(prev => ({ 
                   ...prev, 
-                  duration: audio.duration,
+                  duration: isFinite(audio.duration) ? audio.duration : prev.duration,
                   title: prev.title || fallbackTitle,
                   artist: prev.artist || fallbackArtist
                 }));
-                resolve();
+                finish();
               };
               audio.onerror = () => {
                  setFormData(prev => ({ 
@@ -366,7 +386,7 @@ export function Upload() {
                   title: prev.title || fallbackTitle,
                   artist: prev.artist || fallbackArtist
                 }));
-                resolve();
+                finish();
               };
           });
           
@@ -374,10 +394,12 @@ export function Upload() {
         }
 
       } else {
-        if (fileSizeMB > 5) {
-          toast.error(`Cover image is too big! (${fileSizeMB.toFixed(2)} MB). Max limit is 5MB.`);
+        const check = validateImageFile(file);
+        if (!check.valid) {
+          toast.error(check.error || "Invalid cover image.");
           return;
         }
+        coverEpochRef.current++;
         setCoverFile(file);
         setCoverUrl("");
         setPreviewUrl(URL.createObjectURL(file));
@@ -395,11 +417,12 @@ export function Upload() {
       if (items[i].type.indexOf("image") !== -1) {
         const file = items[i].getAsFile();
         if (file) {
-          const fileSizeMB = file.size / (1024 * 1024);
-          if (fileSizeMB > 5) {
-            toast.error(`Pasted image is too big! (${fileSizeMB.toFixed(2)} MB). Max limit is 5MB.`);
+          const check = validateImageFile(file);
+          if (!check.valid) {
+            toast.error(check.error || "Invalid pasted image.");
             return;
           }
+          coverEpochRef.current++;
           setCoverTab("file");
           setCoverFile(file);
           setCoverUrl("");
@@ -416,11 +439,17 @@ export function Upload() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     
-    // Determine effective cover (File or URL string)
+    // Determine effective cover (File or validated URL string)
+    const validatedCoverUrl = sanitizeMediaUrl(coverUrl.trim());
     const effectiveCover: File | string | null = 
       coverFile || 
-      (coverUrl.trim() ? coverUrl.trim() : null) || 
-      (previewUrl && !previewUrl.startsWith("blob:") ? previewUrl.trim() : null);
+      validatedCoverUrl || 
+      (previewUrl && !previewUrl.startsWith("blob:") ? sanitizeMediaUrl(previewUrl.trim()) : null);
+
+    if (coverUrl.trim() && !validatedCoverUrl && !coverFile) {
+      toast.error("Yaroqsiz rasm havolasi (faqat https:// yoki http:// ruxsat etiladi).");
+      return;
+    }
 
     if (!audioFile || !effectiveCover || !formData.title.trim() || !formData.artist.trim()) {
       toast.error("All fields are required!");
@@ -430,8 +459,8 @@ export function Upload() {
     setLoading(true);
     setUploadProgress(0);
 
-    // Simulate progress
-    const progressInterval = setInterval(() => {
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+    progressIntervalRef.current = setInterval(() => {
       setUploadProgress(prev => {
         if (prev >= 90) return prev;
         return prev + Math.random() * 10;
@@ -440,10 +469,19 @@ export function Upload() {
 
     let finalDuration = formData.duration;
     if (!finalDuration && audioFile) {
+        const durUrl = URL.createObjectURL(audioFile);
         finalDuration = await new Promise((resolve) => {
-            const audio = new Audio(URL.createObjectURL(audioFile));
-            audio.onloadedmetadata = () => resolve(audio.duration);
-            audio.onerror = () => resolve(0);
+            const audio = new Audio(durUrl);
+            audio.onloadedmetadata = () => {
+              URL.revokeObjectURL(durUrl);
+              audio.src = '';
+              resolve(isFinite(audio.duration) ? audio.duration : 0);
+            };
+            audio.onerror = () => {
+              URL.revokeObjectURL(durUrl);
+              audio.src = '';
+              resolve(0);
+            };
         });
     }
 
@@ -463,12 +501,18 @@ export function Upload() {
         uploaderFp
       );
 
-      clearInterval(progressInterval);
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
       setUploadProgress(100);
       toast.success("Track uploaded successfully!");
       setTimeout(() => navigate("/"), 1500);
     } catch (err) {
-      clearInterval(progressInterval);
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
       setUploadProgress(0);
       console.error('Upload error:', err);
       toast.error(err instanceof Error ? err.message : "Failed to upload song.");
@@ -872,8 +916,9 @@ export function Upload() {
                   value={coverUrl}
                   onChange={(e) => {
                     const val = e.target.value;
+                    coverEpochRef.current++;
                     setCoverUrl(val);
-                    setPreviewUrl(val.trim() || null);
+                    setPreviewUrl(sanitizeMediaUrl(val.trim()));
                     setCoverFile(null);
                   }}
                   placeholder="https://example.com/cover.jpg"
@@ -904,7 +949,7 @@ export function Upload() {
               {coverTab === "file" && (
                 <input 
                   type="file" 
-                  accept="image/*" 
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/avif" 
                   onChange={(e) => handleFileChange(e, 'cover')}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
                 />

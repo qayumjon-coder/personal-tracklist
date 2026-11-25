@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { incrementPlayCount } from "../services/musicApi";
 import type { Song } from "../types/Song";
+import { toast } from "sonner";
 
 export type RepeatMode = "off" | "one" | "all";
 export type AudioEffect = "none" | "underwater" | "radio" | "8d" | "bass-boost" | "echo";
@@ -30,6 +31,8 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   const previousVolumeRef = useRef(70);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const [analyserState, setAnalyserState] = useState<AnalyserNode | null>(null);
+  const setupContextRef = useRef<() => void>(() => {});
   const countedSongIdRef = useRef<number | null>(null);
   const songsRef = useRef(songs);
   const indexRef = useRef(index);
@@ -71,6 +74,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     audioRef.current = audio;
 
     const setupContext = () => {
+      if (audioContextRef.current) return;
       try {
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         const ctx = new AudioContextClass();
@@ -111,9 +115,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
         const eightDReverb = ctx.createDelay();
         eightDReverb.delayTime.value = 0.05; // 50ms room delay
         const eightDReverbGain = ctx.createGain();
-        eightDReverbGain.gain.value = 0.3;
-        eightDReverb.connect(eightDReverbGain);
-        eightDReverbGain.connect(eightDReverb);
+        eightDReverbGain.gain.value = 0.25;
         
         const bassBoost = ctx.createBiquadFilter();
         bassBoost.type = 'lowshelf';
@@ -134,6 +136,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
 
         audioContextRef.current = ctx;
         analyserRef.current = analyser;
+        setAnalyserState(analyser);
         bassFilterRef.current = bassFilter;
         midFilterRef.current = midFilter;
         trebleFilterRef.current = trebleFilter;
@@ -146,7 +149,7 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
       }
     };
 
-    setupContext();
+    setupContextRef.current = setupContext;
 
     const handlePlay = () => { setPlaying(true); setAudioError(null); };
     const handlePause = () => setPlaying(false);
@@ -298,6 +301,9 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
             if (error.name !== 'AbortError') {
               console.warn("Playback prevented:", error);
               setPlaying(false);
+              if (error.name === 'NotAllowedError') {
+                toast.info('Brauzer avtomatik ijroni chekladi. Davom etish uchun Play tugmasini bosing.');
+              }
             }
           });
         }
@@ -393,43 +399,45 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     }
   }, [volume, isMuted]);
 
-  // 6. Sleep Timer countdown & soft fade-out
-  useEffect(() => {
-    if (sleepTimerMode !== 'time' || sleepTimerSeconds === null) return;
+  // 6. Sleep Timer countdown & soft fade-out (use refs to avoid recreating interval every second)
+  const volumeRef = useRef(volume);
+  const isMutedRef = useRef(isMuted);
+  useEffect(() => { volumeRef.current = volume; }, [volume]);
+  useEffect(() => { isMutedRef.current = isMuted; }, [isMuted]);
 
-    if (sleepTimerSeconds <= 0) {
-      setPlaying(false);
-      setSleepTimerSeconds(null);
-      setSleepTimerMode(null);
-      if (audioRef.current) audioRef.current.volume = isMuted ? 0 : volume / 100;
-      return;
-    }
+  useEffect(() => {
+    if (sleepTimerMode !== 'time') return;
 
     const timer = setInterval(() => {
       setSleepTimerSeconds(prev => {
         if (prev === null || prev <= 1) {
           setPlaying(false);
           setSleepTimerMode(null);
-          if (audioRef.current) audioRef.current.volume = isMuted ? 0 : volume / 100;
+          if (audioRef.current) audioRef.current.volume = isMutedRef.current ? 0 : volumeRef.current / 100;
           return null;
         }
         const nextSec = prev - 1;
         // Fade out in last 10 seconds
-        if (nextSec <= 10 && audioRef.current && !isMuted) {
-          audioRef.current.volume = Math.max(0, (volume / 100) * (nextSec / 10));
+        if (nextSec <= 10 && audioRef.current && !isMutedRef.current) {
+          audioRef.current.volume = Math.max(0, (volumeRef.current / 100) * (nextSec / 10));
         }
         return nextSec;
       });
-    }, 1000); // Decrement every second
+    }, 1000);
 
     return () => clearInterval(timer);
-  }, [sleepTimerSeconds, sleepTimerMode, volume, isMuted]);
+  }, [sleepTimerMode]);
 
   // Public Methods
-  const play = async () => {
+  const ensureAudioContext = async () => {
+    setupContextRef.current();
     if (audioContextRef.current?.state === 'suspended') {
-      await audioContextRef.current.resume();
+      await audioContextRef.current.resume().catch(() => {});
     }
+  };
+
+  const play = async () => {
+    await ensureAudioContext();
     setPlaying(true);
   };
 
@@ -518,19 +526,23 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
   });
 
   const setBass = (val: number) => {
+    setupContextRef.current();
     if (bassFilterRef.current) bassFilterRef.current.gain.value = val;
     setEq(prev => ({ ...prev, bass: val }));
   };
   const setMid = (val: number) => {
+    setupContextRef.current();
     if (midFilterRef.current) midFilterRef.current.gain.value = val;
     setEq(prev => ({ ...prev, mid: val }));
   };
   const setTreble = (val: number) => {
+    setupContextRef.current();
     if (trebleFilterRef.current) trebleFilterRef.current.gain.value = val;
     setEq(prev => ({ ...prev, treble: val }));
   };
 
   const setEffect = (effect: AudioEffect) => {
+    setupContextRef.current();
     setActiveEffectState(effect);
     const ctx = audioContextRef.current;
     const eqOut = trebleFilterRef.current;
@@ -577,8 +589,10 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
         fx.panner!.connect(fx.eightDLowpass!);
         fx.eightDLowpass!.connect(analyser);
         
-        // Add room reverb for 8D
+        // Add room reverb for 8D (slapback + subtle dampened feedback only when 8D active)
         fx.eightDLowpass!.connect(fx.eightDReverb!);
+        fx.eightDReverb!.connect(fx.eightDReverbGain!);
+        fx.eightDReverbGain!.connect(fx.eightDReverb!);
         fx.eightDReverb!.connect(analyser);
 
         const startTime = ctx.currentTime;
@@ -653,13 +667,18 @@ export function useAudioPlayer(songs: { url: string; id?: number; title?: string
     shuffle, repeat, audioError, play, pause, next, prev, setVolume, toggleMute,
     seek, toggleShuffle: () => setShuffle(!shuffle),
     toggleRepeat: () => setRepeat(r => r === "off" ? "all" : r === "all" ? "one" : "off"),
-    selectSong: (i: number) => { setIndex(i); setPlaying(true); setAudioError(null); },
+    selectSong: (i: number) => {
+      ensureAudioContext();
+      setIndex(i);
+      setPlaying(true);
+      setAudioError(null);
+    },
     setSleepTimer,
     sleepTimer,
     sleepTimerSeconds,
     sleepTimerMode,
     addSleepTime,
-    analyser: analyserRef.current,
+    analyser: analyserState,
     audioRef,
     eq,
     setBass,

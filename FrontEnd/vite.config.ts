@@ -64,11 +64,11 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
-            // Cache Supabase API calls for offline fallback
-            urlPattern: /^https:\/\/.*supabase\.co\/.*/i,
+            // Only cache public song catalog and public media files — never auth or admin endpoints
+            urlPattern: /^https:\/\/.*supabase\.co\/(rest\/v1\/songs|storage\/v1\/object\/public)\/.*/i,
             handler: 'NetworkFirst',
             options: {
-              cacheName: 'supabase-cache',
+              cacheName: 'supabase-public-cache',
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 },
             },
           },

@@ -1,11 +1,27 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import * as idb from "idb-keyval";
 import type { Song } from "../types/Song";
 
 const FOLDER_HANDLE_KEY = "fronto_local_folder_handle";
 
+function revokeSongBlobs(songs: Song[]) {
+  songs.forEach((s) => {
+    if (s.url?.startsWith("blob:")) URL.revokeObjectURL(s.url);
+    if (s.coverUrl?.startsWith("blob:")) URL.revokeObjectURL(s.coverUrl);
+  });
+}
+
 export function useLocalFiles() {
   const [localSongs, setLocalSongs] = useState<Song[]>([]);
+  const localSongsRef = useRef<Song[]>([]);
+  useEffect(() => {
+    localSongsRef.current = localSongs;
+  }, [localSongs]);
+
+  useEffect(() => {
+    return () => revokeSongBlobs(localSongsRef.current);
+  }, []);
+
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ current: number, total: number, filename: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,12 +45,23 @@ export function useLocalFiles() {
   const getAccurateDuration = (url: string): Promise<number> => {
     return new Promise((resolve) => {
       const audio = new Audio();
-      audio.addEventListener('loadedmetadata', () => {
-        resolve(audio.duration || 0);
-      });
-      audio.addEventListener('error', () => {
-        resolve(0);
-      });
+      let settled = false;
+      const cleanup = (dur: number) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeoutId);
+        audio.removeEventListener('loadedmetadata', onLoaded);
+        audio.removeEventListener('error', onErr);
+        audio.src = '';
+        audio.remove();
+        resolve(dur);
+      };
+      const onLoaded = () => cleanup(isFinite(audio.duration) ? audio.duration : 0);
+      const onErr = () => cleanup(0);
+      const timeoutId = setTimeout(() => cleanup(0), 5000);
+
+      audio.addEventListener('loadedmetadata', onLoaded);
+      audio.addEventListener('error', onErr);
       audio.src = url;
     });
   };
@@ -126,6 +153,7 @@ export function useLocalFiles() {
            }
         }
       }
+      revokeSongBlobs(localSongsRef.current);
       setLocalSongs(songs);
       if (songs.length > 0) {
         await idb.set(FOLDER_HANDLE_KEY, directoryHandle);
@@ -133,6 +161,7 @@ export function useLocalFiles() {
       }
     } catch (err: any) {
       setError(err.message || "Failed to scan directory");
+      revokeSongBlobs(localSongsRef.current);
       setLocalSongs([]);
     } finally {
       setIsScanning(false);
@@ -181,12 +210,15 @@ export function useLocalFiles() {
   };
 
   const removeLocalFiles = async () => {
+     revokeSongBlobs(localSongsRef.current);
      setLocalSongs([]);
      setHasStoredHandle(false);
      await idb.del(FOLDER_HANDLE_KEY);
   };
 
   const removeLocalFile = (id: number) => {
+     const target = localSongsRef.current.find(s => s.id === id);
+     if (target) revokeSongBlobs([target]);
      setLocalSongs(prev => prev.filter(s => s.id !== id));
   };
 

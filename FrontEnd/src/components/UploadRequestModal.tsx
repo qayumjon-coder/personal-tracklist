@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Send, Loader2, Clock, CheckCircle, ShieldOff } from 'lucide-react';
 import type { PermissionStatus } from '../hooks/useUploadPermission';
+import { useSettings } from '../contexts/SettingsContext';
 
 interface UploadRequestModalProps {
   status: PermissionStatus;
@@ -9,11 +10,20 @@ interface UploadRequestModalProps {
 }
 
 export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestModalProps) {
+  const { t } = useSettings();
   const [name, setName] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [onClose]);
 
   const handleSubmit = async () => {
     if (!name.trim()) {
@@ -33,6 +43,9 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Upload access request"
       className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
@@ -65,13 +78,12 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
           {status === 'pending' && !submitted && (
             <div className="flex flex-col items-center gap-4 py-4 text-center">
               <Clock size={40} className="text-yellow-400 animate-pulse" />
-              <h2 className="text-lg font-bold font-mono tracking-wider">SO'ROV YUBORILGAN</h2>
+              <h2 className="text-lg font-bold font-mono tracking-wider">{t('req_sent_title')}</h2>
               <p className="text-[var(--text-secondary)] text-sm font-mono leading-relaxed">
-                So'rovingiz adminstratorga yuborildi.<br/>
-                Ko'rib chiqilgandan so'ng sizga ruxsat beriladi.
+                {t('req_sent_desc')}
               </p>
               <button onClick={onClose} className="mt-2 px-6 py-2 border border-[var(--text-secondary)] text-[var(--text-secondary)] text-xs font-mono tracking-widest uppercase hover:border-[var(--accent)] hover:text-[var(--accent)] transition-all">
-                YOPISH
+                {t('close_btn')}
               </button>
             </div>
           )}
@@ -80,35 +92,34 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
           {status === 'denied' && !submitted && (
             <div className="flex flex-col items-center gap-4 py-4 text-center">
               <ShieldOff size={40} className="text-red-400" />
-              <h2 className="text-lg font-bold font-mono tracking-wider text-red-400">RUXSAT BERILMAGAN</h2>
+              <h2 className="text-lg font-bold font-mono tracking-wider text-red-400">{t('req_denied_title')}</h2>
               <p className="text-[var(--text-secondary)] text-sm font-mono leading-relaxed">
-                Upload qilish huquqiga ega emassiz yoki so'rovingiz rad etilgan.<br/>
-                Sababni tushuntirgan holda qayta so'rov yuborishingiz mumkin.
+                {t('req_denied_desc')}
               </p>
 
               {/* Re-submit form */}
               <div className="w-full space-y-3 mt-2 text-left">
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-1.5">
-                    &gt; ISMINGIZ <span className="text-red-400">*</span>
+                    {t('req_name_label')} <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="To'liq ism..."
+                    placeholder={t('req_name_ph')}
                     maxLength={60}
                     className="w-full bg-black/40 border border-[var(--text-secondary)]/40 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/40"
                   />
                 </div>
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-1.5">
-                    &gt; SABAB / IZOH
+                    {t('req_msg_label')}
                   </label>
                   <textarea
                     value={message}
                     onChange={e => setMessage(e.target.value)}
-                    placeholder="Nima maqsadda yuklash istaysiz..."
+                    placeholder={t('req_msg_ph')}
                     maxLength={300}
                     rows={2}
                     className="w-full bg-black/40 border border-[var(--text-secondary)]/40 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[var(--accent)] transition-all placeholder-[var(--text-secondary)]/40 resize-none"
@@ -127,10 +138,10 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
                     disabled={loading}
                     className="flex-1 py-2.5 bg-[var(--accent)] text-[var(--bg-main)] font-bold font-mono text-xs tracking-[0.2em] uppercase hover:opacity-90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {loading ? <><Loader2 size={12} className="animate-spin" /> Yuborilmoqda...</> : <>Qayta So'rov Yuborish</>}
+                    {loading ? <><Loader2 size={12} className="animate-spin" /> {t('req_submitting')}</> : <>{t('req_resubmit')}</>}
                   </button>
                   <button onClick={onClose} className="px-4 py-2.5 border border-[var(--text-secondary)]/40 text-[var(--text-secondary)] text-xs font-mono hover:border-[var(--text-secondary)] transition-all">
-                    Yopish
+                    {t('close_btn')}
                   </button>
                 </div>
               </div>
@@ -141,13 +152,12 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
           {submitted && (
             <div className="flex flex-col items-center gap-4 py-4 text-center">
               <CheckCircle size={40} className="text-green-400" />
-              <h2 className="text-lg font-bold font-mono tracking-wider text-green-400">SO'ROV YUBORILDI!</h2>
+              <h2 className="text-lg font-bold font-mono tracking-wider text-green-400">{t('req_success_title')}</h2>
               <p className="text-[var(--text-secondary)] text-sm font-mono leading-relaxed">
-                Administrator tez orada ko'rib chiqadi.<br />
-                Ruxsat berilganda Upload tugmasi faol bo'ladi.
+                {t('req_success_desc')}
               </p>
               <button onClick={onClose} className="mt-2 px-6 py-2 border border-green-500/50 text-green-400 text-xs font-mono tracking-widest uppercase hover:bg-green-500/10 transition-all">
-                YOPISH
+                {t('close_btn')}
               </button>
             </div>
           )}
@@ -157,10 +167,10 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
             <>
               <div className="mb-5">
                 <p className="text-[var(--text-secondary)] text-xs font-mono uppercase tracking-widest mb-1">
-                  // KIRISH RUXSATI KERAK
+                  {t('req_needed_tag')}
                 </p>
                 <p className="text-sm font-mono text-[var(--text-primary)] leading-relaxed">
-                  Musiqa yuklash uchun administrator ruxsatiga muhtojsiz. Quyida so'rov yuboring.
+                  {t('req_needed_desc')}
                 </p>
               </div>
 
@@ -168,13 +178,13 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
                 {/* Name field */}
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-1.5">
-                    &gt; ISMINGIZ <span className="text-red-400">*</span>
+                    {t('req_name_label')} <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="text"
                     value={name}
                     onChange={e => setName(e.target.value)}
-                    placeholder="To'liq ism..."
+                    placeholder={t('req_name_ph')}
                     maxLength={60}
                     className="w-full bg-black/40 border border-[var(--text-secondary)]/40 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/40"
                   />
@@ -183,12 +193,12 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
                 {/* Message field */}
                 <div>
                   <label className="block text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--accent)] mb-1.5">
-                    &gt; SABAB / IZOH <span className="text-[var(--text-secondary)]">(ixtiyoriy)</span>
+                    {t('req_msg_label')} <span className="text-[var(--text-secondary)]">{t('req_msg_opt')}</span>
                   </label>
                   <textarea
                     value={message}
                     onChange={e => setMessage(e.target.value)}
-                    placeholder="Nima maqsadda yuklash istaysiz..."
+                    placeholder={t('req_msg_ph')}
                     maxLength={300}
                     rows={3}
                     className="w-full bg-black/40 border border-[var(--text-secondary)]/40 px-3 py-2.5 text-sm font-mono focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_10px_rgba(var(--accent-rgb),0.1)] transition-all placeholder-[var(--text-secondary)]/40 resize-none"
@@ -208,9 +218,9 @@ export function UploadRequestModal({ status, onClose, onSubmit }: UploadRequestM
                   className="w-full py-3 bg-[var(--accent)] text-[var(--bg-main)] font-bold font-mono text-xs tracking-[0.25em] uppercase hover:opacity-90 transition-all shadow-[0_0_20px_rgba(var(--accent-rgb),0.2)] hover:shadow-[0_0_30px_rgba(var(--accent-rgb),0.4)] disabled:opacity-50 flex items-center justify-center gap-2"
                 >
                   {loading ? (
-                    <><Loader2 size={14} className="animate-spin" /> YUBORILMOQDA...</>
+                    <><Loader2 size={14} className="animate-spin" /> {t('req_submitting')}</>
                   ) : (
-                    <><Send size={14} /> SO'ROV YUBORISH</>
+                    <><Send size={14} /> {t('req_submit')}</>
                   )}
                 </button>
               </div>

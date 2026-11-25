@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { UPLOAD_LIMITS } from '../utils/constants';
 
 export type PermissionStatus = 'checking' | 'granted' | 'denied' | 'pending' | 'none';
 
@@ -16,14 +17,34 @@ function getFingerprint(): string {
 
 export function useUploadPermission() {
   const [status, setStatus] = useState<PermissionStatus>('checking');
+  const [guestUploadCount, setGuestUploadCount] = useState<number>(0);
   const [fingerprint] = useState(getFingerprint);
 
-  const checkPermission = async () => {
+  const checkPermission = useCallback(async () => {
     setStatus('checking');
     try {
-      const now = new Date().toISOString();
+      // Check how many songs this guest has already uploaded (best effort)
+      const { count } = await supabase
+        .from('songs')
+        .select('id', { count: 'exact', head: true })
+        .eq('uploader_fp', fingerprint);
+      if (typeof count === 'number') {
+        setGuestUploadCount(count);
+      }
 
-      // Check active permissions
+      // Preferred path: privacy-preserving RPC (after security_hardening_migration.sql)
+      const { data: rpcStatus, error: rpcError } = await supabase.rpc('get_my_upload_status', {
+        p_fingerprint: fingerprint,
+      });
+
+      if (!rpcError && typeof rpcStatus === 'string') {
+        const validStatuses: PermissionStatus[] = ['granted', 'denied', 'pending', 'none'];
+        setStatus(validStatuses.includes(rpcStatus as PermissionStatus) ? (rpcStatus as PermissionStatus) : 'none');
+        return;
+      }
+
+      // Fallback path if RPC is not yet deployed in Supabase
+      const now = new Date().toISOString();
       const { data: perms, error } = await supabase
         .from('upload_permissions')
         .select('id, expires_at, is_active')
@@ -37,17 +58,13 @@ export function useUploadPermission() {
       }
 
       if (perms && perms.length > 0) {
-        // Filter out expired
-        const valid = perms.filter(p =>
-          !p.expires_at || new Date(p.expires_at) > new Date(now)
-        );
+        const valid = perms.filter(p => !p.expires_at || new Date(p.expires_at) > new Date(now));
         if (valid.length > 0) {
           setStatus('granted');
           return;
         }
       }
 
-      // Check pending requests
       const { data: reqs } = await supabase
         .from('upload_requests')
         .select('id, status')
@@ -71,15 +88,20 @@ export function useUploadPermission() {
       console.error('Error checking permissions:', err);
       setStatus('denied');
     }
-  };
+  }, [fingerprint]);
 
   useEffect(() => {
     checkPermission();
-  }, [fingerprint]);
+  }, [checkPermission]);
 
   const submitRequest = async (name: string, message: string): Promise<{ success: boolean; error?: string }> => {
     try {
-      // Prevent duplicate pending requests
+      const cleanName = name.trim().slice(0, 60);
+      const cleanMsg = message.trim().slice(0, 300);
+      if (!cleanName) {
+        return { success: false, error: 'Iltimos, ismingizni kiriting.' };
+      }
+
       const { data: existing } = await supabase
         .from('upload_requests')
         .select('id, status')
@@ -87,29 +109,29 @@ export function useUploadPermission() {
         .eq('status', 'pending');
 
       if (existing && existing.length > 0) {
-        return { success: false, error: 'Sizda allaqachon kutilayotgan so\'rov mavjud.' };
+        return { success: false, error: "Sizda allaqachon kutilayotgan so'rov mavjud." };
       }
 
       const { error } = await supabase
         .from('upload_requests')
         .insert([{
-          requester_name: name.trim(),
-          requester_message: message.trim(),
+          requester_name: cleanName,
+          requester_message: cleanMsg,
           fingerprint,
           status: 'pending',
         }]);
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      localStorage.setItem('fronto_uploader_name', name.trim());
+      localStorage.setItem('fronto_uploader_name', cleanName);
       setStatus('pending');
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || 'So\'rov yuborishda xatolik' };
+      return { success: false, error: err.message || "So'rov yuborishda xatolik" };
     }
   };
 
-  return { status, fingerprint, checkPermission, submitRequest };
+  const remainingGuestQuota = Math.max(0, UPLOAD_LIMITS.MAX_SONGS_PER_GUEST - guestUploadCount);
+
+  return { status, fingerprint, guestUploadCount, remainingGuestQuota, checkPermission, submitRequest };
 }

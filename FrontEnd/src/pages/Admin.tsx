@@ -2,7 +2,8 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import { Helmet } from "react-helmet-async";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { getAllSongs, updateSong, deleteSong } from "../services/musicApi";
+import { getAdminSongs, updateSong, deleteSong } from "../services/musicApi";
+import { escapeCsvCell, validateImageFile } from "../utils/security";
 import { ArrowLeft, Search, Save, X, Edit2, Play, Pause, Music as MusicIcon, Upload, Image as ImageIcon, Trash2, AlertTriangle, BarChart2, Maximize2, PlayCircle, Users, Clock, FileText, TrendingUp, CheckCircle, ShieldOff, ShieldCheck, Calendar, Inbox, Database } from "lucide-react";
 import { Pagination } from "../components/Pagination";
 import { useDebounce } from "../hooks/useDebounce";
@@ -152,9 +153,16 @@ export default function Admin() {
     }
   };
 
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+
   const handleBulkDeleteAdmin = async () => {
     if (selectedAdminIds.size === 0) return;
-    if (!window.confirm(`${selectedAdminIds.size} ta trekni o'chirishni tasdiqlaysizmi?`)) return;
+    if (!confirmBulkDelete) {
+      setConfirmBulkDelete(true);
+      setTimeout(() => setConfirmBulkDelete(false), 4000);
+      return;
+    }
+    setConfirmBulkDelete(false);
     setBulkSaving(true);
     try {
       const promises = Array.from(selectedAdminIds).map(id => deleteSong(id));
@@ -174,8 +182,6 @@ export default function Admin() {
   const [lyricsModalOpen, setLyricsModalOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  useScrollLock(!!deleteConfirmId || lyricsModalOpen);
 
   // ── Upload Permission State ──────────────────────────────────────────────────
   interface UploadRequest {
@@ -206,19 +212,43 @@ export default function Admin() {
   const [customDays, setCustomDays] = useState(7);
   const [approving, setApproving] = useState(false);
 
+  useScrollLock(!!deleteConfirmId || lyricsModalOpen || !!approveModal);
+
+  // Close open Admin modals on Escape
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (deleteConfirmId) setDeleteConfirmId(null);
+      else if (lyricsModalOpen) setLyricsModalOpen(false);
+      else if (approveModal) setApproveModal(null);
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [deleteConfirmId, lyricsModalOpen, approveModal]);
+
   async function loadUploadRequests() {
     setLoadingRequests(true);
-    const { data: reqs } = await supabase
-      .from('upload_requests')
-      .select('*')
-      .order('created_at', { ascending: false });
-    const { data: perms } = await supabase
-      .from('upload_permissions')
-      .select('*')
-      .order('granted_at', { ascending: false });
-    if (reqs) setUploadRequests(reqs as UploadRequest[]);
-    if (perms) setUploadPermissions(perms as UploadPermission[]);
-    setLoadingRequests(false);
+    try {
+      const [{ data: reqs, error: reqErr }, { data: perms, error: permErr }] = await Promise.all([
+        supabase
+          .from('upload_requests')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('upload_permissions')
+          .select('*')
+          .order('granted_at', { ascending: false }),
+      ]);
+      if (reqErr) throw reqErr;
+      if (permErr) throw permErr;
+      if (reqs) setUploadRequests(reqs as UploadRequest[]);
+      if (perms) setUploadPermissions(perms as UploadPermission[]);
+    } catch (err) {
+      console.error('Failed to load upload requests:', err);
+      toast.error('So\'rovlar ro\'yxatini yuklashda xatolik');
+    } finally {
+      setLoadingRequests(false);
+    }
   }
 
   useEffect(() => { loadUploadRequests(); }, []);
@@ -234,18 +264,22 @@ export default function Admin() {
           return d.toISOString();
         })();
 
-      await supabase.from('upload_permissions').insert([{
+      const { error: permErr } = await supabase.from('upload_permissions').insert([{
         fingerprint: request.fingerprint,
         expires_at: expiresAt,
         is_active: true,
         request_id: request.id,
       }]);
+      if (permErr) throw permErr;
 
-      await supabase.from('upload_requests').update({ status: 'approved' }).eq('id', request.id);
+      const { error: reqErr } = await supabase.from('upload_requests').update({ status: 'approved' }).eq('id', request.id);
+      if (reqErr) throw reqErr;
+
       toast.success(`"${request.requester_name}" ga ruxsat berildi!`);
       setApproveModal(null);
       loadUploadRequests();
     } catch (err) {
+      console.error('Approve request error:', err);
       toast.error('Ruxsat berishda xatolik');
     } finally {
       setApproving(false);
@@ -253,15 +287,27 @@ export default function Admin() {
   }
 
   async function rejectRequest(id: string) {
-    await supabase.from('upload_requests').update({ status: 'rejected' }).eq('id', id);
-    toast.success('So\'rov rad etildi');
-    loadUploadRequests();
+    try {
+      const { error } = await supabase.from('upload_requests').update({ status: 'rejected' }).eq('id', id);
+      if (error) throw error;
+      toast.success('So\'rov rad etildi');
+      loadUploadRequests();
+    } catch (err) {
+      console.error('Reject request error:', err);
+      toast.error('So\'rovni rad etishda xatolik');
+    }
   }
 
   async function revokePermission(id: string) {
-    await supabase.from('upload_permissions').update({ is_active: false }).eq('id', id);
-    toast.success('Ruxsat bekor qilindi');
-    loadUploadRequests();
+    try {
+      const { error } = await supabase.from('upload_permissions').update({ is_active: false }).eq('id', id);
+      if (error) throw error;
+      toast.success('Ruxsat bekor qilindi');
+      loadUploadRequests();
+    } catch (err) {
+      console.error('Revoke permission error:', err);
+      toast.error('Ruxsatni bekor qilishda xatolik');
+    }
   }
 
   async function extendPermission(id: string, currentExpiresAt: string | null, days: number) {
@@ -271,14 +317,16 @@ export default function Admin() {
       const start = baseDate > now ? baseDate : now;
       start.setDate(start.getDate() + days);
 
-      await supabase.from('upload_permissions').update({
+      const { error } = await supabase.from('upload_permissions').update({
         expires_at: start.toISOString(),
         is_active: true
       }).eq('id', id);
+      if (error) throw error;
 
       toast.success(`Ruxsat +${days} kunga uzaytirildi!`);
       loadUploadRequests();
     } catch (err) {
+      console.error('Extend permission error:', err);
       toast.error('Uzaytirishda xatolik');
     }
   }
@@ -288,12 +336,12 @@ export default function Admin() {
     const headers = ['ID', 'Title', 'Artist', 'Category', 'Play Count', 'Uploaded By', 'Created At'];
     const rows = list.map(m => [
       m.id,
-      `"${(m.title || '').replace(/"/g, '""')}"`,
-      `"${(m.artist || '').replace(/"/g, '""')}"`,
-      `"${(m.category || '').replace(/"/g, '""')}"`,
+      escapeCsvCell(m.title || ''),
+      escapeCsvCell(m.artist || ''),
+      escapeCsvCell(m.category || ''),
       m.play_count || 0,
-      `"${(m.uploaded_by || 'System').replace(/"/g, '""')}"`,
-      m.created_at || ''
+      escapeCsvCell(m.uploaded_by || 'System'),
+      escapeCsvCell(m.created_at || '')
     ]);
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -409,6 +457,12 @@ export default function Admin() {
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      const check = validateImageFile(file);
+      if (!check.valid) {
+        toast.error(check.error || "Rasm formati yoki hajmi yaroqsiz.");
+        e.target.value = '';
+        return;
+      }
       if (newCoverPreview) {
         URL.revokeObjectURL(newCoverPreview);
       }
@@ -435,7 +489,7 @@ export default function Admin() {
   useEffect(() => {
     let mounted = true;
     setLoading(true);
-    getAllSongs()
+    getAdminSongs()
       .then((data) => {
         if (!mounted) return;
         setList(data);
@@ -596,7 +650,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="w-full max-w-6xl mx-auto p-8 md:p-12 pt-48 md:pt-60 relative z-10 font-mono text-[var(--text-primary)] min-h-screen scale-[0.95] origin-top">
+    <div className="w-full max-w-6xl mx-auto p-4 sm:p-8 md:p-10 pt-6 md:pt-10 relative z-10 font-mono text-[var(--text-primary)] min-h-screen">
       <Helmet>
         <title>Admin Panel | Fronto</title>
         <meta name="robots" content="noindex, nofollow" />
@@ -923,24 +977,13 @@ export default function Admin() {
               </div>
 
               {/* Today's Uploads */}
-              <div className="relative cyber-panel relative border border-teal-500/50 hover:border-teal-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(20,184,166,0.2)]">
+              <div className="relative cyber-panel border border-teal-500/50 hover:border-teal-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(20,184,166,0.2)]">
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-teal-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
                 <div className="flex items-center gap-2 text-teal-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
                   <Calendar size={12} /> Uploaded Today
                 </div>
                 <div className="text-2xl font-black text-white group-hover:text-teal-300 transition-colors">
                   {stats?.todaysUploads || 0}
-                </div>
-              </div>
-
-              {/* Storage Size Estimate */}
-              <div className="relative cyber-panel relative border border-indigo-500/50 hover:border-indigo-400 p-4 backdrop-blur-sm group transition-all overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.9)] hover:shadow-[0_0_20px_rgba(99,102,241,0.2)]">
-                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-400 to-transparent opacity-70 group-hover:opacity-100 transition-opacity" />
-                <div className="flex items-center gap-2 text-indigo-400 text-[10px] uppercase tracking-widest mb-2 font-bold">
-                  <Database size={12} /> Est. Storage
-                </div>
-                <div className="text-xl font-black text-white group-hover:text-indigo-300 transition-colors">
-                  {stats?.storageEstimateMB || 0} MB
                 </div>
               </div>
             </div>
@@ -1315,11 +1358,16 @@ export default function Admin() {
                         Janrni O'zgartirish
                       </button>
                       <button
+                        type="button"
                         onClick={handleBulkDeleteAdmin}
                         disabled={bulkSaving}
-                        className="px-3 py-1.5 bg-red-500/20 border border-red-500 text-red-400 font-bold text-xs uppercase hover:bg-red-500 hover:text-black transition-all"
+                        className={`px-3 py-1.5 border font-bold text-xs uppercase transition-all ${
+                          confirmBulkDelete
+                            ? 'bg-red-500 text-black border-red-400 animate-pulse'
+                            : 'bg-red-500/20 border-red-500 text-red-400 hover:bg-red-500 hover:text-black'
+                        }`}
                       >
-                        O'chirish ({selectedAdminIds.size})
+                        {confirmBulkDelete ? `Tasdiqlash (${selectedAdminIds.size})?` : `O'chirish (${selectedAdminIds.size})`}
                       </button>
                       <button
                         onClick={() => setSelectedAdminIds(new Set())}
@@ -1331,38 +1379,38 @@ export default function Admin() {
                   </div>
                 )}
 
-                {/* Table Header */}
-                <div className="grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--accent)]/20 bg-[rgba(var(--accent-rgb),0.12)] backdrop-blur-md text-xs uppercase tracking-widest text-white font-black items-center shadow-sm">
-                  <input
-                    ref={el => {
-                      if (el) {
-                        const isSome = paginatedList.some(m => selectedAdminIds.has(m.id));
-                        const isAll = paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id));
-                        el.indeterminate = isSome && !isAll;
-                      }
-                    }}
-                    type="checkbox"
-                    checked={paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id))}
-                    onChange={() => toggleSelectAllAdmin(paginatedList)}
-                    className="cyber-checkbox"
-                    title="Barchasini tanlash / bekor qilish"
-                  />
-                  <div className="w-12 text-center">Img</div>
-                  <div>Title</div>
-                  <div>Artist</div>
-                  <div>Category</div>
-                  <div>Uploader</div>
-                  <div className="text-right">Time</div>
-                  <div className="text-right">Actions</div>
-                </div>
-
-                {/* List */}
                 {/* Horizontal scroll hint for small screens */}
-                <div className="block sm:hidden text-[9px] font-mono text-[var(--text-secondary)]/40 text-right px-4 py-1 border-b border-[var(--text-secondary)]/10">
+                <div className="block sm:hidden text-[9px] font-mono text-[var(--text-secondary)]/60 text-right px-4 py-1 border-b border-[var(--text-secondary)]/10">
                   ← Jadval uchun suring →
                 </div>
                 <div className="overflow-x-auto custom-scrollbar">
-                  <div className="min-w-[700px]">
+                  <div className="min-w-[780px]">
+                    {/* Table Header (aligned inside scrollable container) */}
+                    <div className="grid grid-cols-[auto_auto_2fr_1.5fr_1fr_1fr_0.5fr_1.5fr] gap-3 p-4 border-b border-[var(--accent)]/20 bg-[rgba(var(--accent-rgb),0.12)] backdrop-blur-md text-xs uppercase tracking-widest text-white font-black items-center shadow-sm">
+                      <input
+                        ref={el => {
+                          if (el) {
+                            const isSome = paginatedList.some(m => selectedAdminIds.has(m.id));
+                            const isAll = paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id));
+                            el.indeterminate = isSome && !isAll;
+                          }
+                        }}
+                        type="checkbox"
+                        checked={paginatedList.length > 0 && paginatedList.every(m => selectedAdminIds.has(m.id))}
+                        onChange={() => toggleSelectAllAdmin(paginatedList)}
+                        className="cyber-checkbox"
+                        title="Barchasini tanlash / bekor qilish"
+                        aria-label="Select all tracks on page"
+                      />
+                      <div className="w-12 text-center">Img</div>
+                      <div>Title</div>
+                      <div>Artist</div>
+                      <div>Category</div>
+                      <div>Uploader</div>
+                      <div className="text-right">Time</div>
+                      <div className="text-right">Actions</div>
+                    </div>
+
                     <div className="max-h-[600px] overflow-y-auto overflow-x-hidden custom-scrollbar">
                       {paginatedList.map((m, idx) => (
                         <div
@@ -1394,7 +1442,7 @@ export default function Admin() {
                                 <input
                                   type="file"
                                   className="hidden"
-                                  accept="image/*"
+                                  accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                                   onChange={handleCoverChange}
                                 />
                               </label>
@@ -1515,7 +1563,7 @@ export default function Admin() {
                           </div>
 
                           {/* Duration */}
-                          <div className="text-right text-sm text-cyan-400 font-bold font-mono">
+                          <div className="text-right text-sm text-[var(--accent)] font-bold font-mono">
                             {formatDuration(m.duration)}
                           </div>
 
@@ -1623,7 +1671,13 @@ export default function Admin() {
 
       {/* Approve Duration Modal */}
       {approveModal && createPortal(
-        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Approve upload permission"
+          className="fixed inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setApproveModal(null); }}
+        >
           <div className="relative w-full max-w-sm bg-[var(--bg-main)] border border-green-500/50 shadow-[0_0_60px_rgba(0,255,0,0.1)] overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-green-500 to-transparent opacity-80" />
             <div className="absolute top-0 left-0 w-3 h-3 border-t-2 border-l-2 border-green-500" />
@@ -1708,7 +1762,13 @@ export default function Admin() {
       )}
 
       {deleteConfirmId && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirm deletion"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-in fade-in duration-300"
+          onClick={(e) => { if (e.target === e.currentTarget && !saving) setDeleteConfirmId(null); }}
+        >
           <div className="bg-[#0a0a0a] border-2 border-red-500/30 w-full max-w-md p-8 shadow-[0_0_50px_rgba(239,68,68,0.15)] relative overflow-hidden">
             {/* Background pattern */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[radial-gradient(#ff0000_1px,transparent_1px)] [background-size:20px_20px]"></div>
@@ -1759,7 +1819,13 @@ export default function Admin() {
 
       {/* Lyrics Modal */}
       {lyricsModalOpen && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit lyrics"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setLyricsModalOpen(false); }}
+        >
           <div className="bg-[var(--bg-main)] border border-[var(--accent)] w-full max-w-2xl p-6 shadow-[0_0_50px_rgba(var(--accent-rgb),0.2)] flex flex-col h-[80vh]">
             <div className="flex justify-between items-center mb-4 border-b border-[var(--text-secondary)] pb-4">
               <h3 className="text-xl font-bold tracking-widest text-[var(--accent)]">EDIT LYRICS</h3>
@@ -1789,6 +1855,9 @@ export default function Admin() {
       {/* Global Search Modal (Command Palette Ctrl+K) */}
       {isSearchModalOpen && createPortal(
         <div 
+          role="dialog"
+          aria-modal="true"
+          aria-label="Admin search"
           className="fixed inset-0 z-[110] flex items-start justify-center pt-16 sm:pt-24 px-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150"
           onClick={e => {
             if (e.target === e.currentTarget) setIsSearchModalOpen(false);
@@ -1817,12 +1886,14 @@ export default function Admin() {
                   <X size={16} />
                 </button>
               )}
-              <kbd 
+              <button
+                type="button"
                 onClick={() => setIsSearchModalOpen(false)}
-                className="px-2 py-1 text-[10px] bg-white/10 hover:bg-white/20 text-white/70 border border-white/20 rounded cursor-pointer transition-colors shrink-0"
+                aria-label="Close search modal"
+                className="px-2 py-1 text-[10px] bg-white/10 hover:bg-white/20 text-white/70 border border-white/20 cursor-pointer transition-colors shrink-0"
               >
                 ESC
-              </kbd>
+              </button>
             </div>
 
             {/* Results Info Bar */}

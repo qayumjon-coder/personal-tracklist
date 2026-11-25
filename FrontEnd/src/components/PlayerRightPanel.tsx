@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { CyberCategoryDropdown } from "./CyberCategoryDropdown";
 import type { Song } from "../types/Song";
 import { Playlist } from "./Playlist";
+import { useSettings } from "../contexts/SettingsContext";
 
 interface PlayerRightPanelProps {
   player: any;
@@ -69,6 +70,7 @@ export function PlayerRightPanel({
   playClick,
   playHover
 }: PlayerRightPanelProps) {
+  const { t } = useSettings();
   const computedCategoryCounts = useMemo(() => {
     if (categoryCounts) return categoryCounts;
     const counts: Record<string, number> = {
@@ -116,28 +118,33 @@ export function PlayerRightPanel({
       }}
       >
         {/* Mobile Swipe Handle */}
-        <div
-          className="w-full flex justify-center py-3 md:hidden cursor-pointer active:bg-white/5 border-b border-[var(--text-secondary)]/10"
+        <button
+          type="button"
+          className="w-full flex justify-center py-3 md:hidden cursor-pointer active:bg-white/5 border-b border-[var(--text-secondary)]/10 relative"
           onClick={() => setIsMobilePlaylistOpen(false)}
           onTouchStart={onDrawerTouchStart}
           onTouchMove={onDrawerTouchMove}
           onTouchEnd={onDrawerTouchEnd}
+          aria-label="Close playlist drawer"
         >
           <div className="flex items-center justify-center w-full pointer-events-none">
             <div className="w-12 h-1 bg-[var(--text-secondary)]/40 rounded-full" />
             <ChevronDown className="absolute right-4 text-[var(--text-secondary)]/50" size={16} />
           </div>
-        </div>
+        </button>
 
         {/* Right Panel Tabs */}
-        <div className="flex items-stretch border-b border-[var(--text-secondary)]/30 bg-[var(--text-secondary)]/5 shrink-0">
+        <div role="tablist" aria-label="Playlist views" className="flex items-stretch border-b border-[var(--text-secondary)]/30 bg-[var(--text-secondary)]/5 shrink-0">
           {[
-            { id: 'playlist', label: 'Tracklist', icon: <ListMusic size={11} /> },
-            { id: 'queue',    label: `Queue${player.queue.length > 0 ? ` (${player.queue.length})` : ''}`, icon: <ListPlus size={11} /> },
-            { id: 'recent',   label: 'Recent', icon: <History size={11} /> },
+            { id: 'playlist', label: t('tracklist'), icon: <ListMusic size={11} /> },
+            { id: 'queue',    label: `${t('queue')}${player.queue.length > 0 ? ` (${player.queue.length})` : ''}`, icon: <ListPlus size={11} /> },
+            { id: 'recent',   label: t('recent'), icon: <History size={11} /> },
           ].map(tab => (
             <button
               key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={rightTab === tab.id}
               onClick={() => { playClick(); setRightTab(tab.id as any); }}
               onMouseEnter={playHover}
               className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-[8px] font-mono uppercase tracking-wider transition-all border-b-2 ${
@@ -156,7 +163,7 @@ export function PlayerRightPanel({
           <div className="flex flex-col gap-1.5 px-3 py-2 border-b border-white/10 bg-black/40">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[9px] font-mono text-white/70 font-bold tracking-widest shrink-0">
-                {filteredSongs.length} SONGS
+                {filteredSongs.length} {t('songs_count')}
               </span>
               <div className="flex-1 max-w-[200px]">
                 <CyberCategoryDropdown
@@ -184,7 +191,7 @@ export function PlayerRightPanel({
                     : "border-white/10 text-white/60 hover:text-white"
                 }`}
               >
-                ALL ({songs.length})
+                {t('all_label')} ({songs.length})
               </button>
               {categories
                 .filter(c => !["All", "Trending", "Favorites", "Queue", "Recently Played"].includes(c))
@@ -214,7 +221,7 @@ export function PlayerRightPanel({
                   className="px-1.5 py-0.5 text-[8px] font-mono text-red-400 hover:text-red-300 border border-red-500/30 hover:border-red-500 bg-red-500/10 ml-auto shrink-0 flex items-center gap-0.5 font-bold"
                   title="Filtrni tozalash"
                 >
-                  <X size={8} /> CLEAR
+                  <X size={8} /> {t('clear_filter')}
                 </button>
               )}
             </div>
@@ -283,8 +290,10 @@ export function PlayerRightPanel({
                           <div className="text-[7px] font-mono truncate opacity-40 uppercase">{song.artist}</div>
                         </div>
                         <button
+                          type="button"
                           onClick={() => player.removeFromQueue(i)}
-                          className="shrink-0 text-[var(--text-secondary)]/20 hover:text-[var(--danger)] opacity-0 group-hover/q:opacity-100 transition-all"
+                          aria-label={`Remove ${song.title} from queue`}
+                          className="shrink-0 text-[var(--text-secondary)]/60 hover:text-[var(--danger)] sm:opacity-0 sm:group-hover/q:opacity-100 focus:opacity-100 transition-all"
                         >
                           <X size={12} />
                         </button>

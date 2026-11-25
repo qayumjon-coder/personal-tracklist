@@ -3,6 +3,7 @@ import { useEffect, useRef, useMemo } from "react";
 import type { RefObject } from "react";
 import { useAudioTime } from "../hooks/useAudioTime";
 import type { Song } from "../types/Song";
+import { sanitizeCssUrl } from "../utils/security";
 
 interface LyricsLine {
   time: number;
@@ -75,17 +76,35 @@ export function LyricsView({ song, audioRef, onClose }: LyricsViewProps) {
     }
   }, [activeIndex]);
 
+  // Close on Escape
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  const safeBgUrl = sanitizeCssUrl(song.coverUrl);
+
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black overflow-hidden animate-in fade-in zoom-in duration-500">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Lyrics View"
+      className="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-black overflow-hidden animate-in fade-in zoom-in duration-500"
+    >
       {/* Blurred Background */}
-      <div 
-        className="absolute inset-0 z-0 opacity-50 blur-[80px] scale-110"
-        style={{ 
-          backgroundImage: `url(${song.coverUrl})`,
-          backgroundPosition: 'center',
-          backgroundSize: 'cover'
-        }}
-      />
+      {safeBgUrl && (
+        <div
+          className="absolute inset-0 z-0 opacity-50 blur-[80px] scale-110"
+          style={{
+            backgroundImage: safeBgUrl,
+            backgroundPosition: 'center',
+            backgroundSize: 'cover',
+          }}
+        />
+      )}
       <div className="absolute inset-0 bg-black/80 z-10" />
 
       {/* Header */}
@@ -103,6 +122,7 @@ export function LyricsView({ song, audioRef, onClose }: LyricsViewProps) {
           onClick={onClose}
           className="p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full transition-all duration-300 group"
           title="Exit Karaoke Mode"
+          aria-label="Close lyrics"
         >
           <X className="text-white group-hover:rotate-90 transition-transform duration-500" size={24} />
         </button>
@@ -111,7 +131,11 @@ export function LyricsView({ song, audioRef, onClose }: LyricsViewProps) {
       {/* Lyrics Content */}
       <div 
         ref={scrollContainerRef}
-        className="relative z-20 flex-1 w-full max-w-4xl overflow-y-auto px-6 md:px-10 py-10 custom-scrollbar mask-fade scroll-smooth"
+        className="relative z-20 flex-1 w-full max-w-4xl overflow-y-auto px-6 md:px-10 py-10 no-scrollbar scroll-smooth"
+        style={{
+          maskImage: 'linear-gradient(to bottom, transparent, black 25%, black 75%, transparent)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 25%, black 75%, transparent)',
+        }}
       >
         <div className="flex flex-col gap-8 md:gap-12 py-[40vh]">
           {lyricsData.length > 0 ? (
@@ -155,15 +179,6 @@ export function LyricsView({ song, audioRef, onClose }: LyricsViewProps) {
       <div className="relative z-20 w-full p-6 text-center opacity-30 font-mono text-[10px] uppercase tracking-[0.5em] text-white">
         Fronto Neural Node — SYNC_ENABLED
       </div>
-
-      <style dangerouslySetInnerHTML={{ __html: `
-        .mask-fade {
-          mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 0px;
-        }
-      `}} />
     </div>
   );
 }

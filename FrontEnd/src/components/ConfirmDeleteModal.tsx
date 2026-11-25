@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 interface ConfirmDeleteModalProps {
@@ -9,12 +10,21 @@ interface ConfirmDeleteModalProps {
 }
 
 export function ConfirmDeleteModal({ isOpen, onClose, onConfirm, songTitle, count }: ConfirmDeleteModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const isBulk = count && count > 1;
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
+    <div role="dialog" aria-modal="true" aria-label="Confirm deletion" className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-200">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm"

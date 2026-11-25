@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useSettings } from "../contexts/SettingsContext";
 import { useNavigate } from "react-router-dom";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -9,20 +10,26 @@ interface SettingsProps {
 
 type Theme = "aqua" | "green" | "amber" | "pink" | "red" | "neon" | "toxic" | "sunset" | "matrix";
 
-// Reusable toggle component with subtitle
+// Reusable accessible switch component with subtitle
 function CyberToggle({ label, subtitle, enabled, onToggle }: { label: string; subtitle: string; enabled: boolean; onToggle: () => void }) {
   return (
-    <div className="flex items-center justify-between group cursor-pointer py-1.5 px-2 hover:bg-[var(--text-secondary)]/5 transition-colors" onClick={onToggle}>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={enabled}
+      onClick={onToggle}
+      className="w-full text-left flex items-center justify-between group cursor-pointer py-1.5 px-2 hover:bg-[var(--text-secondary)]/5 transition-colors"
+    >
       <div className="flex flex-col gap-0.5">
         <span className={`text-[11px] tracking-widest font-bold transition-colors ${enabled ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]/60'}`}>
           {label}
         </span>
-        <span className="text-[8px] text-[var(--text-secondary)]/40 tracking-wider leading-tight">{subtitle}</span>
+        <span className="text-[9px] text-[var(--text-secondary)]/60 tracking-wider leading-tight">{subtitle}</span>
       </div>
       <div className={`w-10 h-5 border flex items-center p-0.5 transition-colors shrink-0 ml-3 ${enabled ? 'border-[var(--text-primary)]' : 'border-[var(--text-secondary)]/20'}`}>
         <div className={`w-3 h-3 transition-all duration-300 ${enabled ? 'translate-x-5 bg-[var(--text-primary)] shadow-[0_0_8px_var(--text-primary)]' : 'translate-x-0 bg-[var(--text-secondary)]/20 shadow-none'}`} />
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -54,6 +61,15 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   } = useSettings();
 
   useScrollLock(isOpen);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleEsc);
+    return () => window.removeEventListener('keydown', handleEsc);
+  }, [isOpen, onClose]);
 
   const handleResetAll = () => {
     // Clear all settings keys from localStorage so defaults persist on reload
@@ -96,7 +112,13 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Settings"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div className="relative w-full max-w-3xl bg-[var(--bg-main)] border border-[var(--text-primary)] shadow-[0_0_50px_rgba(0,0,0,0.5),0_0_100px_rgba(var(--accent-rgb),0.05)] animate-in zoom-in-95 duration-200">
         {/* Decorative Corner Accents */}
         <div className="absolute -top-[1px] -left-[1px] w-4 h-4 border-t-2 border-l-2 border-[var(--text-primary)] z-50 pointer-events-none"></div>
@@ -118,12 +140,14 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
               <button
                 onClick={handleResetAll}
                 className="text-[9px] font-mono text-[var(--text-secondary)]/60 hover:text-red-400 border border-[var(--text-secondary)]/20 hover:border-red-400/50 px-3 py-1.5 transition-all uppercase tracking-widest"
-                title="Reset all settings to default"
+                title={t('reset_all')}
               >
-                Reset
+                {t('reset_all')}
               </button>
               <button
+                type="button"
                 onClick={onClose}
+                aria-label="Close settings"
                 className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-mono text-xl transition-colors p-2"
               >
                 [X]
@@ -143,13 +167,13 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 <div className="space-y-1">
                   <CyberToggle
                     label="AUDIO_HAPTIC"
-                    subtitle="UI ovoz effektlari (klik, hover)"
+                    subtitle={t('haptic_sub')}
                     enabled={soundEnabled}
                     onToggle={() => setSoundEnabled(!soundEnabled)}
                   />
                   <CyberToggle
                     label="NEURAL_AUTOFLOW"
-                    subtitle="Keyingi trekni avtomatik ijro etish"
+                    subtitle={t('autoflow_sub')}
                     enabled={autoplay}
                     onToggle={() => setAutoplay(!autoplay)}
                   />
@@ -160,7 +184,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                   <div className="flex justify-between items-center mb-2">
                     <div className="flex flex-col gap-0.5">
                       <span className="text-[11px] tracking-widest font-bold text-[var(--text-primary)]">CROSSFADE_TRANSITION</span>
-                      <span className="text-[8px] text-[var(--text-secondary)]/40 tracking-wider">Treklar orasida silliq o'tish</span>
+                      <span className="text-[9px] text-[var(--text-secondary)]/60 tracking-wider">{t('crossfade_sub')}</span>
                     </div>
                     <span className="text-[10px] text-[var(--text-primary)] font-bold">{crossfade}s</span>
                   </div>
@@ -171,7 +195,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                         onClick={() => setCrossfade(sec)}
                         className={`py-1.5 text-[9px] font-bold uppercase transition-colors ${crossfade === sec ? 'bg-[var(--text-primary)] text-black' : 'text-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/5'}`}
                       >
-                        {sec === 0 ? 'Off' : `${sec}s`}
+                        {sec === 0 ? t('off') : `${sec}s`}
                       </button>
                     ))}
                   </div>
@@ -184,13 +208,13 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 <div className="space-y-1">
                   <CyberToggle
                     label="SCAN_FILTERS"
-                    subtitle="CRT monitor effekti (gorizontal chiziqlar)"
+                    subtitle={t('scan_sub')}
                     enabled={scanlines}
                     onToggle={() => setScanlines(!scanlines)}
                   />
                   <CyberToggle
                     label="MATRIX_GRID"
-                    subtitle="Fonda katak (grid) ko'rsatish"
+                    subtitle={t('grid_sub')}
                     enabled={grid}
                     onToggle={() => {
                       const nextGrid = !grid;
@@ -200,7 +224,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                   />
                   <CyberToggle
                     label={t('matrix_bg')}
-                    subtitle="Fonda Matrix yomg'ir animatsiyasi"
+                    subtitle={t('matrix_sub')}
                     enabled={matrixBg}
                     onToggle={() => {
                       const nextMatrix = !matrixBg;
@@ -213,8 +237,8 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 {/* Visualizer Engine */}
                 <div className="pt-2 px-2">
                   <div className="flex flex-col gap-0.5 mb-2">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-[0.2em]">VISUAL_ENGINE:</span>
-                    <span className="text-[8px] text-[var(--text-secondary)]/40 tracking-wider">Audio vizualizatsiya rejimi</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-[0.2em]">{t('visual_engine')}</span>
+                    <span className="text-[9px] text-[var(--text-secondary)]/60 tracking-wider">{t('visual_engine_sub')}</span>
                   </div>
                   <div className="grid grid-cols-3 border border-[var(--text-secondary)]/20 divide-x divide-y divide-[var(--text-secondary)]/20 font-mono">
                     {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale', 'aurora', 'stars', 'hex']).map((mode) => (
@@ -232,21 +256,21 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                 {/* Progress Bar Style */}
                 <div className="pt-2 px-2">
                   <div className="flex flex-col gap-0.5 mb-2">
-                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-[0.2em]">PROGRESS_BAR_STYLE:</span>
-                    <span className="text-[8px] text-[var(--text-secondary)]/40 tracking-wider">Qo'shiq progress bar ko'rinishi</span>
+                    <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-[0.2em]">{t('progress_style')}</span>
+                    <span className="text-[9px] text-[var(--text-secondary)]/60 tracking-wider">{t('progress_style_sub')}</span>
                   </div>
                   <div className="grid grid-cols-2 border border-[var(--text-secondary)]/20 divide-x divide-[var(--text-secondary)]/20 font-mono">
                     <button
                       onClick={() => setProgressBarMode("standard")}
                       className={`py-2 text-[9px] font-bold uppercase transition-colors ${progressBarMode === "standard" ? 'bg-[var(--text-primary)] text-black' : 'text-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/5'}`}
                     >
-                      ODDIY (Standard)
+                      {t('progress_standard')}
                     </button>
                     <button
                       onClick={() => setProgressBarMode("waveform")}
                       className={`py-2 text-[9px] font-bold uppercase transition-colors ${progressBarMode === "waveform" ? 'bg-[var(--text-primary)] text-black' : 'text-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/5'}`}
                     >
-                      WAVEFORM (Visualizer)
+                      {t('progress_waveform')}
                     </button>
                   </div>
                 </div>
@@ -334,7 +358,7 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                   onClick={() => { onClose(); navigate('/admin'); }}
                   className="w-full flex items-center justify-between group p-3 border border-[var(--text-secondary)]/10 hover:border-[var(--accent)]/50 hover:bg-[var(--accent)]/5 transition-all text-left"
                 >
-                  <span className="text-[10px] text-[var(--accent)] font-black tracking-[0.3em] uppercase">Access Admin Portal</span>
+                  <span className="text-[10px] text-[var(--accent)] font-black tracking-[0.3em] uppercase">{t('access_admin')}</span>
                   <span className="text-[var(--text-secondary)] group-hover:text-[var(--accent)] transition-colors">→</span>
                 </button>
               </div>

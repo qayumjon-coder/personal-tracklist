@@ -18,6 +18,14 @@ import { parseBlob } from "music-metadata";
 import { uploadSong } from "../services/musicApi";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
+import { validateAudioFile, validateImageFile } from "../utils/security";
+import { UPLOAD_LIMITS } from "../utils/constants";
+
+function revokeIfBlob(url?: string | null) {
+  if (url && url.startsWith("blob:")) {
+    URL.revokeObjectURL(url);
+  }
+}
 
 export interface BatchItem {
   id: string;
@@ -52,18 +60,33 @@ export function BatchUploadPanel({
   const [bulkCoverPreview, setBulkCoverPreview] = useState<string | null>(null);
   const [bulkCoverFile, setBulkCoverFile] = useState<File | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+
+  const itemsRef = useRef<BatchItem[]>([]);
+  const bulkCoverPreviewRef = useRef<string | null>(null);
+  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { bulkCoverPreviewRef.current = bulkCoverPreview; }, [bulkCoverPreview]);
+  useEffect(() => {
+    return () => {
+      itemsRef.current.forEach(it => revokeIfBlob(it.coverPreviewUrl));
+      revokeIfBlob(bulkCoverPreviewRef.current);
+    };
+  }, []);
 
   // Apply a cover image File to a specific item or to all items
   const applyCoverToItem = (file: File, itemId?: string | null) => {
-    const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB > 8) {
-      toast.error(`Rasm hajmi juda katta (${fileSizeMB.toFixed(1)} MB). 8MB dan kichik rasm tanlang.`);
+    const check = validateImageFile(file);
+    if (!check.valid) {
+      toast.error(check.error || "Rasm formati yoki hajmi yaroqsiz.");
       return;
     }
     const previewUrl = URL.createObjectURL(file);
 
     if (itemId) {
-      const target = items.find(it => it.id === itemId);
+      const target = itemsRef.current.find(it => it.id === itemId);
+      if (target && target.coverPreviewUrl !== bulkCoverPreviewRef.current) {
+        revokeIfBlob(target.coverPreviewUrl);
+      }
       setItems(prev => prev.map(it => it.id === itemId ? {
         ...it,
         coverFile: file,
@@ -71,6 +94,13 @@ export function BatchUploadPanel({
       } : it));
       toast.success(`"${target?.title || 'Trek'}" uchun muqova rasmi o'rnatildi!`);
     } else {
+      const oldBulk = bulkCoverPreviewRef.current;
+      itemsRef.current.forEach(it => {
+        if (it.coverPreviewUrl && it.coverPreviewUrl !== oldBulk) {
+          revokeIfBlob(it.coverPreviewUrl);
+        }
+      });
+      revokeIfBlob(oldBulk);
       setBulkCoverFile(file);
       setBulkCoverPreview(previewUrl);
       setItems(prev => prev.map(it => ({
@@ -78,7 +108,7 @@ export function BatchUploadPanel({
         coverFile: file,
         coverPreviewUrl: previewUrl
       })));
-      toast.success(`Barcha ${items.length} ta trekka umumiy muqova rasmi o'rnatildi!`);
+      toast.success(`Barcha ${itemsRef.current.length} ta trekka umumiy muqova rasmi o'rnatildi!`);
     }
   };
 
@@ -188,15 +218,22 @@ export function BatchUploadPanel({
     }
     if (!artist) artist = "Unknown Artist";
 
-    // Fallback duration using Audio element
+    // Fallback duration using Audio element (revoke blob after read)
     if (!duration) {
+      const audioBlobUrl = URL.createObjectURL(file);
       try {
         duration = await new Promise<number>((resolve) => {
-          const a = new Audio(URL.createObjectURL(file));
-          a.onloadedmetadata = () => resolve(a.duration || 0);
-          a.onerror = () => resolve(0);
+          const a = new Audio(audioBlobUrl);
+          const done = (val: number) => {
+            URL.revokeObjectURL(audioBlobUrl);
+            a.src = '';
+            resolve(val);
+          };
+          a.onloadedmetadata = () => done(isFinite(a.duration) ? a.duration : 0);
+          a.onerror = () => done(0);
         });
       } catch {
+        URL.revokeObjectURL(audioBlobUrl);
         duration = 0;
       }
     }
@@ -213,14 +250,37 @@ export function BatchUploadPanel({
 
   // Add files to staging list
   const handleFilesAdded = async (files: FileList | File[]) => {
-    const audioFiles = Array.from(files).filter(f => 
-      f.type.startsWith('audio/') || /\.(mp3|wav|flac|ogg|m4a|aac)$/i.test(f.name)
-    );
+    const validAudioFiles: File[] = [];
+    const rejectedNames: string[] = [];
 
-    if (audioFiles.length === 0) {
-      toast.error("Audio formatidagi fayllar topilmadi (.mp3, .wav, .flac, .ogg, .m4a)");
+    Array.from(files).forEach(f => {
+      const check = validateAudioFile(f);
+      if (check.valid) {
+        validAudioFiles.push(f);
+      } else if (f.type.startsWith('audio/') || /\.(mp3|wav|flac|ogg|m4a|aac|webm)$/i.test(f.name)) {
+        rejectedNames.push(`${f.name} (${(f.size / (1024 * 1024)).toFixed(1)}MB)`);
+      }
+    });
+
+    if (rejectedNames.length > 0) {
+      toast.error(`Hajmi ${UPLOAD_LIMITS.MAX_AUDIO_MB}MB dan katta fayllar o'tkazib yuborildi: ${rejectedNames.slice(0, 3).join(', ')}`);
+    }
+
+    if (validAudioFiles.length === 0) {
+      if (rejectedNames.length === 0) {
+        toast.error("Audio formatidagi fayllar topilmadi (.mp3, .wav, .flac, .ogg, .m4a)");
+      }
       return;
     }
+
+    const audioFiles = !isAuthenticated
+      ? validAudioFiles.slice(0, Math.max(0, UPLOAD_LIMITS.MAX_SONGS_PER_GUEST - items.length))
+      : validAudioFiles;
+
+    if (!isAuthenticated && audioFiles.length < validAudioFiles.length) {
+      toast.warning(`Mehmon foydalanuvchilar ko'pi bilan ${UPLOAD_LIMITS.MAX_SONGS_PER_GUEST} ta trek qo'sha oladi.`);
+    }
+    if (audioFiles.length === 0) return;
 
     const newItems: BatchItem[] = audioFiles.map((f, idx) => ({
       id: `${Date.now()}-${idx}-${f.name}`,
@@ -302,15 +362,7 @@ export function BatchUploadPanel({
   const handleBulkCoverSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setBulkCoverFile(file);
-      const url = URL.createObjectURL(file);
-      setBulkCoverPreview(url);
-      setItems(prev => prev.map(it => ({
-        ...it,
-        coverFile: file,
-        coverPreviewUrl: url
-      })));
-      toast.success("Barcha treklarga umumiy albom rasmi o'rnatildi!");
+      applyCoverToItem(file, null);
     }
     e.target.value = "";
   };
@@ -320,16 +372,30 @@ export function BatchUploadPanel({
     setItems(prev => prev.map(it => it.id === id ? { ...it, [field]: value } : it));
   };
 
-  // Remove single item
+  // Remove single item (and revoke its unique blob URL)
   const removeItem = (id: string) => {
+    const target = itemsRef.current.find(it => it.id === id);
+    if (target && target.coverPreviewUrl !== bulkCoverPreviewRef.current) {
+      revokeIfBlob(target.coverPreviewUrl);
+    }
     setItems(prev => prev.filter(it => it.id !== id));
   };
 
-  // Clear all
+  // Clear all using in-UI confirmation state instead of native window.confirm
   const clearAll = () => {
-    if (items.length > 0 && window.confirm("Rostdan ham barcha qo'shilgan treklarni tozalaysizmi?")) {
-      setItems([]);
+    if (items.length === 0) return;
+    if (!confirmClearAll) {
+      setConfirmClearAll(true);
+      setTimeout(() => setConfirmClearAll(false), 3500);
+      return;
     }
+    itemsRef.current.forEach(it => {
+      if (it.coverPreviewUrl !== bulkCoverPreviewRef.current) {
+        revokeIfBlob(it.coverPreviewUrl);
+      }
+    });
+    setItems([]);
+    setConfirmClearAll(false);
   };
 
   // Upload worker: executes uploads with concurrency limit (e.g. 2 parallel)
@@ -563,7 +629,7 @@ export function BatchUploadPanel({
               <input
                 ref={bulkCoverInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                 onChange={handleBulkCoverSelect}
                 className="hidden"
               />
@@ -573,9 +639,13 @@ export function BatchUploadPanel({
                 type="button"
                 onClick={clearAll}
                 disabled={isUploading}
-                className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 text-xs font-bold transition-all uppercase disabled:opacity-40"
+                className={`px-3 py-1.5 text-xs font-bold transition-all uppercase disabled:opacity-40 border ${
+                  confirmClearAll
+                    ? 'bg-red-500 text-black border-red-400 animate-pulse'
+                    : 'bg-red-500/10 hover:bg-red-500/20 text-red-400 border-red-500/30'
+                }`}
               >
-                Tozalash
+                {confirmClearAll ? "Tasdiqlash?" : "Tozalash"}
               </button>
             </div>
           </div>
@@ -697,7 +767,7 @@ export function BatchUploadPanel({
                             <ImageIcon size={11} />
                             <input
                               type="file"
-                              accept="image/*"
+                              accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
                               className="hidden"
                               onChange={(e) => {
                                 const file = e.target.files?.[0];
