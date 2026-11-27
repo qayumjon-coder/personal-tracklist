@@ -13,7 +13,7 @@ import { PlayerCommandPalette } from "./PlayerCommandPalette";
 import { TrackProgress } from "./TrackProgress";
 import { PlaybackControls } from "./PlaybackControls";
 import { VolumeControl } from "./VolumeControl";
-import { Visualizer, FadeVisualizer, useBeatScale, AmbientBackground, ConcentricWavesVisualizer } from "./Visualizer";
+import { Visualizer, FadeVisualizer, useBeatScale, AmbientBackground, ConcentricWavesVisualizer, VinylDiscVisualizer } from "./Visualizer";
 import { LyricsView } from "./LyricsView";
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useScrollLock } from "../hooks/useScrollLock";
@@ -705,7 +705,7 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
           </div>
           
           <div className="absolute inset-0 opacity-90 pointer-events-none">
-             <Visualizer playing={player.playing} analyser={player.analyser} />
+             <Visualizer playing={player.playing} analyser={player.analyser} coverUrl={current?.coverUrl} />
           </div>
 
           <div className="absolute bottom-12 z-[110] text-[var(--text-secondary)] opacity-40 text-xs font-mono uppercase tracking-[0.4em]">
@@ -821,36 +821,46 @@ export function Player({ songs, loading, error, player, onOpenSettings, onAddToP
                       </div>
                     )}
 
-                    {/* Album art with neon glow + fade animation */}
-                    <div 
-                      className="relative w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56 lg:w-60 lg:h-60 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/40 backdrop-blur-sm shrink-0"
-                      style={{ boxShadow: `0 0 25px rgba(var(--accent-rgb), 0.25), 0 0 60px rgba(var(--accent-rgb), 0.1), inset 0 0 15px rgba(var(--accent-rgb), 0.05)` }}
-                    >
-                      {/* Decorative corner accents for cover */}
-                      <div className="absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--accent)]"></div>
-                      <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--accent)]"></div>
-                      <div className="absolute -top-1 -right-1 w-2 h-2 border-t border-r border-[var(--accent)]"></div>
-                      <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b border-l border-[var(--accent)]"></div>
-
-                      <img
-                        ref={coverImgRef}
-                        src={current?.coverUrl || '/default-cover.png'}
-                        alt={current?.title || 'Unknown Track'}
-                        className={`w-full h-full object-cover transition-all duration-500 ease-out ${coverFading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
-                      />
-                      {/* Sleep Timer Badge */}
-                      {player.sleepTimer !== null && (
-                        <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/80 border border-[var(--accent)]/50 px-2 py-1 text-[8px] font-mono text-[var(--accent)] backdrop-blur-sm shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)] z-10">
-                          <Moon size={9} fill="currentColor" className="animate-pulse" />
-                          <span>
-                            {player.sleepTimerMode === 'end-of-track'
-                              ? 'END OF TRACK'
-                              : player.sleepTimerSeconds !== null && player.sleepTimerSeconds !== undefined
-                              ? `${Math.floor(player.sleepTimerSeconds / 60)}:${(player.sleepTimerSeconds % 60).toString().padStart(2, '0')}`
-                              : `${player.sleepTimer}M`}
-                          </span>
-                        </div>
+                    {/* Album art sleeve + optional emerging Vinyl LP disc */}
+                    <div className={`relative shrink-0 transition-transform duration-700 ease-out ${visualizerMode === 'vinyl' ? '-translate-x-7 sm:-translate-x-10' : ''}`}>
+                      {visualizerMode === 'vinyl' && (
+                        <VinylDiscVisualizer
+                          playing={player.playing}
+                          analyser={player.analyser}
+                          coverUrl={current?.coverUrl}
+                          variant="sleeve"
+                        />
                       )}
+                      <div 
+                        className="relative z-10 w-44 h-44 sm:w-52 sm:h-52 md:w-56 md:h-56 lg:w-60 lg:h-60 aspect-square border border-[var(--text-secondary)]/30 p-1 bg-black/60 backdrop-blur-sm shrink-0"
+                        style={{ boxShadow: `0 0 25px rgba(var(--accent-rgb), 0.25), 0 0 60px rgba(var(--accent-rgb), 0.1), inset 0 0 15px rgba(var(--accent-rgb), 0.05)` }}
+                      >
+                        {/* Decorative corner accents for cover */}
+                        <div className="absolute -top-1 -left-1 w-2 h-2 border-t border-l border-[var(--accent)]"></div>
+                        <div className="absolute -bottom-1 -right-1 w-2 h-2 border-b border-r border-[var(--accent)]"></div>
+                        <div className="absolute -top-1 -right-1 w-2 h-2 border-t border-r border-[var(--accent)]"></div>
+                        <div className="absolute -bottom-1 -left-1 w-2 h-2 border-b border-l border-[var(--accent)]"></div>
+
+                        <img
+                          ref={coverImgRef}
+                          src={current?.coverUrl || '/default-cover.png'}
+                          alt={current?.title || 'Unknown Track'}
+                          className={`w-full h-full object-cover transition-all duration-500 ease-out ${coverFading ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}
+                        />
+                        {/* Sleep Timer Badge */}
+                        {player.sleepTimer !== null && (
+                          <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/80 border border-[var(--accent)]/50 px-2 py-1 text-[8px] font-mono text-[var(--accent)] backdrop-blur-sm shadow-[0_0_8px_rgba(var(--accent-rgb),0.3)] z-10">
+                            <Moon size={9} fill="currentColor" className="animate-pulse" />
+                            <span>
+                              {player.sleepTimerMode === 'end-of-track'
+                                ? 'END OF TRACK'
+                                : player.sleepTimerSeconds !== null && player.sleepTimerSeconds !== undefined
+                                ? `${Math.floor(player.sleepTimerSeconds / 60)}:${(player.sleepTimerSeconds % 60).toString().padStart(2, '0')}`
+                                : `${player.sleepTimer}M`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Cover Art Reflection */}

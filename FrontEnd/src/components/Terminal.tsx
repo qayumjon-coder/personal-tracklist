@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 
 type ThemeType = "aqua" | "green" | "amber" | "pink" | "red" | "neon" | "toxic" | "sunset" | "matrix";
-type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "aurora" | "off";
+type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "aurora" | "stars" | "hex" | "vinyl" | "off";
 
 interface TerminalProps {
   isVisible: boolean;
@@ -79,7 +79,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
         addHistory('response', '  prev            - Skip to previous track');
         addHistory('response', '  vol <0-100>     - Set volume level');
         addHistory('response', '  theme <name>    - Change theme (aqua, green, amber, pink, red, neon, toxic, sunset, matrix)');
-        addHistory('response', '  vis <mode>      - Change visualizer (bars, wave, multiwave, aurora, stars, fade, scale, off)');
+        addHistory('response', '  vis <mode>      - Change visualizer (bars, wave, multiwave, aurora, stars, hex, vinyl, fade, scale, off)');
         addHistory('response', '  zen             - Toggle Zen Mode (Focus Mode)');
         addHistory('response', '  matrix          - Toggle Matrix background rain');
         addHistory('response', '  ls / list       - List all songs in the current playlist');
@@ -146,7 +146,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
         if (args.length === 0) {
           addHistory('error', 'Please specify a visualizer mode.');
         } else {
-          const validVis = ["bars", "wave", "multiwave", "fade", "scale", "aurora", "stars", "off"];
+          const validVis = ["bars", "wave", "multiwave", "fade", "scale", "aurora", "stars", "hex", "vinyl", "off"];
           if (validVis.includes(args[0].toLowerCase())) {
             setVisualizerMode(args[0].toLowerCase() as VisualizerMode);
             addHistory('response', `Visualizer mode changed to '${args[0].toLowerCase()}'.`);
@@ -285,7 +285,7 @@ export function Terminal({ isVisible, player, songs, onClose, onSystemCrash }: T
     } else if (e.key === ' ') {
       const commands = ['play', 'pause', 'next', 'prev', 'vol', 'theme', 'vis', 'zen', 'matrix', 'ls', 'list', 'nowplaying', 'np', 'clear', 'exit', 'quit', 'sudo rm -rf /'];
       const themes = ["aqua", "green", "amber", "pink", "red", "neon", "toxic", "sunset", "matrix"];
-      const visModes = ["bars", "wave", "multiwave", "fade", "scale", "aurora", "off"];
+      const visModes = ["bars", "wave", "multiwave", "fade", "scale", "aurora", "stars", "hex", "vinyl", "off"];
       
       const parts = input.split(' ');
       if (parts.length === 1) {

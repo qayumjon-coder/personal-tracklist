@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 type Theme = "aqua" | "green" | "amber" | "pink" | "red" | "neon" | "toxic" | "sunset" | "matrix";
 type Language = "en" | "uz";
-type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "aurora" | "stars" | "hex" | "off";
+type VisualizerMode = "bars" | "wave" | "multiwave" | "fade" | "scale" | "aurora" | "stars" | "hex" | "vinyl" | "off";
 
 interface SettingsContextType {
   theme: Theme;
@@ -80,6 +80,7 @@ const translations: Record<Language, Record<string, string>> = {
     bars: "BARS",
     wave: "WAVE",
     stars: "STARS",
+    vinyl: "VINYL",
     off: "OFF",
     matrix_bg: "MATRIX RAIN",
     // Settings subtitles & controls
@@ -185,6 +186,7 @@ const translations: Record<Language, Record<string, string>> = {
     bars: "USTUNLAR",
     wave: "TO'LQIN",
     stars: "YULDUZLAR",
+    vinyl: "PLASTINKA",
     off: "O'CHIK",
     matrix_bg: "MATRITSA YOMG'IRI",
     // Settings subtitles & controls

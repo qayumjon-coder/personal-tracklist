@@ -241,11 +241,12 @@ export function Settings({ isOpen, onClose }: SettingsProps) {
                     <span className="text-[9px] text-[var(--text-secondary)]/60 tracking-wider">{t('visual_engine_sub')}</span>
                   </div>
                   <div className="grid grid-cols-3 border border-[var(--text-secondary)]/20 divide-x divide-y divide-[var(--text-secondary)]/20 font-mono">
-                    {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale', 'aurora', 'stars', 'hex']).map((mode) => (
+                    {(['off', 'bars', 'wave', 'multiwave', 'fade', 'scale', 'aurora', 'stars', 'hex', 'vinyl'] as const).map((mode) => (
                       <button
                         key={mode}
-                        onClick={() => setVisualizerMode(mode as any)}
-                        className={`px-1 py-2 text-[8px] sm:text-[9px] font-bold tracking-tighter uppercase transition-colors ${visualizerMode === mode ? 'bg-[var(--text-primary)] text-black' : 'text-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/5'}`}
+                        type="button"
+                        onClick={() => setVisualizerMode(mode)}
+                        className={`px-1 py-2 text-[8px] sm:text-[9px] font-bold tracking-tighter uppercase transition-colors ${mode === 'off' ? 'col-span-3 ' : ''}${visualizerMode === mode ? 'bg-[var(--text-primary)] text-black' : 'text-[var(--text-secondary)] hover:bg-[var(--text-secondary)]/5'}`}
                       >
                         {mode === 'hex' ? 'HEX GRID' : t(mode)}
                       </button>

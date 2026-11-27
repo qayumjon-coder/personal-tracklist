@@ -5,9 +5,10 @@ interface VisualizerProps {
   playing: boolean;
   analyser?: AnalyserNode | null;
   position?: 'center' | 'bottom';
+  coverUrl?: string;
 }
 
-export function Visualizer({ playing, analyser, position = 'center' }: VisualizerProps) {
+export function Visualizer({ playing, analyser, position = 'center', coverUrl }: VisualizerProps) {
   const { visualizerMode, theme } = useSettings();
   const accentColorRef = useRef('#00E5FF');
   const accentRgbRef = useRef('0, 255, 255');
@@ -851,6 +852,12 @@ export function Visualizer({ playing, analyser, position = 'center' }: Visualize
 
   if (visualizerMode === 'off' || visualizerMode === 'fade' || visualizerMode === 'scale') return null;
 
+  if (visualizerMode === 'vinyl') {
+    return position === 'center' ? (
+      <VinylDiscVisualizer playing={playing} analyser={analyser} coverUrl={coverUrl} variant="zen" />
+    ) : null;
+  }
+
   if (visualizerMode === 'wave' || visualizerMode === 'multiwave' || visualizerMode === 'aurora' || visualizerMode === 'stars' || visualizerMode === 'hex') {
     return (
       <canvas 
@@ -1249,5 +1256,142 @@ export function ConcentricWavesVisualizer({ playing, analyser }: VisualizerProps
       className="absolute inset-0 w-full h-full pointer-events-none mix-blend-screen opacity-80"
       style={{ zIndex: 0 }}
     />
+  );
+}
+
+interface VinylDiscVisualizerProps {
+  playing: boolean;
+  analyser?: AnalyserNode | null;
+  coverUrl?: string;
+  variant?: 'sleeve' | 'zen';
+}
+
+export function VinylDiscVisualizer({ playing, analyser, coverUrl, variant = 'sleeve' }: VinylDiscVisualizerProps) {
+  const discGlowRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number | null>(null);
+  const [reducedMotion, setReducedMotion] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Subtle bass-reactive halo pulse on the vinyl rim without triggering React re-renders
+  useEffect(() => {
+    const bufferLength = analyser ? analyser.frequencyBinCount : 0;
+    const dataArray = new Uint8Array(bufferLength);
+    let smoothBass = 0;
+
+    const animate = () => {
+      if (document.hidden) {
+        if (playing) animationRef.current = requestAnimationFrame(animate);
+        return;
+      }
+
+      let rawBass = 0;
+      if (playing && analyser && bufferLength > 0) {
+        analyser.getByteFrequencyData(dataArray);
+        const bassBins = Math.max(4, Math.floor(bufferLength * 0.12));
+        let sum = 0;
+        for (let i = 0; i < bassBins; i++) sum += dataArray[i] || 0;
+        rawBass = sum / (bassBins * 255);
+      }
+
+      smoothBass += (rawBass - smoothBass) * (rawBass > smoothBass ? 0.35 : 0.08);
+
+      if (discGlowRef.current) {
+        const glowAlpha = (0.12 + smoothBass * 0.36).toFixed(3);
+        const spread = Math.round(14 + smoothBass * 28);
+        discGlowRef.current.style.boxShadow = `0 0 ${spread}px rgba(var(--accent-rgb), ${glowAlpha}), inset 0 0 18px rgba(0, 0, 0, 0.9)`;
+      }
+
+      if (playing && !reducedMotion) {
+        animationRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    animate();
+    return () => {
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+    };
+  }, [playing, analyser, reducedMotion]);
+
+  const wrapperClass =
+    variant === 'sleeve'
+      ? `absolute top-1/2 -translate-y-1/2 right-0 w-[92%] h-[92%] z-0 pointer-events-none transition-transform duration-700 ease-out ${
+          playing ? 'translate-x-[48%]' : 'translate-x-[22%]'
+        }`
+      : 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 sm:w-80 sm:h-80 pointer-events-none opacity-65';
+
+  return (
+    <div className={wrapperClass} aria-hidden="true">
+      {/* Bass-reactive outer disc container */}
+      <div
+        ref={discGlowRef}
+        className="relative w-full h-full rounded-full bg-[#09090b] border border-white/15 overflow-hidden"
+        style={{
+          boxShadow: '0 0 14px rgba(var(--accent-rgb), 0.12), inset 0 0 18px rgba(0, 0, 0, 0.9)',
+        }}
+      >
+        {/* Spinning grooved vinyl surface */}
+        <div
+          className="w-full h-full rounded-full animate-spin flex items-center justify-center"
+          style={{
+            animationDuration: '4.5s',
+            animationPlayState: playing && !reducedMotion ? 'running' : 'paused',
+            background: `
+              repeating-radial-gradient(
+                circle at center,
+                rgba(255, 255, 255, 0.03) 0px,
+                rgba(255, 255, 255, 0.03) 1px,
+                rgba(10, 10, 12, 0.96) 2px,
+                rgba(10, 10, 12, 0.96) 4.5px
+              )
+            `,
+          }}
+        >
+          {/* Outer vinyl edge groove ring */}
+          <div className="absolute inset-2 rounded-full border border-white/10 pointer-events-none" />
+          <div className="absolute inset-6 rounded-full border border-white/[0.04] pointer-events-none" />
+
+          {/* Center record label with track cover art */}
+          <div className="relative w-[38%] h-[38%] rounded-full overflow-hidden border-2 border-zinc-900 ring-1 ring-white/20 shadow-inner bg-zinc-950 flex items-center justify-center">
+            <img
+              src={coverUrl || '/default-cover.png'}
+              alt=""
+              className="w-full h-full object-cover opacity-90"
+            />
+            {/* Inner ring + center spindle hole */}
+            <div className="absolute inset-0 rounded-full border border-black/40" />
+            <div className="absolute w-3.5 h-3.5 rounded-full bg-[#070709] border border-white/30 shadow-inner" />
+          </div>
+        </div>
+
+        {/* Stationary diagonal light reflection sheen over spinning grooves */}
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none mix-blend-screen opacity-25"
+          style={{
+            background:
+              'conic-gradient(from 35deg, transparent 0deg, rgba(255,255,255,0.22) 22deg, transparent 52deg, transparent 180deg, rgba(255,255,255,0.18) 202deg, transparent 235deg)',
+          }}
+        />
+      </div>
+
+      {/* Minimalist metallic tonearm pivoting onto vinyl when playing */}
+      {variant === 'sleeve' && (
+        <div
+          className={`hidden sm:block absolute -top-3 -right-3 w-4 h-4 rounded-full bg-zinc-800 border border-white/30 shadow-md transition-transform duration-700 ease-out origin-center ${
+            playing ? 'rotate-[24deg]' : '-rotate-[6deg]'
+          }`}
+        >
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 w-[2px] h-14 md:h-16 bg-gradient-to-b from-zinc-300 via-zinc-400 to-zinc-500 rounded-full origin-top" />
+          <div className="absolute top-[54px] md:top-[62px] left-1/2 -translate-x-1/2 w-2 h-3 bg-[var(--accent)]/85 border border-white/40 rounded-[1px]" />
+        </div>
+      )}
+    </div>
   );
 }
